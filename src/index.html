@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" class="dark" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <title>KARMA OS | Mission Control</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;family=Inter:wght@400;500&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "primary": "#c3f5ff",
+            "on-secondary-container": "#ddcdff",
+            "background": "#0d1320",
+            "secondary": "#d1bcff",
+            "surface-container": "#19202c",
+            "on-surface": "#dce2f4",
+            "primary-container": "#00e5ff",
+            "surface-variant": "#2e3542",
+            "outline-variant": "#3b494c",
+            "surface-dim": "#0d1320",
+            "on-background": "#dce2f4",
+            "tertiary": "#ffe9db",
+            "inverse-primary": "#006875"
+          },
+          "fontFamily": {
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-mono": ["Space Grotesk"],
+            "body-sm": ["Inter"],
+            "data-num": ["Space Grotesk"],
+            "display-lg": ["Plus Jakarta Sans"]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="text-on-surface font-body-sm bg-background min-h-screen">
+  <app-root></app-root>
+</body>
+</html>

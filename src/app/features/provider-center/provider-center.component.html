@@ -1,0 +1,177 @@
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+  <!-- Title / Controls Header -->
+  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">key</span>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-none">AI Provider Configurations</h2>
+        <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-1 block">Establish API key connections and check engine latencies</span>
+      </div>
+    </div>
+    
+    <div class="flex gap-2">
+      <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="showAddProvider = true">
+        <span class="material-symbols-outlined text-sm">add</span> Add Provider
+      </button>
+      <button class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer" (click)="loadProviders()" [disabled]="loading">
+        <span class="material-symbols-outlined text-sm">sync</span> Sync Connectors
+      </button>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="flex-grow flex flex-col items-center justify-center gap-3">
+      <div class="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs text-on-surface-variant uppercase font-mono tracking-widest animate-pulse">Scanning Connectors...</span>
+    </div>
+  }
+
+  <!-- Provider Grid -->
+  @if (!loading) {
+    <div class="flex-grow overflow-y-auto no-scrollbar pb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        @for (provider of providers; track provider.id) {
+          <div class="lightning-panel rounded-xl p-5 flex flex-col justify-between gap-4 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25 hover:border-primary/45 transition-colors">
+            <!-- Provider Card Header -->
+            <div class="flex justify-between items-start">
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0.5">{{ provider.name }}</h4>
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider">{{ provider.provider_type }}</span>
+              </div>
+              
+              <div class="flex items-center gap-1.5 bg-white/5 border border-outline-variant/30 px-2.5 py-0.5 rounded-full">
+                <span class="w-2 h-2 rounded-full" 
+                  [class]="provider.status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : provider.status === 'error' ? 'bg-red-500' : 'bg-white/20'"></span>
+                <span class="text-[9px] font-bold uppercase tracking-wider"
+                  [class]="provider.status === 'connected' ? 'text-green-400' : provider.status === 'error' ? 'text-red-400' : 'text-on-surface-variant'">
+                  {{ provider.status }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Associated Models -->
+            <div class="space-y-1 mt-1">
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase block">Available Models</span>
+              <div class="flex flex-wrap gap-1.5">
+                @for (model of provider.models; track model) {
+                  <span class="px-2 py-0.5 rounded border border-[#00e5ff]/20 bg-[#00e5ff]/5 text-[9px] font-mono text-primary-container">
+                    {{ model }}
+                  </span>
+                }
+              </div>
+            </div>
+
+            <!-- Health & Connection Metrics -->
+            <div class="grid grid-cols-3 gap-2 py-2 border-y border-outline-variant/20 text-center bg-white/5 rounded-lg">
+              <div>
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Latency</span>
+                <span class="text-xs font-bold text-on-surface">{{ healthData.get(provider.id)?.latency_ms ?? '—' }}ms</span>
+              </div>
+              <div>
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Error Rate</span>
+                <span class="text-xs font-bold text-on-surface" [class.text-red-400]="(healthData.get(provider.id)?.error_rate ?? 0) > 0">
+                  {{ healthData.get(provider.id)?.error_rate ?? '—' }}%
+                </span>
+              </div>
+              <div>
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Usage/hr</span>
+                <span class="text-xs font-bold text-on-surface">{{ healthData.get(provider.id)?.requests_last_hour ?? '—' }}</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2.5 mt-1">
+              <button class="flex-grow px-3 py-1.5 bg-gradient-to-r from-primary/10 to-secondary/10 hover:from-primary/25 hover:to-secondary/25 border border-primary/30 text-on-surface text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer" (click)="openConfig(provider)">
+                <span class="material-symbols-outlined text-sm">settings</span> Configure API Key
+              </button>
+              <button class="px-3 py-1.5 bg-white/5 border border-outline-variant/30 hover:bg-white/10 text-on-surface-variant text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer" (click)="testConnection(provider)" [disabled]="testing">
+                <span class="material-symbols-outlined text-sm">power</span> Test
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Add Provider Modal Overlay -->
+  @if (showAddProvider) {
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddProvider = false">
+      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+          <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Add AI Provider</h4>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddProvider = false">&times;</button>
+        </div>
+        
+        <div class="flex flex-col gap-4">
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Provider Name</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProvider.name" placeholder="OpenRouter API" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Provider Type / Endpoint Gateway</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProvider.provider_type" placeholder="OpenRouter Gateway" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Supported Models (comma-separated)</label>
+            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="modelInputString" rows="3" placeholder="meta-llama/llama-3.1-405b-instruct, qwen/qwen-2.5-72b-instruct"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showAddProvider = false">Cancel</button>
+          <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="addProvider()">Create Provider</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Config Modal Overlay -->
+  @if (selectedProvider) {
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="dismissModal()">
+      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+          <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Configure {{ selectedProvider.name }}</h4>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="dismissModal()">&times;</button>
+        </div>
+        
+        <div class="flex flex-col gap-4">
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Secret API Key</label>
+            <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="config.api_key" placeholder="sk-••••••••••••••••••••" />
+            <span class="text-[8px] text-on-surface-variant leading-relaxed">Enter your platform security token. API keys are stored securely inside localStorage.</span>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>
+            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="config.base_url" placeholder="https://api.openai.com/v1" />
+          </div>
+
+          @if (testResult) {
+            <div class="p-3 border rounded-xl text-xs flex items-start gap-2 animate-[pulse_3s_infinite]"
+              [class]="testResult.success ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'">
+              <span class="material-symbols-outlined text-sm mt-0.5">{{ testResult.success ? 'check_circle' : 'warning' }}</span>
+              <div>
+                <p class="font-bold mb-0.5">{{ testResult.success ? 'Test Successful' : 'Validation Failed' }}</p>
+                <p class="mb-0 text-[10px]">{{ testResult.message }}</p>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="dismissModal()">Cancel</button>
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 hover:bg-white/10 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer" (click)="testConnection(selectedProvider)" [disabled]="testing">
+            @if (testing) {
+              <span class="w-3.5 h-3.5 border-2 border-on-surface border-t-transparent rounded-full animate-spin"></span>
+              <span>Testing...</span>
+            } @else {
+              <span class="material-symbols-outlined text-sm">power</span>
+              <span>Test Connection</span>
+            }
+          </button>
+          <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="saveConfig()">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

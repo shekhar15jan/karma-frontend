@@ -1,0 +1,688 @@
+<div class="grid grid-cols-[300px_1fr_310px] gap-6 h-full w-full overflow-hidden select-none">
+  <!-- LEFT COLUMN -->
+  <section class="flex flex-col gap-6 overflow-hidden">
+    <!-- Active Mission -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3">
+      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+      @if (activeMission) {
+        <div class="flex gap-3 items-start mt-1">
+          <div class="w-12 h-12 bg-primary/10 rounded border border-[#00e5ff]/30 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-primary-container">description</span>
+          </div>
+          <div class="space-y-1 min-w-0">
+            <p class="text-[13px] font-bold text-on-surface mb-0 truncate" [title]="activeMission.name">{{ activeMission.name }}</p>
+            <p class="text-[10px] text-on-surface-variant font-label-mono uppercase mb-0">{{ activeMission.missionType || 'Standard Mission' }}</p>
+            <p class="text-[9px] text-on-surface-variant mb-0">Created: {{ activeMission.formattedDate || 'Just now' }}</p>
+          </div>
+        </div>
+        <div class="space-y-2 mt-2">
+          <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+            <!-- Simulated progress based on status -->
+            <div class="bg-[#00e5ff] h-full shadow-[0_0_10px_#00e5ff]" [style.width]="activeMission.status === 'COMPLETED' ? '100%' : '72%'"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-on-surface-variant font-label-mono">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400' : 'bg-[#00e5ff]'"></span>
+              <span>Status: {{ activeMission.status }}</span>
+            </div>
+            <span>{{ activeMission.status === 'COMPLETED' ? '100%' : '72%' }}</span>
+          </div>
+        </div>
+      } @else {
+        <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
+          <span class="material-symbols-outlined text-[32px] opacity-50">flight_takeoff</span>
+          <p class="text-[11px] mb-0">No active missions found</p>
+          <button (click)="showToast('Mission planner coming soon', 'add')" class="mt-2 text-[10px] px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded cursor-pointer hover:bg-primary/30 transition-colors">Start Mission</button>
+        </div>
+      }
+    </div>
+
+    <!-- Agents -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 overflow-hidden">
+      <div class="flex justify-between items-center">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Agents</h3>
+        <button (click)="openModal('agents')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
+      </div>
+      <div class="space-y-1 overflow-y-auto no-scrollbar max-h-[300px]">
+        @for (agent of (agentStatusList.length > 0 ? agentStatusList : defaultAgents); track agent.name) {
+          <div class="flex items-center gap-3 p-1.5 hover:bg-white/5 rounded-lg border transition-colors" [class]="agent.borderClass || 'border-transparent'">
+            <div class="w-7 h-7 rounded-full border border-primary/20 flex items-center justify-center bg-white/5 shrink-0" [class]="agent.pulseClass">
+              <span class="material-symbols-outlined text-[14px]" [class]="agent.colorClass || 'text-on-surface-variant'">{{ agent.icon || 'smart_toy' }}</span>
+            </div>
+            <span class="text-[11px] flex-grow text-on-surface">{{ agent.name }}</span>
+            <div class="flex items-center gap-2">
+              @if (agent.status === 'Ready' || agent.status === 'Healthy') {
+                <svg class="w-8 h-3 text-green-400" viewBox="0 0 40 15"><path d="M0 7.5 Q5 2.5 10 7.5 T20 7.5 T30 7.5 T40 7.5" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
+              } @else if (agent.status === 'Offline') {
+                <span class="material-symbols-outlined text-[12px] text-red-400">error</span>
+              } @else {
+                <span class="material-symbols-outlined text-[10px] animate-spin inline-block text-on-surface-variant">sync</span>
+              }
+              <span class="text-[9px] font-bold" 
+                    [ngClass]="agent.status === 'Ready' || agent.status === 'Healthy' ? 'text-green-400' : (agent.status === 'Offline' ? 'text-red-400' : 'text-on-surface-variant')">
+                {{ agent.status }}
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- AI Providers -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">AI Providers</h3>
+        <button (click)="openModal('providers')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-primary/20">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-primary">psychology</span>
+            <span class="text-[10px]">OpenAI GPT-4o</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-green-400 font-bold">• Online</span>
+            <span class="px-1.5 py-0.5 bg-primary text-background text-[8px] rounded font-bold uppercase">Primary</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-secondary">smart_toy</span>
+            <span class="text-[10px]">Claude 3.5 Sonnet</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-green-400 font-bold">• Online</span>
+            <span class="px-1.5 py-0.5 bg-secondary/20 text-secondary text-[8px] rounded font-bold uppercase">Backup</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-blue-400">google</span>
+            <span class="text-[10px]">Google Gemini 1.5</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-green-400 font-bold">• Online</span>
+            <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-orange-500">bolt</span>
+            <span class="text-[10px]">Groq Llama 3 70B</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-green-400 font-bold">• Online</span>
+            <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[14px] text-on-surface-variant">token</span>
+            <span class="text-[10px]">Anthropic Claude</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[8px] text-green-400 font-bold">• Online</span>
+            <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CENTER AREA -->
+  <section class="flex flex-col gap-6 overflow-hidden">
+    <!-- Flows Pipeline -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Flows</h3>
+        <div class="flex items-center gap-2">
+          <button (click)="toggleDiagnosticsSidebar()" class="text-[9px] flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors bg-green-400/10 border border-green-400/30 px-2 py-0.5 rounded cursor-pointer">
+            <span class="material-symbols-outlined text-[12px] animate-pulse">sensors</span> Diagnostics
+          </button>
+          <button (click)="openModal('flows')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between px-4 w-full overflow-x-auto no-scrollbar">
+        @if (flowsList && flowsList.length > 0) {
+          @for (flow of flowsList; track flow.id; let last = $last) {
+            <div class="flex flex-col items-center gap-2 shrink-0 w-20">
+              <div class="w-10 h-10 rounded-full border flex items-center justify-center transition-colors"
+                   [ngClass]="{'border-green-400 bg-green-400/10 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.2)]': flow.status === 'COMPLETED', 'border-[#00e5ff] bg-[#00e5ff]/10 text-[#00e5ff] animate-pulse shadow-[0_0_15px_rgba(0,229,255,0.4)]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'border-outline-variant bg-white/5 opacity-50 text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">
+                <span class="material-symbols-outlined text-[20px]">{{ flow.icon || 'account_tree' }}</span>
+              </div>
+              <span class="text-[8px] uppercase font-label-mono text-on-surface text-center leading-tight">{{ flow.name }}</span>
+              <span class="text-[8px] font-bold uppercase" [ngClass]="{'text-green-400': flow.status === 'COMPLETED', 'text-[#00e5ff]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flow.status || 'PENDING' }}</span>
+            </div>
+            @if (!last) {
+              <div class="h-[1.5px] flex-grow min-w-[10px] mx-1 transition-colors" [ngClass]="flow.status === 'COMPLETED' ? 'bg-green-400' : (flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE' ? 'bg-[#00e5ff]' : 'bg-white/10')"></div>
+            }
+          }
+        } @else {
+          <div class="w-full text-center py-6 text-on-surface-variant flex flex-col items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-[24px] opacity-50">account_tree</span>
+            <span class="text-[11px]">No workflows running</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Central Hub (Karma Core) -->
+    <div class="flex-grow relative flex items-center justify-center overflow-visible py-4">
+      <div class="absolute inset-0 pointer-events-none" id="connection-lines-container"></div>
+      <div class="relative w-[520px] h-[520px] flex items-center justify-center">
+        <!-- Concentric HUD Rings (SVG for precision) -->
+        <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 520 520">
+          <circle cx="260" cy="260" fill="none" opacity="0.15" r="160" stroke="#00e5ff" stroke-dasharray="4 4" stroke-width="1"></circle>
+          <circle cx="260" cy="260" fill="none" opacity="0.1" r="210" stroke="#00e5ff" stroke-dasharray="2 6" stroke-width="1"></circle>
+        </svg>
+        <!-- Orbital Nodes Container -->
+        <div class="absolute inset-0" id="nodes-container">
+          <!-- Research (Top - 270deg) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]">
+                <span class="material-symbols-outlined text-green-400">search</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">RESEARCH</p>
+              <span class="text-[8px] text-green-400 font-bold">100%</span>
+            </div>
+          </div>
+          <!-- Script (45deg - Top Right) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+                <span class="material-symbols-outlined text-green-400">description</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SCRIPT</p>
+              <span class="text-[8px] text-green-400 font-bold">100%</span>
+            </div>
+          </div>
+          <!-- Blog (Right - 0deg) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+                <span class="material-symbols-outlined text-green-400">feed</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">BLOG</p>
+              <span class="text-[8px] text-green-400 font-bold">100%</span>
+            </div>
+          </div>
+          <!-- SEO (135deg - Bottom Right) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+                <span class="material-symbols-outlined text-green-400">bar_chart</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SEO</p>
+              <span class="text-[8px] text-green-400 font-bold">100%</span>
+            </div>
+          </div>
+          <!-- Karma Core (Center) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 260px; z-index: 10;">
+            <div class="w-32 h-32 rounded-full lightning-panel flex flex-col items-center justify-center transition-all duration-300 relative"
+                 [ngClass]="isKarmaSpeaking ? 'border-[#00e5ff] shadow-[0_0_80px_rgba(0,229,255,0.8)] scale-110 animate-pulse' : 'border-primary shadow-[0_0_40px_rgba(0,229,255,0.3)]'">
+              <!-- Inner Core -->
+              <div class="absolute inset-0 m-2 rounded-full border border-[#00e5ff]/50 flex items-center justify-center transition-all duration-300"
+                   [ngClass]="isKarmaSpeaking ? 'bg-[#00e5ff]/20' : 'bg-[#00e5ff]/5'">
+                <span class="font-display font-black text-[#00e5ff] tracking-widest text-[16px] uppercase leading-tight text-center glow-text shadow-glow transition-all duration-300"
+                      [ngClass]="{'opacity-100': isKarmaSpeaking, 'opacity-90': !isKarmaSpeaking}">KARMA<br>CORE</span>
+              </div>
+            </div>
+          </div>
+          <!-- Voice (Bottom - 90deg) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-secondary shadow-[0_0_15px_rgba(209,188,255,0.3)]">
+                <span class="material-symbols-outlined text-secondary">mic</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VOICE</p>
+              <span class="text-[8px] text-secondary font-bold">Generating</span>
+            </div>
+          </div>
+          <!-- Video (225deg - Bottom Left) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-primary-container shadow-[0_0_15_rgba(0,229,255,0.3)]">
+                <span class="material-symbols-outlined text-primary-container">videocam</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VIDEO</p>
+              <span class="text-[8px] text-primary-container font-bold">Rendering 45%</span>
+            </div>
+          </div>
+          <!-- Thumbnail (Left - 180deg) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-outline-variant/50">
+                <span class="material-symbols-outlined text-on-surface-variant">grid_view</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">THUMBNAIL</p>
+              <span class="text-[8px] text-on-surface-variant font-bold">Pending</span>
+            </div>
+          </div>
+          <!-- Image (315deg - Top Left) -->
+          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
+            <div class="flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.3)]">
+                <span class="material-symbols-outlined text-orange-400">image</span>
+              </div>
+              <p class="text-[9px] mt-1 font-bold uppercase mb-0">IMAGE</p>
+              <span class="text-[8px] text-orange-400 font-bold">Generating 8/12</span>
+            </div>
+          </div>
+        </div>
+        <!-- Core Hub -->
+        <div class="relative z-10 w-52 h-52 rounded-full bg-gradient-to-br from-[#00e5ff]/20 via-background to-secondary/20 border border-[#00e5ff]/40 shadow-[0_0_120px_rgba(0,229,255,0.3)] flex flex-col items-center justify-center">
+          <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 rounded-full"></div>
+          <div class="w-36 h-36 rounded-full border-2 border-[#00e5ff]/30 flex items-center justify-center animate-[pulse_4s_infinite]">
+            <div class="text-center">
+              <h2 class="text-headline-md font-bold tracking-[0.2em] text-on-surface mb-0 leading-none">KARMA</h2>
+              <h3 class="text-[12px] font-bold tracking-[0.5em] text-[#00e5ff] mb-0 mt-1">CORE</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT COLUMN -->
+  <section class="flex flex-col gap-6 overflow-hidden">
+    <!-- System Status -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-4">
+      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">System Status</h3>
+      <div class="flex gap-4">
+        <div class="space-y-1.5 flex-grow">
+          <!-- Original System Health Indicators -->
+          <div class="flex justify-between items-center text-[10px]">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary">emergency</span><span>Core System</span></div>
+            <span class="font-bold flex items-center gap-1" [ngClass]="{'text-green-400': systemHealth.core === 'Healthy', 'text-on-surface-variant': systemHealth.core === 'Checking...', 'text-red-500': systemHealth.core === 'ERROR'}">
+              @if (systemHealth.core === 'Checking...') { <span class="material-symbols-outlined text-[10px] animate-spin inline-block">sync</span> }
+              {{ systemHealth.core }}
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[10px]">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary">cloud_done</span><span>AI Providers</span></div>
+            <span class="font-bold flex items-center gap-1" [ngClass]="{'text-green-400': systemHealth.providers === 'Healthy', 'text-on-surface-variant': systemHealth.providers === 'Checking...', 'text-red-500': systemHealth.providers === 'ERROR'}">
+              @if (systemHealth.providers === 'Checking...') { <span class="material-symbols-outlined text-[10px] animate-spin inline-block">sync</span> }
+              {{ systemHealth.providers }}
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[10px]">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary">dns</span><span>MCP Servers</span></div>
+            <span class="font-bold flex items-center gap-1" [ngClass]="{'text-green-400': systemHealth.mcp === 'Healthy', 'text-on-surface-variant': systemHealth.mcp === 'Checking...', 'text-red-500': systemHealth.mcp === 'ERROR'}">
+              @if (systemHealth.mcp === 'Checking...') { <span class="material-symbols-outlined text-[10px] animate-spin inline-block">sync</span> }
+              {{ systemHealth.mcp }}
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[10px]">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary">smart_toy</span><span>Agent Runtime</span></div>
+            <span class="font-bold flex items-center gap-1" [ngClass]="{'text-green-400': systemHealth.runtime === 'Healthy', 'text-on-surface-variant': systemHealth.runtime === 'Checking...', 'text-red-500': systemHealth.runtime === 'ERROR'}">
+              @if (systemHealth.runtime === 'Checking...') { <span class="material-symbols-outlined text-[10px] animate-spin inline-block">sync</span> }
+              {{ systemHealth.runtime }}
+            </span>
+          </div>
+          <div class="flex justify-between items-center text-[10px]">
+            <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary">record_voice_over</span><span>Voice Engine</span></div>
+            <span class="font-bold flex items-center gap-1" [ngClass]="{'text-green-400': systemHealth.voice === 'Healthy', 'text-on-surface-variant': systemHealth.voice === 'Checking...', 'text-red-500': systemHealth.voice === 'ERROR'}">
+              @if (systemHealth.voice === 'Checking...') { <span class="material-symbols-outlined text-[10px] animate-spin inline-block">sync</span> }
+              {{ systemHealth.voice }}
+            </span>
+          </div>
+
+        </div>
+        
+        <!-- Hardware Diagnostics (Replaces HUD Cube) -->
+        <div class="w-32 shrink-0 flex flex-col justify-center gap-2">
+          <!-- CPU panel -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase flex items-center gap-1"><span class="material-symbols-outlined text-[10px] text-primary">memory</span> CPU</span>
+              <span class="text-[10px] font-bold text-primary">{{ cpuLoad | number:'1.0-0' }}%</span>
+            </div>
+            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30">
+              <div class="bg-primary h-full transition-all duration-500 shadow-[0_0_8px_rgba(0,229,255,0.5)]" [style.width.%]="cpuLoad"></div>
+            </div>
+          </div>
+
+          <!-- GPU panel -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase flex items-center gap-1"><span class="material-symbols-outlined text-[10px] text-[#00e5ff]">developer_board</span> GPU</span>
+              <span class="text-[10px] font-bold text-[#00e5ff]">{{ gpuLoad | number:'1.0-0' }}%</span>
+            </div>
+            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30">
+              <div class="bg-[#00e5ff] h-full transition-all duration-500 shadow-[0_0_8px_rgba(0,229,255,0.5)]" [style.width.%]="gpuLoad"></div>
+            </div>
+          </div>
+
+          <!-- Task Queue panel -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase flex items-center gap-1"><span class="material-symbols-outlined text-[10px] text-green-400">queue</span> PIPELINE</span>
+              <span class="text-[10px] font-bold text-green-400">{{ queueSize }}</span>
+            </div>
+            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30 flex gap-0.5">
+              <div class="bg-green-500/80 h-full w-1/3 shadow-[0_0_6px_rgba(74,222,128,0.5)]"></div>
+              <div class="bg-green-500/80 h-full w-1/3 shadow-[0_0_6px_rgba(74,222,128,0.5)]"></div>
+              <div class="bg-white/10 h-full w-1/3"></div>
+            </div>
+          </div>
+          
+          <button (click)="openModal('threads')" class="mt-1 flex items-center justify-center gap-1 w-full py-1 bg-white/5 border border-outline-variant/30 text-[9px] text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors rounded cursor-pointer">
+            <span class="material-symbols-outlined text-[12px]">account_tree</span> Threads
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Approvals -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden">
+      <div class="flex justify-between items-center">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Pending Approvals</h3>
+        <button (click)="openModal('approvals')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
+      </div>
+      <div class="space-y-2 overflow-y-auto no-scrollbar">
+        @if (pendingApprovals && pendingApprovals.length > 0) {
+          @for (approval of pendingApprovals; track approval.id) {
+            <div class="flex items-start gap-3 p-2 bg-white/5 rounded-lg border border-primary/10 transition-colors hover:bg-white/10">
+              <div class="w-10 h-10 rounded flex items-center justify-center shrink-0 border"
+                   [ngClass]="{'bg-red-600/20 border-red-500/30 text-red-500': approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT', 'bg-blue-600/20 border-blue-500/30 text-blue-400': approval.type === 'BLOG_POST' || approval.type === 'ARTICLE', 'bg-[#00e5ff]/20 border-[#00e5ff]/30 text-[#00e5ff]': approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN', 'bg-primary/20 border-primary/30 text-primary': !['VIDEO_SCRIPT','SCRIPT','BLOG_POST','ARTICLE','SOCIAL_POST','LINKEDIN'].includes(approval.type)}">
+                @if (approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT') { <span class="material-symbols-outlined text-[20px]">play_circle</span> }
+                @else if (approval.type === 'BLOG_POST' || approval.type === 'ARTICLE') { <span class="material-symbols-outlined text-[20px]">article</span> }
+                @else if (approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN') { <span class="text-[18px] font-bold flex items-center justify-center">in</span> }
+                @else { <span class="material-symbols-outlined text-[20px]">inventory_2</span> }
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="flex justify-between items-center"><p class="text-[10px] font-bold truncate mb-0" [title]="approval.title || approval.name">{{ approval.title || approval.name || 'Artifact Review' }}</p><span class="text-[8px] text-on-surface-variant">{{ approval.formattedDate || 'Just now' }}</span></div>
+                <div class="flex gap-1.5 mt-1.5">
+                  <button (click)="showToast('Reviewing ' + (approval.title || 'Artifact'), 'preview')" class="flex-grow py-1 bg-white/5 border border-primary/30 text-[9px] rounded hover:bg-primary/10 text-on-surface transition-colors cursor-pointer">Review</button>
+                  <button (click)="showToast('Approved ' + (approval.title || 'Artifact'), 'check_circle')" class="flex-grow py-1 bg-green-600/60 border border-green-500/40 text-[9px] rounded font-bold text-white transition-colors cursor-pointer hover:bg-green-500/80">Approve</button>
+                </div>
+              </div>
+            </div>
+          }
+        } @else {
+          <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
+            <span class="material-symbols-outlined text-[32px] opacity-50">fact_check</span>
+            <p class="text-[11px] mb-0 text-center px-4">No artifacts currently waiting for human approval.</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Voice Commands -->
+    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3">
+      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Voice Commands</h3>
+      <div class="flex items-center gap-3 py-1 border-b border-primary/20">
+        <div class="flex-grow overflow-hidden h-8">
+          <svg class="w-full h-full text-primary/60" viewBox="0 0 200 40">
+            <path d="M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <animate attributeName="d" dur="2s" repeatCount="indefinite" values="M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20; M0 20 Q5 35 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20; M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20"></animate>
+            </path>
+          </svg>
+        </div>
+        <div (click)="triggerVoiceCommand()" class="w-10 h-10 rounded-full border border-primary flex items-center justify-center bg-primary/10 hover:bg-primary/25 cursor-pointer shadow-[0_0_12px_#00e5ff] shrink-0 transition-colors">
+          <span class="material-symbols-outlined text-[20px] text-primary">mic</span>
+        </div>
+      </div>
+      <div class="text-[10px] font-mono text-primary-container uppercase tracking-wide py-1 text-center bg-white/5 border border-outline-variant/20 rounded-lg">
+        {{ heardCommand }}
+      </div>
+      <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] text-on-surface-variant font-medium">
+        <p class="mb-0">• "Wake up Karma"</p>
+        <p class="mb-0">• "Surprise Me Karma"</p>
+        <p class="mb-0">• "Run Research"</p>
+        <p class="mb-0">• "Generate Media"</p>
+        <p class="mb-0">• "Approve Script"</p>
+        <p class="mb-0">• "Publish Content"</p>
+        <p class="mb-0">• "Bye Bye Karma"</p>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<!-- Floating Right Sidebar for Live Diagnostics -->
+<div class="fixed top-16 right-0 bottom-0 w-[310px] z-40 transform transition-transform duration-300 ease-in-out p-4 flex flex-col"
+     [ngClass]="showDiagnosticsSidebar ? 'translate-x-0' : 'translate-x-full'">
+  <!-- Semi-transparent backdrop when open (optional, or just floating) -->
+  <div class="absolute inset-0 bg-background/80 backdrop-blur-md border-l border-outline-variant/30 z-0"></div>
+  
+  <div class="relative z-10 flex-grow flex flex-col pt-2 h-full">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0 flex items-center gap-2">
+        <span class="material-symbols-outlined text-[14px] text-green-400 animate-pulse">sensors</span>
+        System Diagnostics
+      </h3>
+      <button (click)="toggleDiagnosticsSidebar()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer p-0 text-[18px]">close</button>
+    </div>
+    
+    <div class="lightning-panel rounded-xl flex flex-col gap-2 p-3 bg-background/50 border border-outline-variant/20 flex-grow overflow-hidden">
+      <div class="flex-grow overflow-y-auto custom-scrollbar font-mono text-[10px] text-green-400 space-y-1.5 leading-relaxed px-2 py-2 select-text bg-[#0a0a0a] border border-[#00e5ff]/20 rounded shadow-[inset_0_0_10px_rgba(0,229,255,0.1)]">
+        @for (log of logs; track $index) {
+          <div class="border-b border-white/5 pb-1 mb-1 last:border-0 opacity-90 hover:opacity-100 transition-opacity">{{ log }}</div>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Overlay Modal -->
+@if (activeModal) {
+  <div class="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+    <!-- Click outside to close (invisible backdrop) -->
+    <div class="absolute inset-0 cursor-pointer" (click)="closeModal()"></div>
+    
+    <div class="bg-[#0f1418] border border-outline-variant/30 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-[600px] max-w-full max-h-[85vh] flex flex-col lightning-panel relative z-10 overflow-hidden transform-gpu animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Header -->
+      <div class="flex justify-between items-center px-6 py-4 border-b border-outline-variant/30 bg-white/5 shrink-0">
+        <h2 class="text-primary-container font-display tracking-widest text-[14px] uppercase glow-text mb-0 flex items-center gap-2">
+          @if (activeModal === 'agents') { <span class="material-symbols-outlined text-primary-container text-[18px]">smart_toy</span> Agent Directory }
+          @if (activeModal === 'providers') { <span class="material-symbols-outlined text-primary-container text-[18px]">dns</span> AI Providers Config }
+          @if (activeModal === 'flows') { <span class="material-symbols-outlined text-primary-container text-[18px]">account_tree</span> System Workflows }
+          @if (activeModal === 'approvals') { <span class="material-symbols-outlined text-primary-container text-[18px]">check_circle</span> Pending Approvals }
+          @if (activeModal === 'threads') { <span class="material-symbols-outlined text-primary-container text-[18px]">memory</span> Active Threads Pool }
+        </h2>
+        <button (click)="closeModal()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer">close</button>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="p-6 overflow-y-auto custom-scrollbar flex-grow space-y-4">
+        
+        <!-- Agents Modal Content -->
+        @if (activeModal === 'agents') {
+          <div class="grid grid-cols-2 gap-4">
+            @for (agent of (agentStatusList.length > 0 ? agentStatusList : defaultAgents); track agent.name) {
+              <div class="flex items-center gap-3 p-3 rounded-lg border bg-white/5 hover:bg-white/10 transition-colors cursor-pointer" [class]="agent.borderClass || 'border-outline-variant/30'">
+                <div class="w-10 h-10 rounded-full border border-primary/20 flex items-center justify-center bg-background shrink-0" [class]="agent.pulseClass">
+                  <span class="material-symbols-outlined text-[20px]" [class]="agent.colorClass || 'text-on-surface-variant'">{{ agent.icon || 'smart_toy' }}</span>
+                </div>
+                <div class="flex flex-col flex-grow">
+                  <span class="text-[12px] font-bold text-on-surface">{{ agent.name }}</span>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    @if (agent.status === 'Ready' || agent.status === 'Healthy') {
+                      <svg class="w-8 h-2 text-green-400" viewBox="0 0 40 15"><path d="M0 7.5 Q5 2.5 10 7.5 T20 7.5 T30 7.5 T40 7.5" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
+                    } @else if (agent.status === 'Offline') {
+                      <span class="material-symbols-outlined text-[10px] text-red-400">error</span>
+                    } @else {
+                      <span class="material-symbols-outlined text-[10px] animate-spin text-on-surface-variant">sync</span>
+                    }
+                    <span class="text-[9px] font-bold uppercase tracking-wider" 
+                          [ngClass]="agent.status === 'Ready' || agent.status === 'Healthy' ? 'text-green-400' : (agent.status === 'Offline' ? 'text-red-400' : 'text-on-surface-variant')">
+                      {{ agent.status }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Providers Modal Content -->
+        @if (activeModal === 'providers') {
+          <div class="space-y-3">
+            <div class="p-4 bg-white/5 rounded-lg border border-primary/30 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/50"><span class="material-symbols-outlined">psychology</span></div>
+                <div>
+                  <h4 class="text-on-surface font-bold text-[13px] mb-0">OpenAI GPT-4o</h4>
+                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 120ms • Used for Core Logic</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="px-2 py-1 bg-primary text-background text-[9px] rounded font-bold uppercase mb-1 inline-block">Primary Active</span>
+                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
+              </div>
+            </div>
+            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-secondary/20 text-secondary flex items-center justify-center border border-secondary/50"><span class="material-symbols-outlined">smart_toy</span></div>
+                <div>
+                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Claude 3.5 Sonnet</h4>
+                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 145ms • Used for Creative Writing</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="px-2 py-1 bg-secondary/20 text-secondary text-[9px] rounded font-bold uppercase mb-1 inline-block">Backup Active</span>
+                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
+              </div>
+            </div>
+            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-400/20 text-blue-400 flex items-center justify-center border border-blue-400/50"><span class="material-symbols-outlined">google</span></div>
+                <div>
+                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Google Gemini 1.5 Pro</h4>
+                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 130ms • Used for Large Context</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="px-2 py-1 bg-white/10 text-on-surface-variant text-[9px] rounded uppercase mb-1 inline-block">Failover</span>
+                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
+              </div>
+            </div>
+            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between opacity-60">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-orange-400/20 text-orange-400 flex items-center justify-center border border-orange-400/50"><span class="material-symbols-outlined">view_in_ar</span></div>
+                <div>
+                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Local Ollama (Llama 3)</h4>
+                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Local Server Unreachable</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="px-2 py-1 bg-white/10 text-on-surface-variant text-[9px] rounded uppercase mb-1 inline-block">Disabled</span>
+                <p class="text-red-400 text-[10px] font-bold mb-0">Offline</p>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Flows Modal Content -->
+        @if (activeModal === 'flows') {
+          <div class="space-y-4">
+            <div class="p-4 rounded-xl border border-green-400/30 bg-green-400/5">
+              <div class="flex justify-between items-center mb-3">
+                <h4 class="text-on-surface font-bold text-[13px] mb-0 flex items-center gap-2"><span class="material-symbols-outlined text-green-400">manage_search</span> Research Flow</h4>
+                <span class="px-2 py-1 bg-green-400/20 text-green-400 text-[9px] rounded font-bold uppercase">Completed</span>
+              </div>
+              <p class="text-[11px] text-on-surface-variant leading-relaxed">Agent has successfully gathered all trending news sources and validated factual accuracy against 3 independent knowledge bases.</p>
+            </div>
+            
+            <div class="p-4 rounded-xl border border-[#00e5ff]/40 bg-[#00e5ff]/10 relative overflow-hidden">
+              <div class="absolute inset-0 bg-gradient-to-r from-transparent via-[#00e5ff]/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+              <div class="flex justify-between items-center mb-3 relative z-10">
+                <h4 class="text-on-surface font-bold text-[13px] mb-0 flex items-center gap-2"><span class="material-symbols-outlined text-[#00e5ff]">movie</span> Media Generation Flow</h4>
+                <span class="px-2 py-1 bg-[#00e5ff]/20 text-[#00e5ff] text-[9px] rounded font-bold uppercase animate-pulse">In Progress</span>
+              </div>
+              <div class="w-full bg-background/50 h-1.5 rounded-full overflow-hidden mt-3 mb-2 relative z-10">
+                <div class="bg-[#00e5ff] h-full w-[72%] shadow-[0_0_10px_#00e5ff]"></div>
+              </div>
+              <p class="text-[10px] text-on-surface-variant relative z-10 text-right">Rendering frames (72%)</p>
+            </div>
+
+            <div class="p-4 rounded-xl border border-outline-variant/30 bg-white/5 opacity-70">
+              <div class="flex justify-between items-center mb-3">
+                <h4 class="text-on-surface font-bold text-[13px] mb-0 flex items-center gap-2"><span class="material-symbols-outlined text-on-surface-variant">publish</span> Publishing Flow</h4>
+                <span class="px-2 py-1 bg-white/10 text-on-surface-variant text-[9px] rounded font-bold uppercase">Queued</span>
+              </div>
+              <p class="text-[11px] text-on-surface-variant leading-relaxed">Waiting for Media Generation to complete before distributing to YouTube and LinkedIn.</p>
+            </div>
+          </div>
+        }
+
+        <!-- Approvals Modal Content -->
+        @if (activeModal === 'approvals') {
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 p-4 bg-white/5 rounded-xl border border-primary/20">
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded bg-red-600/20 flex items-center justify-center shrink-0 border border-red-500/30">
+                  <span class="material-symbols-outlined text-red-500 text-[24px]">play_circle</span>
+                </div>
+                <div class="flex-grow">
+                  <div class="flex justify-between items-center mb-1">
+                    <h4 class="text-[13px] font-bold text-on-surface m-0">YouTube Video Script</h4>
+                    <span class="text-[10px] text-on-surface-variant">2m ago</span>
+                  </div>
+                  <p class="text-[11px] text-on-surface-variant mb-0 line-clamp-2">"In today's deep dive, we explore how AI agents are transforming DevOps from reactive troubleshooting to predictive, autonomous healing..."</p>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <button class="flex-grow py-2 bg-background border border-primary/30 text-[11px] font-bold rounded hover:bg-primary/10 text-on-surface transition-colors cursor-pointer">Preview Script</button>
+                <button class="flex-grow py-2 bg-green-600/20 border border-green-500/40 text-[11px] rounded font-bold text-green-400 hover:bg-green-600/40 transition-colors cursor-pointer">Approve & Continue</button>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3 p-4 bg-white/5 rounded-xl border border-primary/20">
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded bg-blue-600/20 flex items-center justify-center shrink-0 border border-blue-500/30">
+                  <span class="material-symbols-outlined text-blue-400 text-[24px]">article</span>
+                </div>
+                <div class="flex-grow">
+                  <div class="flex justify-between items-center mb-1">
+                    <h4 class="text-[13px] font-bold text-on-surface m-0">SEO Blog Post</h4>
+                    <span class="text-[10px] text-on-surface-variant">4m ago</span>
+                  </div>
+                  <p class="text-[11px] text-on-surface-variant mb-0 line-clamp-2">An accompanying 1200-word article optimized for 'AI DevOps automation' keywords with 3 embedded AI-generated diagrams.</p>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <button class="flex-grow py-2 bg-background border border-primary/30 text-[11px] font-bold rounded hover:bg-primary/10 text-on-surface transition-colors cursor-pointer">Review Draft</button>
+                <button class="flex-grow py-2 bg-green-600/20 border border-green-500/40 text-[11px] rounded font-bold text-green-400 hover:bg-green-600/40 transition-colors cursor-pointer">Approve SEO</button>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Threads Modal Content -->
+        @if (activeModal === 'threads') {
+          <div class="space-y-4">
+            @for (w of workers; track w.id) {
+              <div class="bg-white/5 border border-outline-variant/20 p-4 rounded-xl flex flex-col gap-3 hover:bg-white/10 transition-colors">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <h4 class="text-xs font-bold text-on-surface uppercase mb-0.5">{{ w.name }}</h4>
+                    <span class="text-[9px] font-mono text-on-surface-variant uppercase">{{ w.task }}</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-full border border-outline-variant/30">
+                    <span class="w-1.5 h-1.5 rounded-full" 
+                      [class]="w.status === 'running' ? 'bg-green-500 animate-pulse' : 'bg-white/20'"></span>
+                    <span class="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant">{{ w.status }}</span>
+                  </div>
+                </div>
+                
+                @if (w.status === 'running') {
+                  <div class="flex items-center gap-3">
+                    <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/20">
+                      <div class="bg-primary h-full transition-all duration-300 shadow-[0_0_6px_rgba(0,229,255,0.3)]" [style.width.%]="w.progress"></div>
+                    </div>
+                    <span class="text-[10px] font-mono text-on-surface-variant">{{ w.progress }}%</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+      
+    </div>
+  </div>
+}

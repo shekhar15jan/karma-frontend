@@ -1,0 +1,154 @@
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+  <!-- Title / Header -->
+  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">publish</span>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-none">Social Accounts & Publishing</h2>
+        <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-1 block">Link channels and verify automated publication schedules</span>
+      </div>
+    </div>
+    
+    <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="loadPublishingData()" [disabled]="loading">
+      <span class="material-symbols-outlined text-sm">sync</span> Sync Credentials
+    </button>
+  </div>
+
+  @if (loading) {
+    <div class="flex-grow flex flex-col items-center justify-center gap-3">
+      <div class="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs text-on-surface-variant uppercase font-mono tracking-widest animate-pulse">Scanning Channels...</span>
+    </div>
+  }
+
+  @if (!loading) {
+    <!-- Social Accounts Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 shrink-0">
+      @for (channel of channels; track channel.id) {
+        <div class="lightning-panel rounded-xl p-5 flex flex-col justify-between gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+          <div class="flex justify-between items-start">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-xl" 
+                [class]="channel.platform === 'youtube' ? 'text-red-500' : channel.platform === 'instagram' ? 'text-pink-500' : channel.platform === 'linkedin' ? 'text-blue-500' : 'text-primary'">
+                {{ channel.platform === 'youtube' ? 'video_library' : channel.platform === 'instagram' ? 'photo_camera' : channel.platform === 'linkedin' ? 'work' : 'bolt' }}
+              </span>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">{{ channel.platform }}</h4>
+            </div>
+            
+            <div class="flex items-center gap-1 bg-white/5 border border-outline-variant/30 px-2 py-0.5 rounded-full">
+              <span class="w-1.5 h-1.5 rounded-full" 
+                [class]="channel.status === 'connected' ? 'bg-green-500 shadow-[0_0_6px_rgba(74,222,128,0.5)]' : 'bg-white/20'"></span>
+              <span class="text-[8px] font-bold uppercase tracking-wider"
+                [class]="channel.status === 'connected' ? 'text-green-400' : 'text-on-surface-variant'">
+                {{ channel.status }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Account Details -->
+          <div class="space-y-1 py-1">
+            @if (channel.status === 'connected') {
+              <p class="text-xs font-bold text-on-surface mb-0.5">{{ channel.name }}</p>
+              <p class="text-[10px] font-mono text-primary-container mb-0">{{ channel.handle }}</p>
+              <p class="text-[9px] text-on-surface-variant mt-1 mb-0">{{ channel.stats?.followers }} &bull; {{ channel.stats?.videos_count }} videos</p>
+            } @else {
+              <p class="text-xs font-bold text-on-surface-variant mb-0.5">Disconnected</p>
+              <p class="text-[9px] text-on-surface-variant leading-relaxed">No channel connected for {{ channel.platform }}.</p>
+            }
+          </div>
+
+          <!-- Button controls -->
+          <div>
+            @if (channel.status === 'connected') {
+              <button class="w-full px-3 py-1.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="disconnectChannel(channel)">
+                Unlink Account
+              </button>
+            } @else {
+              <button class="w-full px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="openLinkModal(channel)">
+                Connect Account
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Recent Publications Table -->
+    <div class="flex-grow flex flex-col overflow-hidden gap-4 mt-2">
+      <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Publication History</h3>
+      
+      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+        <div class="overflow-y-auto no-scrollbar flex-grow">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-outline-variant/30 text-[10px] font-mono text-primary-container uppercase tracking-wider bg-white/5">
+                <th class="py-3 px-4 w-2/5">Video Title</th>
+                <th class="py-3 px-4 w-1/5">Destination</th>
+                <th class="py-3 px-4 w-1/5">Schedule Date</th>
+                <th class="py-3 px-4 w-1/6">Views Count</th>
+                <th class="py-3 px-4 text-right">Publishing Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pub of publications; track pub.id) {
+                <tr class="border-b border-outline-variant/20 hover:bg-white/5 transition-colors text-xs text-on-surface">
+                  <td class="py-2.5 px-4 font-bold">{{ pub.title }}</td>
+                  <td class="py-2.5 px-4">
+                    <div class="flex items-center gap-2">
+                      <span class="material-symbols-outlined text-sm" 
+                        [class]="pub.platform === 'youtube' ? 'text-red-500' : pub.platform === 'instagram' ? 'text-pink-500' : pub.platform === 'linkedin' ? 'text-blue-500' : 'text-primary'">
+                        {{ pub.platform === 'youtube' ? 'video_library' : pub.platform === 'instagram' ? 'photo_camera' : pub.platform === 'linkedin' ? 'work' : 'bolt' }}
+                      </span>
+                      <span class="capitalize text-[10px] font-bold">{{ pub.platform }}</span>
+                    </div>
+                  </td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ pub.published_at | date:'medium' }}</td>
+                  <td class="py-2.5 px-4 font-mono text-[10px]">{{ pub.views | number }}</td>
+                  <td class="py-2.5 px-4 text-right">
+                    <span class="px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider inline-block text-center"
+                      [class]="pub.status === 'completed' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : pub.status === 'failed' ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-primary/10 border border-primary/20 text-primary-container'">
+                      {{ pub.status }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Link Modal Overlay -->
+  @if (showLinkModal && selectedChannel) {
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showLinkModal = false">
+      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+          <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Link {{ selectedChannel.platform | uppercase }} Channel</h4>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showLinkModal = false">&times;</button>
+        </div>
+        
+        <div class="flex flex-col gap-4">
+          <p class="text-xs text-on-surface-variant leading-relaxed mb-0">Authenticate Karma OS to enable video uploading and publishing queues on your behalf.</p>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">OAuth Client ID</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="clientId" placeholder="Enter Client ID" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">OAuth Client Secret</label>
+            <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="clientSecret" placeholder="••••••••••••••••" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Access Token / Developer Key</label>
+            <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="authKey" placeholder="Enter security access key" />
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showLinkModal = false">Cancel</button>
+          <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="linkChannel()">Link Channel Account</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

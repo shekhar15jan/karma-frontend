@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.workflow-designer {
+  background: #fff;
+}
+
+.agent-palette {
+  overflow-y: auto;
+}
+
+.agent-item {
+  transition: all 0.15s ease;
+  cursor: grab;
+
+  &:hover {
+    border-color: var(--bs-primary) !important;
+    background: rgba(var(--bs-primary-rgb), 0.04);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.canvas-area {
+  overflow: auto;
+  background-image:
+    radial-gradient(circle, #dee2e6 1px, transparent 1px);
+  background-size: 20px 20px;
+  cursor: default;
+}
+
+.canvas-node {
+  width: 120px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+  z-index: 2;
+
+  &.selected {
+    z-index: 3;
+    box-shadow: 0 0 0 3px var(--bs-primary);
+  }
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.properties-panel {
+  overflow-y: auto;
+}

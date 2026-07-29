@@ -1,0 +1,20 @@
+.nav-tabs .nav-link {
+  cursor: pointer;
+  color: var(--bs-secondary-color, #6c757d);
+
+  &.active {
+    font-weight: 500;
+  }
+}
+
+.modal-backdrop {
+  z-index: 1040;
+}
+
+.modal {
+  z-index: 1050;
+}
+
+.form-check-inline {
+  margin-right: 0.5rem;
+}

@@ -1,0 +1,20 @@
+.card {
+  transition: box-shadow 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.12) !important;
+  }
+}
+
+.badge.rounded-pill {
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.modal-backdrop {
+  z-index: 1040;
+}
+
+.modal {
+  z-index: 1050;
+}

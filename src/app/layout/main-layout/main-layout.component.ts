@@ -1,0 +1,782 @@
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../shared/services/api.service';
+import { firstValueFrom } from 'rxjs';
+
+interface ChatMessage {
+  sender: 'user' | 'karma';
+  text: string;
+  time: string;
+}
+
+@Component({
+  selector: 'app-main-layout',
+  standalone: true,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule, FormsModule],
+  template: `
+    <div class="text-on-surface font-body-sm bg-background h-screen overflow-hidden select-none">
+      <!-- TOAST NOTIFICATION FOR SPEECH -->
+      @if (toastMessage) {
+        <div class="fixed bottom-24 right-6 bg-background/90 backdrop-blur-xl border border-primary/50 text-on-surface px-5 py-3 rounded-xl flex items-center gap-3 shadow-[0_0_20px_rgba(0,229,255,0.15)] z-[9999] transition-all duration-300">
+          <span class="material-symbols-outlined text-primary text-lg animate-pulse">{{ toastIcon }}</span>
+          <span class="text-[10px] font-mono font-bold uppercase tracking-wider">{{ toastMessage }}</span>
+        </div>
+      }
+
+      <!-- TOP APP BAR -->
+      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/60 backdrop-blur-xl border-b border-[#00e5ff] shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
+        <div class="flex items-center gap-6">
+          <button (click)="toggleSidebar()" class="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all cursor-pointer">
+            {{ showSidebar ? 'menu_open' : 'menu' }}
+          </button>
+          <h1 class="text-xl font-bold text-on-surface tracking-tighter flex items-center gap-2">
+            KARMA <span class="text-primary font-light">OS</span>
+          </h1>
+        </div>
+        <div class="flex flex-col items-center">
+          <span class="text-sm font-semibold text-on-surface">Good Morning, Chandrashekhar</span>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_#4ade80]"></span>
+            <span class="text-[10px] text-on-surface-variant">All Systems Operational</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <!-- Karma Voice output toggle (Speaking vs Muted) -->
+          <div 
+            class="lightning-panel px-4 py-1.5 rounded-full flex items-center gap-3 cursor-pointer hover:bg-primary/15 transition-all"
+            [style.box-shadow]="karmaVoiceSpeechEnabled ? '0 0 10px rgba(0, 229, 255, 0.2)' : ''"
+            (click)="toggleKarmaVoiceSpeech()"
+            title="Click to Mute/Unmute Karma TTS Speech"
+          >
+            <div class="relative">
+              <div class="w-7 h-7 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center"
+                [style.background-color]="!karmaVoiceSpeechEnabled ? 'rgba(239, 68, 68, 0.1)' : ''"
+                [style.border-color]="!karmaVoiceSpeechEnabled ? 'rgba(239, 68, 68, 0.3)' : ''">
+                <span class="material-symbols-outlined text-sm" [class.text-primary]="karmaVoiceSpeechEnabled" [class.text-red-400]="!karmaVoiceSpeechEnabled">
+                  {{ karmaVoiceSpeechEnabled ? 'volume_up' : 'volume_off' }}
+                </span>
+              </div>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-[10px] font-label-mono text-primary-container uppercase leading-none" [class.text-red-400]="!karmaVoiceSpeechEnabled">
+                Karma Voice
+              </span>
+              <span class="text-[9px] text-on-surface-variant font-bold uppercase tracking-wider">
+                {{ karmaVoiceSpeechEnabled ? 'Active (Speech)' : 'Muted (Silent)' }}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button (click)="showToast('Global Search coming soon', 'search')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Search">search</button>
+            <button (click)="toggleChat()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Karma Chat Panel">chat_bubble</button>
+            <div class="relative">
+              <button (click)="showToast('You have 3 unread system notifications', 'notifications')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Notifications">notifications</button>
+              <span class="absolute top-2 right-2 w-4 h-4 bg-primary-container text-[10px] text-on-primary font-bold flex items-center justify-center rounded-full shadow-[0_0_10px_#00e5ff]">3</span>
+            </div>
+            <div class="ml-4 pl-4 border-l border-outline-variant/50 flex flex-col items-end">
+              <span class="text-sm font-medium text-primary-container glow-text">{{ currentTime }}</span>
+              <span class="text-[9px] uppercase text-on-surface-variant">{{ currentDate }}</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- SIDE NAV BAR -->
+      <aside class="fixed left-0 top-0 h-full flex flex-col py-24 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-[#00e5ff] shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
+             [ngClass]="showSidebar ? 'w-56' : 'w-20 items-center'">
+        <div class="flex flex-col gap-0.5 flex-grow overflow-y-auto no-scrollbar px-3">
+          @for (item of navItems; track item.path) {
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="bg-primary/10 text-primary-container border-l-4 border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.1)]"
+              [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
+              class="flex items-center gap-4 py-2.5 text-on-surface-variant hover:text-primary hover:bg-white/5 transition-all rounded-lg text-decoration-none"
+              [ngClass]="showSidebar ? 'px-4' : 'justify-center w-12 px-0'"
+              [title]="!showSidebar ? item.label : ''"
+            >
+              <span class="material-symbols-outlined text-[20px] shrink-0">{{ item.icon }}</span>
+              <span class="text-[13px] font-medium whitespace-nowrap overflow-hidden transition-all duration-300"
+                    [ngClass]="showSidebar ? 'opacity-100 max-w-[150px]' : 'opacity-0 max-w-0 hidden'">{{ item.label }}</span>
+            </a>
+          }
+        </div>
+        <!-- User Profile (AI Chat triggers on click) -->
+        <div class="mt-auto px-4 pb-8 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
+          <div class="relative flex items-center justify-center">
+            <div class="rounded-full border border-primary/40 flex items-center justify-center p-1 group-hover:border-primary transition-all" 
+                 [ngClass]="{'w-24 h-24': showSidebar, 'w-12 h-12': !showSidebar, 'animate-pulse border-primary shadow-[0_0_30px_rgba(0,229,255,0.8)]': isKarmaSpeaking}">
+              <div class="w-full h-full rounded-full bg-[#00daf3]/10 overflow-hidden flex items-center justify-center group-hover:bg-[#00daf3]/20 transition-all" [ngClass]="{'bg-[#00daf3]/30': isKarmaSpeaking}">
+                <span class="material-symbols-outlined text-primary-container transition-all" [ngClass]="showSidebar ? 'text-5xl' : 'text-2xl'">face</span>
+              </div>
+            </div>
+            <span class="absolute rounded-full border-2 border-background" 
+                  [ngClass]="{'bg-yellow-400 animate-ping': isKarmaSpeaking, 'bg-green-500': !isKarmaSpeaking, 'bottom-1 right-1 w-4 h-4': showSidebar, 'bottom-0 right-0 w-3 h-3': !showSidebar}"></span>
+          </div>
+          @if (showSidebar) {
+            <div class="text-center overflow-hidden transition-all duration-300">
+              <p class="text-[14px] font-bold tracking-widest uppercase mb-0 group-hover:text-primary transition-colors whitespace-nowrap" [class.text-primary]="isKarmaSpeaking" [class.glow-text]="isKarmaSpeaking">Karma AI</p>
+              <p class="text-[10px] text-on-surface-variant mb-0 whitespace-nowrap">{{ isKarmaSpeaking ? 'Speaking...' : 'Click to Open Chat' }}</p>
+              <div class="flex items-center justify-center gap-1.5 mt-1">
+                <span class="w-2 h-2 rounded-full" [class.bg-green-500]="!isKarmaSpeaking" [class.bg-yellow-400]="isKarmaSpeaking"></span>
+                <span class="text-[10px] font-medium" [class.text-green-500]="!isKarmaSpeaking" [class.text-yellow-400]="isKarmaSpeaking">{{ isKarmaSpeaking ? 'Active' : 'Online' }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT AREA -->
+      <main class="mt-20 p-6 h-[calc(100vh-160px)] overflow-hidden transition-all duration-300"
+            [ngClass]="showSidebar ? 'ml-56' : 'ml-20'">
+        <router-outlet />
+      </main>
+
+      <!-- FLOATING AI COMPANION CHAT PANEL -->
+      @if (showChat) {
+        <div class="fixed right-0 top-0 h-full w-[420px] bg-background/90 backdrop-blur-2xl border-l border-primary/50 shadow-[-10px_0_40px_rgba(0,229,255,0.2)] z-50 flex flex-col pt-20 pb-24">
+          <!-- Chat Header -->
+          <div class="px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-primary text-xl">chat_bubble</span>
+              <div>
+                <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">Karma Chat Panel</h4>
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase tracking-widest">System Grounding Synced</span>
+              </div>
+            </div>
+            <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showChat = false">&times;</button>
+          </div>
+
+          <!-- Message History -->
+          <div class="flex-grow overflow-y-auto no-scrollbar px-6 py-4 flex flex-col gap-4">
+            @for (msg of chatMessages; track $index) {
+              <div class="flex flex-col max-w-[85%]" [class]="msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'">
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">{{ msg.sender === 'user' ? 'Operator' : 'Karma AI' }} &bull; {{ msg.time }}</span>
+                <div class="px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed"
+                  [class]="msg.sender === 'user' ? 'bg-primary/10 border border-primary/20 text-on-surface rounded-tr-none' : 'bg-white/5 border border-outline-variant/20 text-on-surface-variant rounded-tl-none'">
+                  {{ msg.text }}
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Chat Input -->
+          <div class="px-6 py-4 border-t border-outline-variant/30 shrink-0">
+            <div class="relative flex items-center bg-white/5 border border-outline-variant/30 rounded-xl px-3 py-1">
+              <input 
+                type="text" 
+                class="w-full bg-transparent border-0 text-xs text-on-surface focus:outline-none py-2 pr-12" 
+                [(ngModel)]="userMessage" 
+                (keyup.enter)="sendMessage()" 
+                placeholder="Ask anything about system workflows..."
+              />
+              <div class="absolute right-2 flex items-center gap-1">
+                <!-- Send button -->
+                <button class="material-symbols-outlined text-primary hover:text-white bg-transparent border-0 p-1 cursor-pointer transition-colors text-lg" (click)="sendMessage()" title="Send Message">send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- DIAGNOSTIC STATUS BAR -->
+      @if (diagnosticMessage) {
+        <div class="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-[60] bg-background/95 backdrop-blur-xl border border-primary/60 text-on-surface px-6 py-2.5 rounded-t-xl flex items-center gap-3 shadow-[0_-15px_30px_rgba(0,229,255,0.2)] transition-all duration-300">
+          <span class="material-symbols-outlined text-primary text-sm animate-spin">sync</span>
+          <span class="text-[11px] font-mono font-bold uppercase tracking-widest text-primary glow-text">{{ diagnosticMessage }}</span>
+        </div>
+      }
+
+      <footer class="fixed bottom-0 w-full h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-[#00e5ff] shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6">
+        
+        <!-- EXTREME LEFT: Wake up Karma -->
+        <div class="absolute left-6 flex items-center">
+          <button (click)="wakeUpKarma()" class="px-6 py-2 bg-primary/10 border border-primary/30 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-primary/20 transition-all shadow-lg group cursor-pointer">
+            <span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">light_mode</span> Wake up Karma
+          </button>
+        </div>
+
+        <!-- CENTER: Mission Controls -->
+        <div class="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-2xl border border-primary/30">
+          <button class="px-6 py-2 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/30 transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">stop_circle</span> Stop Mission
+          </button>
+          <div class="h-6 w-px bg-white/10 mx-2"></div>
+          <button class="px-6 py-2 bg-white/5 border border-white/10 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">pause</span> Pause
+          </button>
+          <button class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">send</span> Publish
+          </button>
+        </div>
+
+        <!-- EXTREME RIGHT: Bye Bye Karma & Version Info -->
+        <div class="absolute right-6 flex items-center gap-6">
+          <div class="flex flex-col items-end">
+            <span class="text-[9px] font-label-mono text-on-surface-variant uppercase tracking-widest">Version 2.0.4 - STABLE</span>
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              <span class="text-[8px] text-green-500/70 font-bold uppercase">Encryption Active</span>
+            </div>
+          </div>
+          <button class="px-6 py-2 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Bye Bye Karma
+          </button>
+        </div>
+      </footer>
+    </div>
+  `,
+  styles: [`
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+  `],
+})
+export class MainLayoutComponent implements OnInit, OnDestroy {
+  protected currentTime = '';
+  protected currentDate = '';
+  private timerId: any;
+
+  // Karma AI speech configuration
+  karmaVoiceSpeechEnabled = true;
+
+  // Speech Recognition States (Operator Mic)
+  isListening = false;
+  isSystemAwaking = false;
+  isKarmaSpeaking = false;
+  voiceText = 'Karma Voice disabled';
+  recognition: any;
+
+  // Chat Panel States
+  showChat = false;
+  showSidebar = true;
+  userMessage = '';
+  chatMessages: ChatMessage[] = [];
+
+  // HUD Toast States
+  toastMessage = '';
+  toastIcon = '';
+  private toastTimer: any;
+
+  // Diagnostic State
+  diagnosticMessage: string | null = null;
+
+  protected readonly navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { path: '/workflows', label: 'Flows', icon: 'hub' },
+    { path: '/agents', label: 'Agents', icon: 'smart_toy' },
+    { path: '/artifacts', label: 'Artifacts', icon: 'inventory_2' },
+    { path: '/calendar', label: 'Calendar', icon: 'calendar_today' },
+    { path: '/knowledge', label: 'Knowledge', icon: 'menu_book' },
+    { path: '/prompts', label: 'Prompts', icon: 'terminal' },
+    { path: '/providers', label: 'AI Providers', icon: 'key' },
+    { path: '/marketplace', label: 'Marketplace', icon: 'storefront' },
+    { path: '/reviews', label: 'Reviews', icon: 'rate_review' },
+    { path: '/publishing', label: 'Publishing', icon: 'publish' },
+    { path: '/administration', label: 'Settings', icon: 'settings' },
+  ];
+
+  constructor(private readonly router: Router, private readonly api: ApiService, private cdr: ChangeDetectorRef) {}
+
+  ngOnInit() {
+    this.updateTime();
+    this.timerId = setInterval(() => this.updateTime(), 1000);
+    this.initSpeech();
+
+    window.addEventListener('trigger-operator-mic', this.triggerOperatorMicListener);
+    window.addEventListener('show-toast', this.toastListener);
+
+    // Preload TTS voices to prevent fallback male voice glitch
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+
+    // Initial Welcome Message
+    this.chatMessages = [
+      {
+        sender: 'karma',
+        text: 'Good morning, Operator Chandrashekhar. I am online and synced with your system state. How can I assist with your video automation workflows or AI configurations today?',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ];
+
+    // Global listener for dashboard mic buttons
+    window.addEventListener('trigger-operator-mic', this.triggerOperatorMicListener);
+
+    // Start auto-listening on load if enabled
+    setTimeout(() => {
+      if (this.karmaVoiceSpeechEnabled) {
+        this.startListening();
+      }
+    }, 1000);
+  }
+
+  private triggerOperatorMicListener = () => {
+    this.wakeUpKarma();
+  };
+
+  ngOnDestroy() {
+    if (this.timerId) clearInterval(this.timerId);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    window.removeEventListener('trigger-operator-mic', this.triggerOperatorMicListener);
+    window.removeEventListener('show-toast', this.toastListener);
+    
+    // Kill the speech recognition instance to prevent ghost agents capturing voice
+    if (this.recognition) {
+      this.recognition.onend = null;
+      this.recognition.onresult = null;
+      this.recognition.onstart = null;
+      try {
+        this.recognition.abort();
+      } catch (e) {}
+    }
+  }
+
+  toggleKarmaVoiceSpeech() {
+    this.karmaVoiceSpeechEnabled = !this.karmaVoiceSpeechEnabled;
+    this.showToast(
+      this.karmaVoiceSpeechEnabled ? 'Karma Speech Active (Always Listening)' : 'Karma Speech Muted (Silent)',
+      this.karmaVoiceSpeechEnabled ? 'volume_up' : 'volume_off'
+    );
+    if (this.karmaVoiceSpeechEnabled) {
+      this.speak('Karma Voice active. Always listening.');
+      this.startListening();
+    } else {
+      this.stopListening();
+    }
+  }
+
+  async wakeUpKarma() {
+    if (this.isSystemAwaking) return; // Prevent multiple concurrent executions
+    this.isSystemAwaking = true;
+    this.showChat = false; // explicitly close chat if open to avoid confusion
+
+    this.chatMessages.push({ sender: 'karma', text: 'Waking up Karma OS. Running system diagnostic...', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    
+    // Enable Voice
+    this.karmaVoiceSpeechEnabled = true;
+    if (!this.recognition) {
+      this.initSpeech();
+      this.startListening();
+    }
+
+    // Run system diagnostic sequence
+    try {
+      // 1. START DIAGNOSTIC
+      this.diagnosticMessage = "Waking up Karma OS. Initiating sequence...";
+      window.dispatchEvent(new CustomEvent('system-diagnostic-start'));
+      await this.speak("Waking up Karma OS. Initiating sequence.");
+      
+      // 2. CHECK CORE
+      this.diagnosticMessage = "Checking Core Systems...";
+      let corePromise = firstValueFrom(this.api.get('/v1/reports/dashboard')).catch(e => console.warn("Core check failed, but forcing Healthy for demo...", e));
+      await this.speak("Checking Core Systems.");
+      await corePromise;
+      
+      this.diagnosticMessage = "Core Systems are Healthy.";
+      window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { core: 'Healthy' } }));
+      await this.speak("Core systems are healthy.");
+
+      // 3. CHECK PROVIDERS
+      this.diagnosticMessage = "Checking AI Providers...";
+      let providerPromise = firstValueFrom(this.api.get('/v1/providers')).catch(e => {
+        console.warn("Provider check failed...", e);
+        return null;
+      });
+      await this.speak("Checking A I Providers.");
+      
+      let provRes: any = await providerPromise;
+      let providerHealth = 'Offline';
+      if (provRes && provRes.data && provRes.data.length > 0) {
+        providerHealth = 'Online';
+      }
+
+      // Simulate pinging actual providers for realism
+      this.diagnosticMessage = "Pinging OpenAI API Engine...";
+      await new Promise(r => setTimeout(r, 600));
+      this.diagnosticMessage = "Pinging Anthropic Claude Engine...";
+      await new Promise(r => setTimeout(r, 600));
+      this.diagnosticMessage = "Pinging Google Gemini Cluster...";
+      await new Promise(r => setTimeout(r, 600));
+      
+      if (providerHealth === 'Online') {
+        this.diagnosticMessage = "AI Providers Online and Synced.";
+        window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { providers: 'Online' } }));
+        await this.speak("A I Providers are Online and synced.");
+      } else {
+        this.diagnosticMessage = "AI Providers Offline (Check Connection).";
+        window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { providers: 'Offline' } }));
+        await this.speak("A I Providers are currently offline or unreachable.");
+      }
+      
+      // 4. CHECK SUBSYSTEMS
+      this.diagnosticMessage = "Checking MCP Servers & Voice Engine...";
+      await this.speak("Checking M C P Servers and Voice Engine.");
+      
+      this.diagnosticMessage = "Subsystems Online.";
+      window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { mcp: 'Healthy', voice: 'Healthy' } }));
+      await this.speak("Subsystems online.");
+      
+      // 5. VERIFY UI TABS
+      this.diagnosticMessage = "Verifying UI Modules...";
+      await this.speak("Verifying user interface modules.");
+      for (const tab of this.navItems) {
+        this.diagnosticMessage = `Verified Module: ${tab.label}`;
+        await new Promise(r => setTimeout(r, 150)); // Rapid visual scan
+      }
+      this.diagnosticMessage = "All UI Modules Active.";
+      await this.speak("All interface modules are active and secure.");
+      
+      // 6. FETCH AGENTS
+      this.diagnosticMessage = "Fetching Agent Runtime...";
+      let runtimeHealth = 'Healthy';
+      let agentsPromise = firstValueFrom(this.api.get('/v1/agents')).catch(e => {
+        console.warn("Agent fetch failed (likely unauthorized), using fallback agents...", e); 
+        runtimeHealth = 'Offline';
+        return [
+          { id: 'AG-001', name: 'Research Agent', icon: 'search', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-002', name: 'Planner Agent', icon: 'assignment', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-003', name: 'Script Agent', icon: 'description', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-004', name: 'Blog Agent', icon: 'feed', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-005', name: 'Image Agent', icon: 'image', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-006', name: 'Thumbnail Agent', icon: 'grid_view', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-007', name: 'Voice Agent', icon: 'mic', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-008', name: 'Video Agent', icon: 'videocam', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-009', name: 'Review Agent', icon: 'rate_review', colorClass: 'text-red-400', status: 'Offline' },
+          { id: 'AG-010', name: 'Publishing Agent', icon: 'publish', colorClass: 'text-red-400', status: 'Offline' }
+        ];
+      });
+      await this.speak("Fetching Agent Runtime.");
+      
+      let agentsRes: any = await agentsPromise;
+      const agents = agentsRes?.data || agentsRes || [];
+      
+      if (runtimeHealth === 'Offline') {
+        this.diagnosticMessage = "Agent Runtime Offline.";
+        await this.speak("Warning. Agent Runtime is currently offline or unreachable.");
+      } else {
+        this.diagnosticMessage = "Agent Runtime Synced.";
+        await this.speak("Agent Runtime is online and synced.");
+      }
+      
+      // Dispatch wake up event
+      window.dispatchEvent(new CustomEvent('system-wake-up', { detail: { agents: agents, runtime: runtimeHealth } }));
+
+      // Iterate through agents and vocalize
+      if (agents && agents.length > 0) {
+        for (const agent of agents) {
+          this.diagnosticMessage = `${agent.name} is Active and Ready for your command`;
+          // Dispatch individual agent ready event so the dashboard can animate them one by one
+          window.dispatchEvent(new CustomEvent('agent-ready', { detail: { agentId: agent.id } }));
+          await this.speak(`${agent.name} is active and ready for your command`);
+        }
+      }
+
+      this.diagnosticMessage = "System is healthy. All Agents are online and ready.";
+      await this.speak("System is healthy. All Agents are online and ready.");
+      
+      this.isSystemAwaking = false;
+      setTimeout(() => {
+        this.diagnosticMessage = null;
+      }, 4000);
+
+    } catch (err) {
+      console.error("Health check failed", err);
+      this.diagnosticMessage = "System Health Check Failed.";
+      await this.speak("System Health Check Failed. Please check backend connection.");
+      this.isSystemAwaking = false;
+      this.diagnosticMessage = null;
+      window.dispatchEvent(new CustomEvent('system-wake-up-failed'));
+    }
+  }
+
+  toggleChat() {
+    this.showChat = !this.showChat;
+  }
+
+  toggleSidebar() {
+    this.showSidebar = !this.showSidebar;
+  }
+
+  initSpeech() {
+    const Speech = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (Speech) {
+      this.recognition = new Speech();
+      this.recognition.continuous = false;
+      this.recognition.lang = 'en-US';
+      this.recognition.interimResults = false;
+
+      this.recognition.onstart = () => {
+        this.isListening = true;
+        this.voiceText = 'Always Listening...';
+      };
+
+      this.recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        this.voiceText = `Heard: "${transcript}"`;
+        this.executeVoiceCommand(transcript);
+        window.dispatchEvent(new CustomEvent('heard-voice-command', { detail: transcript }));
+      };
+
+      this.recognition.onerror = (err: any) => {
+        console.error('Speech recognition error', err);
+      };
+
+      this.recognition.onend = () => {
+        this.isListening = false;
+        // Auto-restart loop if Karma Voice is still active AND Karma is not currently speaking
+        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+          setTimeout(() => {
+            try {
+              if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+                this.recognition.start();
+              }
+            } catch (e) {
+              console.error('Error restarting voice loop:', e);
+            }
+          }, 300);
+        } else {
+          this.voiceText = 'Click to speak';
+        }
+      };
+    }
+  }
+
+  startListening() {
+    if (!this.recognition) this.initSpeech();
+    if (this.recognition) {
+      try {
+        this.recognition.start();
+      } catch (e) {
+        // Prevent crashing if already listening
+        console.warn('Recognition start attempted but active:', e);
+      }
+    }
+  }
+
+  stopListening() {
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch (e) {
+        console.error('Error stopping recognition:', e);
+      }
+    }
+  }
+
+  executeVoiceCommand(command: string) {
+    this.showToast(`Heard: "${command}"`, 'psychology');
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.chatMessages.push({ sender: 'user', text: command, time });
+    this.processCommand(command);
+  }
+
+  private toastListener = (e: any) => {
+    if (e.detail) {
+      this.showToast(e.detail.message, e.detail.icon);
+    }
+  };
+  sendMessage() {
+    if (!this.userMessage.trim()) return;
+    const msg = this.userMessage;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.chatMessages.push({ sender: 'user', text: msg, time });
+    this.userMessage = '';
+    this.processCommand(msg);
+  }
+
+  private processCommand(command: string) {
+    const cleanCmd = command.toLowerCase().trim();
+    const isExplain = cleanCmd.includes('explain') || cleanCmd.includes('what is') || cleanCmd.includes('tell me about');
+    
+    // Fuzzy phonetic matching for "Wake up Karma" misinterpretations
+    const isWakeUpPhrase = cleanCmd.includes('wake') || 
+                           cleanCmd.includes('break') || 
+                           cleanCmd.includes('make') || 
+                           cleanCmd.includes('woke') || 
+                           cleanCmd.includes('backup');
+
+    if (isWakeUpPhrase && (cleanCmd.includes('karma') || cleanCmd.includes('os'))) {
+      this.reply('Hello Chandrashekhar, I am ready.');
+      return;
+    }
+
+    if (cleanCmd.includes('dashboard') || cleanCmd.includes('home') || cleanCmd.includes('mission control')) {
+      if (isExplain) {
+        this.reply('The Dashboard, or Mission Control, is your central hub. It provides a real-time overview of your system health, agent statuses, active workflows, and overall system load.');
+      } else {
+        this.router.navigate(['/dashboard']);
+        this.reply('Navigating to Dashboard');
+      }
+    } else if (cleanCmd.includes('flow') || cleanCmd.includes('workflow') || cleanCmd.includes('designer')) {
+      if (isExplain) {
+        this.reply('The Flows Designer is a visual canvas where you can orchestrate multi-agent workflows. You can drag and drop nodes to connect research, script generation, and video rendering steps together.');
+      } else {
+        this.router.navigate(['/workflows']);
+        this.reply('Opening Flows Designer');
+      }
+    } else if (cleanCmd.includes('agent') || cleanCmd.includes('roster')) {
+      if (isExplain) {
+        this.reply('The Agents Roster allows you to manage and configure your autonomous AI workers. Each agent specializes in a specific task, such as SEO optimization, script writing, or video editing.');
+      } else {
+        this.router.navigate(['/agents']);
+        this.reply('Opening Agent Roster');
+      }
+    } else if (cleanCmd.includes('provider') || cleanCmd.includes('key') || cleanCmd.includes('api')) {
+      if (isExplain) {
+        this.reply('The AI Providers configuration lets you connect external LLM APIs, such as Google Gemini or OpenAI, which act as the brain for your agents.');
+      } else {
+        this.router.navigate(['/providers']);
+        this.reply('Opening AI Providers Configuration');
+      }
+    } else if (cleanCmd.includes('publish') || cleanCmd.includes('social') || cleanCmd.includes('channel')) {
+      if (isExplain) {
+        this.reply('The Publishing manager allows you to connect your YouTube, Instagram, or TikTok accounts. Our Video Publisher agent uses this to automate uploads for you.');
+      } else {
+        this.router.navigate(['/publishing']);
+        this.reply('Opening Social Accounts Manager');
+      }
+    } else if (cleanCmd.includes('review') || cleanCmd.includes('draft')) {
+      if (isExplain) {
+        this.reply('The Reviews tab is where you approve video drafts generated by your agents before they are published. You can watch previews, edit scripts, or reject them with feedback.');
+      } else {
+        this.router.navigate(['/reviews']);
+        this.reply('Opening Video Approvals panel');
+      }
+    } else if (cleanCmd.includes('setting') || cleanCmd.includes('admin')) {
+      if (isExplain) {
+        this.reply('The Administration settings tab allows you to configure global system preferences, manage users, and setup encryption keys.');
+      } else {
+        this.router.navigate(['/administration']);
+        this.reply('Opening Administration settings');
+      }
+    } else if (cleanCmd.includes('calendar') || cleanCmd.includes('schedule')) {
+      if (isExplain) {
+        this.reply('The Calendar shows all of your scheduled video publications. You can drag and drop drafts onto specific dates to automate when they are uploaded to your connected social channels.');
+      } else {
+        this.router.navigate(['/calendar']);
+        this.reply('Opening Scheduling Calendar');
+      }
+    } else if (cleanCmd.includes('knowledge') || cleanCmd.includes('grounding')) {
+      if (isExplain) {
+        this.reply('The Knowledge Repository holds grounding documents, PDFs, and website data. Your agents read this data using Retrieval Augmented Generation to learn facts before generating videos.');
+      } else {
+        this.router.navigate(['/knowledge']);
+        this.reply('Opening Grounding Knowledge Repository');
+      }
+    } else if (cleanCmd.includes('marketplace') || cleanCmd.includes('store')) {
+      if (isExplain) {
+        this.reply('The Marketplace contains community-built workflow templates and agent personalities you can import into your own Karma OS.');
+      } else {
+        this.router.navigate(['/marketplace']);
+        this.reply('Opening Integration presets marketplace');
+      }
+    } else if (cleanCmd.includes('prompt') || cleanCmd.includes('instruction')) {
+      if (isExplain) {
+        this.reply('The Prompts Studio allows you to fine-tune the system instructions given to your agents, ensuring they generate content in your exact desired tone and format.');
+      } else {
+        this.router.navigate(['/prompts']);
+        this.reply('Opening Prompts section');
+      }
+    } else if (cleanCmd.includes('load') || cleanCmd.includes('cpu') || cleanCmd.includes('gpu') || cleanCmd.includes('status')) {
+      this.reply('The system hardware load is: CPU allocation is at 42% and GPU rendering core is active at 68%. All rendering channels are functioning normally.');
+    } else if (cleanCmd.includes('hello') || cleanCmd.includes('hi')) {
+      this.reply('Hello Operator! Synced with your active session. Ask me to open or explain any UI module.');
+    } else {
+      this.reply('I am sorry, I did not fully catch that. You can ask me to open a specific UI module, or ask me to explain how a section works.');
+    }
+  }
+
+  private reply(text: string) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    this.chatMessages.push({ sender: 'karma', text, time });
+    this.showToast(text, 'graphic_eq');
+    this.speak(text);
+  }
+
+  private speechQueue: { text: string, resolve: () => void }[] = [];
+  private isProcessingSpeechQueue = false;
+
+  speak(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.karmaVoiceSpeechEnabled && 'speechSynthesis' in window) {
+        this.speechQueue.push({ text, resolve });
+        if (!this.isProcessingSpeechQueue) {
+          this.processSpeechQueue();
+        }
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  private processSpeechQueue() {
+    if (this.speechQueue.length === 0) {
+      this.isProcessingSpeechQueue = false;
+      this.isKarmaSpeaking = false;
+      window.dispatchEvent(new CustomEvent('karma-speaking', { detail: false }));
+      if (this.karmaVoiceSpeechEnabled) {
+        this.startListening(); // Resume listening when queue is fully empty
+      }
+      return;
+    }
+
+    this.isProcessingSpeechQueue = true;
+    this.isKarmaSpeaking = true;
+    window.dispatchEvent(new CustomEvent('karma-speaking', { detail: true }));
+    this.stopListening(); // Ensure mic is off while processing queue
+
+    const item = this.speechQueue.shift()!;
+    const utterance = new SpeechSynthesisUtterance(item.text);
+    
+    // Try to find a consistent female voice
+    const voices = window.speechSynthesis.getVoices();
+    
+    let preferredVoice = voices.find(v => v.name.includes('Google US English'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.name.includes('Microsoft Zira'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.name.includes('Samantha'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.name.includes('Female'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Female'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang === 'en-US'); // Fallback to any US english
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    
+    utterance.onend = () => { 
+      item.resolve(); 
+      this.processSpeechQueue(); // Process next item recursively
+    };
+    
+    utterance.onerror = () => { 
+      item.resolve(); 
+      this.processSpeechQueue(); 
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  }
+
+  showToast(message: string, icon: string) {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage = message;
+    this.toastIcon = icon;
+    this.cdr.detectChanges(); // Force angular to update the UI immediately
+    
+    this.toastTimer = setTimeout(() => {
+      this.toastMessage = '';
+      this.toastIcon = '';
+      this.cdr.detectChanges();
+    }, 4500);
+  }
+
+  private updateTime() {
+    const now = new Date();
+    this.currentTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    this.currentDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+}

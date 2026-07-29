@@ -1,0 +1,339 @@
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+  <!-- Title / Tab Selection Header -->
+  <div class="lightning-panel p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">settings</span>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-none">Administration Panel</h2>
+        <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-1 block">Configure core models, access control, and audit logs</span>
+      </div>
+    </div>
+    
+    <!-- Tab Controls -->
+    <div class="flex gap-2 bg-white/5 p-1 rounded-xl border border-outline-variant/20">
+      <button 
+        class="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border-0 transition-all flex items-center gap-2 cursor-pointer"
+        [class]="activeTab === 'users' ? 'bg-primary/20 text-primary-container border border-primary/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]' : 'bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-white/5'"
+        (click)="switchTab('users')"
+      >
+        <span class="material-symbols-outlined text-sm">group</span> Users
+      </button>
+      <button 
+        class="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border-0 transition-all flex items-center gap-2 cursor-pointer"
+        [class]="activeTab === 'roles' ? 'bg-primary/20 text-primary-container border border-primary/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]' : 'bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-white/5'"
+        (click)="switchTab('roles')"
+      >
+        <span class="material-symbols-outlined text-sm">security</span> Roles
+      </button>
+      <button 
+        class="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border-0 transition-all flex items-center gap-2 cursor-pointer"
+        [class]="activeTab === 'settings' ? 'bg-primary/20 text-primary-container border border-primary/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]' : 'bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-white/5'"
+        (click)="switchTab('settings')"
+      >
+        <span class="material-symbols-outlined text-sm">settings_applications</span> Core Settings
+      </button>
+      <button 
+        class="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg border-0 transition-all flex items-center gap-2 cursor-pointer"
+        [class]="activeTab === 'audit' ? 'bg-primary/20 text-primary-container border border-primary/30 shadow-[0_0_10px_rgba(0,229,255,0.15)]' : 'bg-transparent text-on-surface-variant hover:text-on-surface hover:bg-white/5'"
+        (click)="switchTab('audit')"
+      >
+        <span class="material-symbols-outlined text-sm">history</span> Audit Log
+      </button>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="flex-grow flex flex-col items-center justify-center gap-3">
+      <div class="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs text-on-surface-variant uppercase font-mono tracking-widest animate-pulse">Retrieving Data...</span>
+    </div>
+  }
+
+  <!-- Users Tab -->
+  @if (!loading && activeTab === 'users') {
+    <div class="flex-grow flex flex-col overflow-hidden gap-4">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Authorized Users</h3>
+        <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="showAddUser = true">
+          <span class="material-symbols-outlined text-sm">person_add</span> Add User
+        </button>
+      </div>
+
+      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+        <div class="overflow-y-auto no-scrollbar flex-grow">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-outline-variant/30 text-[10px] font-mono text-primary-container uppercase tracking-wider bg-white/5">
+                <th class="py-3 px-4">Display Name</th>
+                <th class="py-3 px-4">Email Address</th>
+                <th class="py-3 px-4">Assigned Role</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Last Activity</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of users; track user.id) {
+                <tr class="border-b border-outline-variant/20 hover:bg-white/5 transition-colors text-xs text-on-surface">
+                  <td class="py-2.5 px-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
+                        {{ user.display_name[0] | uppercase }}
+                      </div>
+                      <span class="font-bold">{{ user.display_name }}</span>
+                    </div>
+                  </td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono">{{ user.email }}</td>
+                  <td class="py-2.5 px-4">
+                    <span class="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary-container text-[10px] font-bold uppercase tracking-wider">
+                      {{ user.role }}
+                    </span>
+                  </td>
+                  <td class="py-2.5 px-4">
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-2.5 h-2.5 rounded-full" [class]="user.is_active ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-white/20'"></span>
+                      <span class="font-medium text-[10px] uppercase tracking-wider">{{ user.is_active ? 'Active' : 'Deactivated' }}</span>
+                    </div>
+                  </td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ user.last_login_at | date:'medium' }}</td>
+                  <td class="py-2.5 px-4 text-right">
+                    <div class="flex justify-end gap-2">
+                      <button class="px-3 py-1 bg-white/5 border border-outline-variant/30 text-on-surface text-[10px] font-bold rounded hover:bg-white/10 transition-all cursor-pointer" (click)="editUser(user)">Edit</button>
+                      <button class="px-3 py-1 bg-red-600/10 border border-red-500/20 text-red-400 text-[10px] font-bold rounded hover:bg-red-600/20 transition-all cursor-pointer" (click)="deactivateUser(user)" [disabled]="!user.is_active">Deactivate</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add User Modal Overlay -->
+    @if (showAddUser) {
+      <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddUser = false">
+        <div class="lightning-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+          <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+            <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Add Authorized User</h4>
+            <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddUser = false">&times;</button>
+          </div>
+          <div class="flex flex-col gap-4">
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Display Name</label>
+              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newUser.display_name" placeholder="John Doe" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Email Address</label>
+              <input type="email" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newUser.email" placeholder="john@karma.os" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Access Level</label>
+              <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newUser.role">
+                <option value="Administrator">Administrator</option>
+                <option value="Developer">Developer</option>
+                <option value="Auditor">Auditor</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+            <button class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showAddUser = false">Cancel</button>
+            <button class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="addUser()">Create User</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Edit User Modal Overlay -->
+    @if (editingUser) {
+      <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="editingUser = null">
+        <div class="lightning-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+          <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+            <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Modify Access Permissions</h4>
+            <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="editingUser = null">&times;</button>
+          </div>
+          <div class="flex flex-col gap-4">
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Display Name</label>
+              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="editingUser.display_name" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Email Address</label>
+              <input type="email" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="editingUser.email" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Access Level</label>
+              <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="editingUser.role">
+                <option value="Administrator">Administrator</option>
+                <option value="Developer">Developer</option>
+                <option value="Auditor">Auditor</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+            <button class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="editingUser = null">Cancel</button>
+            <button class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="saveUser()">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- Roles Tab -->
+  @if (!loading && activeTab === 'roles') {
+    <div class="flex-grow flex flex-col overflow-hidden gap-4">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Role & Capability Matrices</h3>
+        <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="showAddRole = true">
+          <span class="material-symbols-outlined text-sm">security</span> Add Role
+        </button>
+      </div>
+
+      <div class="flex-grow overflow-y-auto no-scrollbar pb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          @for (role of roles; track role.id) {
+            <div class="lightning-panel rounded-xl p-5 flex flex-col gap-3 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25">
+              <div class="flex justify-between items-center border-b border-outline-variant/20 pb-2.5">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-primary-container mb-0">{{ role.name }}</h4>
+              </div>
+              <p class="text-xs text-on-surface-variant mb-1">{{ role.description }}</p>
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                @for (perm of role.permissions; track perm) {
+                  <span class="px-2 py-0.5 rounded border border-outline-variant/30 bg-white/5 text-[9px] font-mono text-on-surface">
+                    {{ perm }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Role Modal Overlay -->
+    @if (showAddRole) {
+      <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddRole = false">
+        <div class="lightning-panel rounded-2xl p-6 w-[500px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+          <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+            <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Generate Access Matrix</h4>
+            <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddRole = false">&times;</button>
+          </div>
+          <div class="flex flex-col gap-4">
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Role Name</label>
+              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newRole.name" placeholder="Workflow Engineer" />
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Description</label>
+              <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newRole.description" rows="2" placeholder="Describe the authority scope"></textarea>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase block">Select Permissions</label>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-2 mt-1 max-h-48 overflow-y-auto no-scrollbar p-1 border border-outline-variant/20 rounded bg-white/5">
+                @for (perm of availablePermissions; track perm) {
+                  <label class="flex items-center gap-2 text-[10px] text-on-surface-variant cursor-pointer select-none">
+                    <input type="checkbox" class="accent-primary" [checked]="newRole.permissions?.includes(perm)" (change)="togglePermission(perm)" />
+                    <span class="font-mono">{{ perm }}</span>
+                  </label>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+            <button class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showAddRole = false">Cancel</button>
+            <button class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="addRole()">Create Role</button>
+          </div>
+        </div>
+      </div>
+    }
+  }
+
+  <!-- System Settings Tab -->
+  @if (!loading && activeTab === 'settings') {
+    <div class="flex-grow flex flex-col overflow-hidden gap-4">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Video Automation Parameters</h3>
+        <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="saveSettings()">
+          <span class="material-symbols-outlined text-sm">save</span> Save All Settings
+        </button>
+      </div>
+
+      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+        <div class="overflow-y-auto no-scrollbar flex-grow">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-outline-variant/30 text-[10px] font-mono text-primary-container uppercase tracking-wider bg-white/5">
+                <th class="py-3 px-4 w-1/4">Setting Key</th>
+                <th class="py-3 px-4 w-1/4">Active Value</th>
+                <th class="py-3 px-4 w-2/5">Functional Description</th>
+                <th class="py-3 px-4 w-10 text-right">Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (setting of settings; track $index) {
+                <tr class="border-b border-outline-variant/20 hover:bg-white/5 transition-colors text-xs text-on-surface">
+                  <td class="py-2.5 px-4 font-mono text-secondary">
+                    <code>{{ setting.key }}</code>
+                  </td>
+                  <td class="py-2.5 px-4">
+                    <input 
+                      class="bg-white/5 border border-outline-variant/30 rounded px-2.5 py-1 text-xs text-on-surface focus:outline-none focus:border-primary w-full"
+                      [(ngModel)]="setting.value" 
+                    />
+                  </td>
+                  <td class="py-2.5 px-4 text-on-surface-variant leading-relaxed">{{ setting.description }}</td>
+                  <td class="py-2.5 px-4 text-right">
+                    <span class="px-2 py-0.5 rounded bg-[#00e5ff]/10 border border-[#00e5ff]/20 text-primary-container text-[9px] font-bold uppercase tracking-wider text-nowrap">
+                      {{ setting.category }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Audit Log Tab -->
+  @if (!loading && activeTab === 'audit') {
+    <div class="flex-grow flex flex-col overflow-hidden gap-4">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">System Log Trace</h3>
+      </div>
+
+      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+        <div class="overflow-y-auto no-scrollbar flex-grow">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-outline-variant/30 text-[10px] font-mono text-primary-container uppercase tracking-wider bg-white/5">
+                <th class="py-3 px-4">Timestamp</th>
+                <th class="py-3 px-4">User</th>
+                <th class="py-3 px-4">Action</th>
+                <th class="py-3 px-4">Resource Scope</th>
+                <th class="py-3 px-4">Operation Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of auditLog; track $index) {
+                <tr class="border-b border-outline-variant/20 hover:bg-white/5 transition-colors text-xs text-on-surface">
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px] text-nowrap">{{ entry.timestamp | date:'medium' }}</td>
+                  <td class="py-2.5 px-4 font-bold">{{ entry.user }}</td>
+                  <td class="py-2.5 px-4">
+                    <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-center"
+                      [class]="entry.action === 'Update Setting' ? 'bg-orange-500/10 border border-orange-500/20 text-orange-400' : entry.action === 'Bypass Auth' ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-primary/10 border border-primary/20 text-primary-container'">
+                      {{ entry.action }}
+                    </span>
+                  </td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ entry.resource }}</td>
+                  <td class="py-2.5 px-4 text-on-surface-variant leading-relaxed">{{ entry.details }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+</div>

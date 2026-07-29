@@ -1,0 +1,70 @@
+@import 'bootstrap/scss/bootstrap';
+
+:root {
+  --app-header-height: 64px;
+  --app-sidebar-width: 224px;
+}
+
+html, body {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background-color: #0d1320;
+  background-image: 
+      radial-gradient(circle at 50% 50%, rgba(0, 218, 243, 0.1) 0%, transparent 70%),
+      url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+}
+
+@keyframes lightning-energy {
+  0%, 100% { 
+      box-shadow: 0 0 12px #00e5ff, inset 0 0 6px rgba(0, 229, 255, 0.4); 
+      border-color: rgba(0, 229, 255, 0.9);
+  }
+  50% { 
+      box-shadow: 0 0 20px #00e5ff, inset 0 0 10px rgba(0, 229, 255, 0.6); 
+      border-color: rgba(0, 229, 255, 1);
+  }
+}
+
+.lightning-panel {
+  backdrop-filter: blur(20px);
+  background: rgba(13, 19, 32, 0.7);
+  border: 1px solid #00e5ff;
+  animation: lightning-energy 4s infinite ease-in-out;
+}
+
+.karma-node {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-top: -40px; /* Offset for node size */
+  margin-left: -40px;
+  z-index: 20;
+  width: 80px;
+  height: 80px;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.core-connection {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, #00e5ff, transparent);
+  transform-origin: left center;
+  z-index: 0;
+  filter: drop-shadow(0 0 4px #00e5ff);
+}
+
+.glow-text { text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
+.circular-gauge { transform: rotate(-90deg); }
+
+.hud-cube-spin {
+  animation: spin 10s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
