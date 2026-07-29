@@ -78,9 +78,9 @@
                   <td class="py-2.5 px-4">
                     <div class="flex items-center gap-3">
                       <div class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold">
-                        {{ user.display_name[0] | uppercase }}
+                        {{ user.displayName[0] | uppercase }}
                       </div>
-                      <span class="font-bold">{{ user.display_name }}</span>
+                      <span class="font-bold">{{ user.displayName }}</span>
                     </div>
                   </td>
                   <td class="py-2.5 px-4 text-on-surface-variant font-mono">{{ user.email }}</td>
@@ -91,15 +91,15 @@
                   </td>
                   <td class="py-2.5 px-4">
                     <div class="flex items-center gap-1.5">
-                      <span class="w-2.5 h-2.5 rounded-full" [class]="user.is_active ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-white/20'"></span>
-                      <span class="font-medium text-[10px] uppercase tracking-wider">{{ user.is_active ? 'Active' : 'Deactivated' }}</span>
+                      <span class="w-2.5 h-2.5 rounded-full" [class]="user.isActive ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-white/20'"></span>
+                      <span class="font-medium text-[10px] uppercase tracking-wider">{{ user.isActive ? 'Active' : 'Deactivated' }}</span>
                     </div>
                   </td>
-                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ user.last_login_at | date:'medium' }}</td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ user.lastLoginAt | date:'medium' }}</td>
                   <td class="py-2.5 px-4 text-right">
                     <div class="flex justify-end gap-2">
                       <button class="px-3 py-1 bg-white/5 border border-outline-variant/30 text-on-surface text-[10px] font-bold rounded hover:bg-white/10 transition-all cursor-pointer" (click)="editUser(user)">Edit</button>
-                      <button class="px-3 py-1 bg-red-600/10 border border-red-500/20 text-red-400 text-[10px] font-bold rounded hover:bg-red-600/20 transition-all cursor-pointer" (click)="deactivateUser(user)" [disabled]="!user.is_active">Deactivate</button>
+                      <button class="px-3 py-1 bg-red-600/10 border border-red-500/20 text-red-400 text-[10px] font-bold rounded hover:bg-red-600/20 transition-all cursor-pointer" (click)="deactivateUser(user)" [disabled]="!user.isActive">Deactivate</button>
                     </div>
                   </td>
                 </tr>
@@ -121,7 +121,7 @@
           <div class="flex flex-col gap-4">
             <div class="space-y-1">
               <label class="text-[9px] font-mono text-on-surface-variant uppercase">Display Name</label>
-              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newUser.display_name" placeholder="John Doe" />
+              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newUser.displayName" placeholder="John Doe" />
             </div>
             <div class="space-y-1">
               <label class="text-[9px] font-mono text-on-surface-variant uppercase">Email Address</label>
@@ -155,7 +155,7 @@
           <div class="flex flex-col gap-4">
             <div class="space-y-1">
               <label class="text-[9px] font-mono text-on-surface-variant uppercase">Display Name</label>
-              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="editingUser.display_name" />
+              <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="editingUser.displayName" />
             </div>
             <div class="space-y-1">
               <label class="text-[9px] font-mono text-on-surface-variant uppercase">Email Address</label>
@@ -318,16 +318,16 @@
             <tbody>
               @for (entry of auditLog; track $index) {
                 <tr class="border-b border-outline-variant/20 hover:bg-white/5 transition-colors text-xs text-on-surface">
-                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px] text-nowrap">{{ entry.timestamp | date:'medium' }}</td>
-                  <td class="py-2.5 px-4 font-bold">{{ entry.user }}</td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px] text-nowrap">{{ entry.createdAt | date:'medium' }}</td>
+                  <td class="py-2.5 px-4 font-bold">{{ entry.actorId }}</td>
                   <td class="py-2.5 px-4">
                     <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider text-center"
                       [class]="entry.action === 'Update Setting' ? 'bg-orange-500/10 border border-orange-500/20 text-orange-400' : entry.action === 'Bypass Auth' ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-primary/10 border border-primary/20 text-primary-container'">
                       {{ entry.action }}
                     </span>
                   </td>
-                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ entry.resource }}</td>
-                  <td class="py-2.5 px-4 text-on-surface-variant leading-relaxed">{{ entry.details }}</td>
+                  <td class="py-2.5 px-4 text-on-surface-variant font-mono text-[10px]">{{ entry.entityType }}</td>
+                  <td class="py-2.5 px-4 text-on-surface-variant leading-relaxed">{{ entry.action }}</td>
                 </tr>
               }
             </tbody>

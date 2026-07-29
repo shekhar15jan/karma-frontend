@@ -2,17 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
-import { ApiService } from '../../shared/services/api.service';
-
-export interface AgentPaletteItem {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  category: string;
-}
+import { AgentsService } from '../../shared/services/agents.service';
+import { WorkflowsService } from '../../shared/services/workflows.service';
+import { AgentResponse } from '../../shared/models/agent.model';
 
 export interface WorkflowNode {
   id: string;
@@ -40,7 +32,7 @@ export interface WorkflowEdge {
   styleUrl: './workflow-designer.component.scss',
 })
 export class WorkflowDesignerComponent implements OnInit {
-  agents: AgentPaletteItem[] = [];
+  agents: AgentResponse[] = [];
   nodes: WorkflowNode[] = [];
   edges: WorkflowEdge[] = [];
   selectedNode: WorkflowNode | null = null;
@@ -61,21 +53,27 @@ export class WorkflowDesignerComponent implements OnInit {
 
   private destroy$ = new Subject<void>();
 
-  constructor(private readonly api: ApiService) {}
+  constructor(
+    private readonly agentsService: AgentsService,
+    private readonly workflowsService: WorkflowsService,
+  ) {}
 
   ngOnInit(): void {
-    this.api.get<AgentPaletteItem[]>('/v1/agents')
-      .pipe(
-        catchError(() => of([])),
-        takeUntil(this.destroy$),
-      )
-      .subscribe(agents => {
-        this.agents = agents;
-        this.loading = false;
+    this.agentsService.getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (agents) => {
+          this.agents = agents;
+          this.loading = false;
+        },
+        error: () => {
+          this.loading = false;
+          this.error = 'Failed to load agents.';
+        }
       });
   }
 
-  addNode(agent: AgentPaletteItem): void {
+  addNode(agent: AgentResponse): void {
     const id = `node-${this.nodes.length + 1}-${Date.now()}`;
     const node: WorkflowNode = {
       id,
@@ -141,41 +139,43 @@ export class WorkflowDesignerComponent implements OnInit {
 
   saveWorkflow(): void {
     this.saving = true;
+    this.error = null;
     const payload = {
       name: this.workflowName,
       nodes: this.nodes,
       edges: this.edges,
     };
-    this.api.post('/v1/workflows', payload)
-      .pipe(
-        catchError(() => {
+    this.workflowsService.saveWorkflow(payload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.saving = false;
+        },
+        error: () => {
           this.error = 'Failed to save workflow.';
-          return of(null);
-        }),
-        takeUntil(this.destroy$),
-      )
-      .subscribe(() => {
-        this.saving = false;
+          this.saving = false;
+        }
       });
   }
 
   runWorkflow(): void {
     this.running = true;
+    this.error = null;
     const payload = {
       name: this.workflowName,
       nodes: this.nodes,
       edges: this.edges,
     };
-    this.api.post('/v1/workflows/run', payload)
-      .pipe(
-        catchError(() => {
+    this.workflowsService.runWorkflow(payload)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.running = false;
+        },
+        error: () => {
           this.error = 'Failed to run workflow.';
-          return of(null);
-        }),
-        takeUntil(this.destroy$),
-      )
-      .subscribe(() => {
-        this.running = false;
+          this.running = false;
+        }
       });
   }
 

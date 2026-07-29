@@ -1,6 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService } from '../../shared/services/api.service';
+import { Subject, takeUntil } from 'rxjs';
+import { MissionsService } from '../../shared/services/missions.service';
+import { ExecutionsService } from '../../shared/services/executions.service';
+import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
 
 interface WorkerState {
   id: string;
@@ -18,73 +21,75 @@ interface WorkerState {
   styleUrls: ['./mission-control.component.scss']
 })
 export class MissionControlComponent implements OnInit, OnDestroy {
+  executions: ExecutionResponse[] = [];
+  steps: ExecutionStepResponse[] = [];
   workers: WorkerState[] = [];
   logs: string[] = [];
-  cpuLoad = 42;
-  gpuLoad = 68;
-  queueSize = 3;
-  private logInterval: any;
-  private progressInterval: any;
+  cpuLoad = 0;
+  gpuLoad = 0;
+  queueSize = 0;
+  loading = false;
+  error: string | null = null;
 
-  constructor(private readonly api: ApiService) {}
+  private destroy$ = new Subject<void>();
+
+  constructor(
+    private readonly missionsService: MissionsService,
+    private readonly executionsService: ExecutionsService,
+  ) {}
 
   ngOnInit(): void {
-    this.workers = [
-      { id: 'W-1', name: 'Renderer Thread 1', task: 'Stitching video tracks via FFmpeg', progress: 45, status: 'running' },
-      { id: 'W-2', name: 'TTS Voice Engine', task: 'Synthesizing voiceover track', progress: 82, status: 'running' },
-      { id: 'W-3', name: 'Asset Downloader', task: 'Idle', progress: 0, status: 'idle' }
-    ];
-
-    this.logs = [
-      '[SYSTEM] Initializing Mission Control Worker Threads...',
-      '[SYSTEM] All connections to OpenRouter API verified.',
-      '[W-2] Generating audio speech track for script PRJ-01...',
-      '[W-1] Parsing media source clips (4 video tracks found)...',
-      '[SYSTEM] Waiting for publisher queue approvals...'
-    ];
-
-    this.startSimulation();
+    this.loadExecutions();
   }
 
   ngOnDestroy(): void {
-    if (this.logInterval) clearInterval(this.logInterval);
-    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
-  private startSimulation(): void {
-    // Simulate log outputs
-    const sampleLogs = [
-      '[W-1] Rendered chunk 12/64 in 1.2s (avg latency 140ms)',
-      '[W-2] Speech synthesis completed for scene 3',
-      '[SYSTEM] Memory garbage collection clean completed',
-      '[W-3] Fetching image asset from unsplash provider...',
-      '[SYSTEM] Syncing analytics dashboards...'
-    ];
+  private loadExecutions(): void {
+    this.loading = true;
+    this.error = null;
 
-    this.logInterval = setInterval(() => {
-      const randomLog = sampleLogs[Math.floor(Math.random() * sampleLogs.length)];
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
-      this.logs.unshift(`[${timestamp}] ${randomLog}`);
-      if (this.logs.length > 50) this.logs.pop();
-
-      // Slightly fluctuate cpu/gpu load
-      this.cpuLoad = Math.max(20, Math.min(95, this.cpuLoad + (Math.random() > 0.5 ? 4 : -4)));
-      this.gpuLoad = Math.max(30, Math.min(98, this.gpuLoad + (Math.random() > 0.5 ? 5 : -5)));
-    }, 3000);
-
-    // Simulate progress updates
-    this.progressInterval = setInterval(() => {
-      this.workers = this.workers.map(w => {
-        if (w.status === 'running') {
-          let nextProgress = w.progress + Math.floor(Math.random() * 8) + 2;
-          if (nextProgress >= 100) {
-            nextProgress = 0;
-            w.task = w.id === 'W-1' ? 'Compiling audio tracks' : 'Generating TTS';
+    this.executionsService.getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (executions) => {
+          this.executions = executions;
+          if (executions.length > 0) {
+            this.loadSteps(executions[0].id);
+            this.workers = executions.slice(0, 4).map((ex, i) => ({
+              id: ex.id.substring(0, 4),
+              name: `Execution ${i + 1}`,
+              task: `Mission ${ex.missionId?.substring(0, 8) || 'N/A'}`,
+              progress: ex.status === 'COMPLETED' ? 100 : ex.status === 'RUNNING' ? 45 : 0,
+              status: (ex.status === 'RUNNING' ? 'running' : ex.status === 'COMPLETED' ? 'idle' : 'paused') as 'running' | 'idle' | 'paused',
+            }));
+            this.cpuLoad = executions.filter(e => e.status === 'RUNNING').length * 15;
+            this.gpuLoad = executions.filter(e => e.status === 'RUNNING').length * 20;
           }
-          return { ...w, progress: nextProgress };
+          this.loading = false;
+        },
+        error: (err) => {
+          this.error = 'Failed to load executions.';
+          this.loading = false;
+          console.error('Failed to fetch executions', err);
         }
-        return w;
       });
-    }, 1500);
+  }
+
+  private loadSteps(executionId: string): void {
+    this.executionsService.getSteps(executionId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (steps) => {
+          this.steps = steps;
+          this.queueSize = steps.filter(s => s.status === 'PENDING').length;
+        },
+        error: (err) => {
+          console.error('Failed to load steps', err);
+          this.error = 'Failed to load execution steps.';
+        }
+      });
   }
 }

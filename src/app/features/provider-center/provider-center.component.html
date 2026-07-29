@@ -36,7 +36,7 @@
             <div class="flex justify-between items-start">
               <div>
                 <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0.5">{{ provider.name }}</h4>
-                <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider">{{ provider.provider_type }}</span>
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider">{{ provider.providerType }}</span>
               </div>
               
               <div class="flex items-center gap-1.5 bg-white/5 border border-outline-variant/30 px-2.5 py-0.5 rounded-full">
@@ -65,17 +65,17 @@
             <div class="grid grid-cols-3 gap-2 py-2 border-y border-outline-variant/20 text-center bg-white/5 rounded-lg">
               <div>
                 <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Latency</span>
-                <span class="text-xs font-bold text-on-surface">{{ healthData.get(provider.id)?.latency_ms ?? '—' }}ms</span>
+                <span class="text-xs font-bold text-on-surface">{{ provider.metrics.latencyMs || '—' }}ms</span>
               </div>
               <div>
                 <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Error Rate</span>
-                <span class="text-xs font-bold text-on-surface" [class.text-red-400]="(healthData.get(provider.id)?.error_rate ?? 0) > 0">
-                  {{ healthData.get(provider.id)?.error_rate ?? '—' }}%
+                <span class="text-xs font-bold text-on-surface" [class.text-red-400]="(provider.metrics.errorRate || 0) > 0">
+                  {{ provider.metrics.errorRate || '—' }}%
                 </span>
               </div>
               <div>
                 <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Usage/hr</span>
-                <span class="text-xs font-bold text-on-surface">{{ healthData.get(provider.id)?.requests_last_hour ?? '—' }}</span>
+                <span class="text-xs font-bold text-on-surface">{{ provider.metrics.requestsLastHour || '—' }}</span>
               </div>
             </div>
 
@@ -108,9 +108,22 @@
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Provider Name</label>
             <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProvider.name" placeholder="OpenRouter API" />
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Type</label>
+            <select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
+              <option value="OPENAI">OpenAI</option>
+              <option value="ANTHROPIC">Anthropic</option>
+              <option value="GEMINI">Google Gemini</option>
+              <option value="OPENROUTER">OpenRouter (200+ Models)</option>
+              <option value="OPENCODE">OpenCode (Local)</option>
+              <option value="OLLAMA">Local Ollama</option>
+              <option value="CUSTOM">Custom Endpoint</option>
+            </select>
+          </div>
           <div class="space-y-1">
-            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Provider Type / Endpoint Gateway</label>
-            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProvider.provider_type" placeholder="OpenRouter Gateway" />
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for OpenCode)</span></label>
+            <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
+            <span class="text-[8px] text-on-surface-variant">For OpenRouter: get your key at openrouter.ai/keys · For OpenCode: leave blank</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Supported Models (comma-separated)</label>

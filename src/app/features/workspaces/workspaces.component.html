@@ -1,0 +1,95 @@
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+  <!-- Title Header -->
+  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">workspaces</span>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-none">Workspace Management</h2>
+        <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-1 block">Organize projects, manage access, and configure overarching environments</span>
+      </div>
+    </div>
+    
+    <button 
+      (click)="openCreateModal()"
+      class="px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary-container text-xs font-bold rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+      <span class="material-symbols-outlined text-sm">add</span> New Workspace
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto no-scrollbar flex-grow content-start">
+    @if (loading && workspaces.length === 0) {
+      <div class="col-span-full flex justify-center py-12">
+        <span class="material-symbols-outlined text-primary text-4xl animate-spin">refresh</span>
+      </div>
+    }
+
+    @for (ws of workspaces; track ws.id) {
+      <div class="lightning-panel rounded-xl p-5 flex flex-col gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)] relative overflow-hidden group">
+        
+        <!-- Status Indicator Strip -->
+        <div class="absolute top-0 left-0 w-full h-1" [ngClass]="ws.status === 'ACTIVE' ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : 'bg-red-400'"></div>
+        
+        <div class="flex justify-between items-start mt-2">
+          <div>
+            <h3 class="text-sm font-bold text-on-surface mb-1">{{ ws.name }}</h3>
+            <p class="text-[10px] text-on-surface-variant line-clamp-2 leading-relaxed">{{ ws.description || 'No description provided.' }}</p>
+          </div>
+          <button (click)="archiveWorkspace(ws)" title="Archive Workspace" class="material-symbols-outlined text-on-surface-variant hover:text-red-400 transition-colors text-lg opacity-0 group-hover:opacity-100 cursor-pointer">
+            archive
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-white/5">
+          <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg border border-white/5">
+            <span class="text-lg font-bold text-primary glow-text">{{ ws.projectCount }}</span>
+            <span class="text-[8px] uppercase tracking-wider text-on-surface-variant">Projects</span>
+          </div>
+          <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg border border-white/5">
+            <span class="text-lg font-bold text-secondary glow-text">{{ ws.missionCount }}</span>
+            <span class="text-[8px] uppercase tracking-wider text-on-surface-variant">Missions</span>
+          </div>
+          <div class="flex flex-col items-center p-2 bg-white/5 rounded-lg border border-white/5">
+            <span class="text-lg font-bold text-tertiary glow-text">{{ ws.artifactCount }}</span>
+            <span class="text-[8px] uppercase tracking-wider text-on-surface-variant">Artifacts</span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Create Modal Overlay -->
+  @if (showCreateModal) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative">
+        <button (click)="closeCreateModal()" class="absolute top-4 right-4 material-symbols-outlined text-on-surface-variant hover:text-on-surface cursor-pointer">close</button>
+        
+        <div>
+          <h3 class="text-lg font-bold text-on-surface mb-1">Create New Workspace</h3>
+          <p class="text-xs text-on-surface-variant">Establish a new isolated environment for projects.</p>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Workspace Name <span class="text-red-400">*</span></label>
+            <input type="text" [(ngModel)]="newWorkspace.name" class="bg-surface-container/50 border border-outline-variant/30 rounded-lg p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-on-surface-variant/50" placeholder="e.g. Marketing Division">
+          </div>
+          
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Description</label>
+            <textarea [(ngModel)]="newWorkspace.description" rows="3" class="bg-surface-container/50 border border-outline-variant/30 rounded-lg p-2.5 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all resize-none placeholder:text-on-surface-variant/50" placeholder="Purpose of this workspace..."></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-2">
+          <button (click)="closeCreateModal()" class="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer">Cancel</button>
+          <button (click)="createWorkspace()" [disabled]="!newWorkspace.name || loading" class="px-6 py-2 bg-primary/20 hover:bg-primary/40 disabled:opacity-50 disabled:cursor-not-allowed border border-primary/50 text-primary-container text-xs font-bold rounded-lg transition-all shadow-[0_0_15px_rgba(0,229,255,0.2)] cursor-pointer flex items-center gap-2">
+            @if (loading) {
+              <span class="material-symbols-outlined text-sm animate-spin">refresh</span>
+            }
+            Create Workspace
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

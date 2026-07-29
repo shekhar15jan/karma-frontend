@@ -1,17 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../shared/services/api.service';
-
-interface SystemAgent {
-  id: string;
-  name: string;
-  description: string;
-  role: string;
-  successRate: number;
-  totalRuns: number;
-  temperature: number;
-}
+import { AgentsService } from '../../shared/services/agents.service';
+import { AgentResponse } from '../../shared/models/agent.model';
 
 @Component({
   selector: 'app-agents',
@@ -21,11 +12,12 @@ interface SystemAgent {
   styleUrls: ['./agents.component.scss']
 })
 export class AgentsComponent implements OnInit {
-  agents: SystemAgent[] = [];
-  selectedAgent: SystemAgent | null = null;
+  agents: AgentResponse[] = [];
+  selectedAgent: AgentResponse | null = null;
   loading = false;
+  error: string | null = null;
 
-  constructor(private readonly api: ApiService) {}
+  constructor(private readonly agentsService: AgentsService) {}
 
   ngOnInit(): void {
     this.loadAgents();
@@ -33,44 +25,34 @@ export class AgentsComponent implements OnInit {
 
   loadAgents(): void {
     this.loading = true;
-    this.api.get<SystemAgent[]>('/v1/agents/list').subscribe({
+    this.error = null;
+    this.agentsService.getAll().subscribe({
       next: (data) => {
-        this.agents = data && data.length ? data : this.getMockAgents();
+        this.agents = data;
         this.loading = false;
       },
-      error: () => {
-        this.agents = this.getMockAgents();
+      error: (err) => {
+        this.error = 'Failed to load agents.';
         this.loading = false;
+        console.error('Failed to fetch agents', err);
       }
     });
   }
 
-  selectAgent(agent: SystemAgent): void {
+  selectAgent(agent: AgentResponse): void {
     this.selectedAgent = { ...agent };
   }
 
   saveAgentSettings(): void {
     if (!this.selectedAgent) return;
-    this.api.post(`/v1/agents/${this.selectedAgent.id}/configure`, this.selectedAgent).subscribe({
+    this.agentsService.update(this.selectedAgent.id, this.selectedAgent).subscribe({
       next: () => {
         this.agents = this.agents.map(a => a.id === this.selectedAgent!.id ? this.selectedAgent! : a);
         this.selectedAgent = null;
       },
-      error: () => {
-        // Local fallback update
-        this.agents = this.agents.map(a => a.id === this.selectedAgent!.id ? this.selectedAgent! : a);
-        this.selectedAgent = null;
+      error: (err) => {
+        console.error('Failed to save agent settings', err);
       }
     });
-  }
-
-  private getMockAgents(): SystemAgent[] {
-    return [
-      { id: 'agent-1', name: 'Project Manager', description: 'Orchestrates the entire generation pipeline and allocates resources.', role: 'Coordinator', successRate: 98, totalRuns: 1420, temperature: 0.2 },
-      { id: 'agent-2', name: 'Research Agent', description: 'Gathers trending news facts, search transcripts, and analytics.', role: 'Information Gatherer', successRate: 95, totalRuns: 1105, temperature: 0.3 },
-      { id: 'agent-3', name: 'Script Writer', description: 'Generates creative script dialogs, speech narration, and stage directions.', role: 'Creative Director', successRate: 92, totalRuns: 950, temperature: 0.7 },
-      { id: 'agent-4', name: 'Fact Checker', description: 'Verifies script statements and parameters before rendering.', role: 'Auditor', successRate: 99, totalRuns: 820, temperature: 0.1 },
-      { id: 'agent-5', name: 'Audience Analyst', description: 'Applies hook formulas to optimize the first 5 seconds for viral appeal.', role: 'Optimizer', successRate: 94, totalRuns: 730, temperature: 0.6 }
-    ];
   }
 }

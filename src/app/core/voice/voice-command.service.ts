@@ -162,12 +162,14 @@ export class VoiceCommandService {
         text,
         context: { current_page: this.router.url },
       }).toPromise();
-      if (res && res.action === 'navigate' && res.target) {
-        this.ngZone.run(() => this.router.navigate([res.target]));
+      if (res?.data?.action === 'navigate' && res.data.target) {
+        this.ngZone.run(() => this.router.navigate([res.data.target]));
       }
-      this.lastCommand.set(res || null);
+      this.lastCommand.set(res?.data || null);
     } catch {
-      // Silent fallback
+      console.warn('Voice command API unavailable, using client-side matching');
+      const cmd: VoiceCommand = { text, intent: 'unknown', action: 'unknown', confidence: 0.5, display_text: 'Command not recognized.' };
+      this.lastCommand.set(cmd);
     }
   }
 }

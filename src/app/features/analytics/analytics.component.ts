@@ -60,29 +60,35 @@ export class AnalyticsComponent implements OnInit {
 
   loadData(): void {
     this.loading = true;
-    const period = this.selectedPeriod === 'custom' ? 'custom' : this.selectedPeriod;
 
-    this.api.get<AnalyticsSummary>(`/v1/analytics/summary?period=${period}`).subscribe({
-      next: (data) => (this.summary = data),
-    });
-
-    const dailyParams =
-      this.selectedPeriod === 'custom'
-        ? `from=${this.dateFrom}&to=${this.dateTo}`
-        : `period=${this.selectedPeriod}`;
-    this.api.get<DailyExecution[]>(`/v1/analytics/daily?${dailyParams}`).subscribe({
-      next: (data) => {
-        this.dailyData = data;
+    this.api.get<any>('/v1/reports/dashboard').subscribe({
+      next: (res) => {
+        const data = res?.data || res;
+        if (data) {
+          this.summary = {
+            total_executions: data.totalExecutions || data.total_executions || 0,
+            avg_duration_ms: data.avgDurationMs || data.avg_duration_ms || 0,
+            total_cost: data.totalCost || data.total_cost || 0,
+            success_rate: data.successRate || data.success_rate || 0,
+          };
+        }
         this.loading = false;
       },
+      error: () => {
+        this.loading = false;
+      }
     });
 
-    this.api.get<CostBreakdown[]>(`/v1/analytics/costs?period=${this.selectedPeriod}`).subscribe({
-      next: (data) => (this.costData = data),
-    });
-
-    this.api.get<SlowWorkflow[]>('/v1/analytics/slow-workflows?limit=10').subscribe({
-      next: (data) => (this.slowWorkflows = data),
+    this.api.get<any>('/v1/reports/missions').subscribe({
+      next: (res) => {
+        const data = res?.data || res;
+        if (data) {
+          this.dailyData = data.dailyExecutions || data.daily_data || [];
+          this.costData = data.costBreakdown || data.cost_breakdown || [];
+          this.slowWorkflows = data.slowWorkflows || data.slow_workflows || [];
+        }
+      },
+      error: () => {}
     });
   }
 

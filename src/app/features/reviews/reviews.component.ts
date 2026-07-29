@@ -1,5 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ApiService } from '../../shared/services/api.service';
+import { ArtifactsService } from '../../shared/services/artifacts.service';
+import { ArtifactResponse } from '../../shared/models/artifact.model';
 
 interface VideoDraft {
   id: string;
@@ -19,14 +22,35 @@ interface VideoDraft {
 export class ReviewsComponent implements OnInit {
   drafts: VideoDraft[] = [];
   selectedDraft: VideoDraft | null = null;
+  loading = false;
+
+  constructor(
+    private readonly api: ApiService,
+    private readonly artifactsService: ArtifactsService,
+  ) {}
 
   ngOnInit(): void {
-    this.drafts = [
-      { id: 'draft-1', title: 'Why Agentic AI is the Future of Tech', duration: '00:58', scriptSnippet: 'Artificial Intelligence is evolving rapidly, but the real revolution is in agentic workflows. Instead of standard answers, agents plan and execute...', status: 'pending_review' },
-      { id: 'draft-2', title: 'Why developers love Karma OS', duration: '01:15', scriptSnippet: 'Operating systems are built for users, but what about creators? Karma OS acts as your companion, automating the content lifecycle end-to-end...', status: 'pending_review' },
-      { id: 'draft-3', title: 'Stitch UI layout explanation', duration: '00:45', scriptSnippet: 'Aesthetics are not just visuals, they represent user experience. Stitch UI brings radial gradients and neon accents to build dark HUD consoles...', status: 'approved' }
-    ];
-    this.selectedDraft = this.drafts[0];
+    this.loadDrafts();
+  }
+
+  loadDrafts(): void {
+    this.loading = true;
+    this.artifactsService.getPendingReview().subscribe({
+      next: (artifacts) => {
+        this.drafts = artifacts.map((a: ArtifactResponse) => ({
+          id: String(a.id),
+          title: a.name || 'Untitled Artifact',
+          duration: '00:30',
+          scriptSnippet: a.contentText?.substring(0, 120) || '',
+          status: (a.reviewStatus === 'APPROVED' ? 'approved' : a.reviewStatus === 'REJECTED' ? 'rejected' : 'pending_review') as 'pending_review' | 'approved' | 'rejected'
+        }));
+        this.selectedDraft = this.drafts.length > 0 ? this.drafts[0] : null;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      }
+    });
   }
 
   selectDraft(draft: VideoDraft): void {

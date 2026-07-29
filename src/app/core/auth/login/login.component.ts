@@ -105,10 +105,16 @@ export class LoginComponent {
   }
 
   bypass(): void {
-    this.auth.handleAuthResponse({
-      access_token: 'mock_local_dev_token',
-      user_id: 'dev_user_1',
-      display_name: 'Chandrashekhar'
+    this.loading = true;
+    this.error = '';
+    const email = this.email || 'dev@karma.local';
+    const password = this.password || 'dev123';
+    this.auth.devBypass(email, password).subscribe({
+      next: (res) => this.auth.handleAuthResponse(res),
+      error: (err) => {
+        this.error = err.error?.detail || 'Bypass failed';
+        this.loading = false;
+      },
     });
   }
 

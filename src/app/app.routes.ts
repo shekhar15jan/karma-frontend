@@ -18,6 +18,13 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
+        path: 'workspaces',
+        loadComponent: () =>
+          import('./features/workspaces/workspaces.component').then(
+            (m) => m.WorkspacesComponent,
+          ),
+      },
+      {
         path: 'dashboard',
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then(

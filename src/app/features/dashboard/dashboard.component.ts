@@ -2,14 +2,10 @@ import { Component, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { ApiService } from '../../shared/services/api.service';
-
-interface Project {
-  id: string;
-  name: string;
-  status: string;
-  created_at: string;
-}
+import { DashboardService } from '../../shared/services/dashboard.service';
+import { MissionResponse } from '../../shared/models/mission.model';
+import { FlowResponse } from '../../shared/models/flow.model';
+import { ArtifactResponse } from '../../shared/models/artifact.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -19,33 +15,32 @@ interface Project {
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
-  projects: Project[] = [];
-  
-  // Real Data Variables
-  activeMission: any = null;
-  flowsList: any[] = [];
-  pendingApprovals: any[] = [];
-  
+  activeMission: (MissionResponse & { formattedDate?: string }) | null = null;
+  flowsList: (FlowResponse & { icon?: string; status?: string })[] = [];
+  pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
+
   // Hardware Diagnostics State
   cpuLoad: number = 42;
   gpuLoad: number = 78;
   queueSize: number = 14;
-  workers: any[] = [];
+  workers: { id: number; name: string; task: string; status: string; progress: number }[] = [];
   logs: string[] = [];
   private hwInterval: any;
-  
+
   loading = false;
   error: string | null = null;
   heardCommand = 'Say "Wake up Karma" to begin';
 
   // Wake Up Sequence States
   isSystemAwake = false;
+  systemStatusTab: 'health' | 'hardware' = 'health';
+  leftPanelTab: 'agents' | 'providers' = 'agents';
   systemHealth = {
-    core: 'Healthy',
-    providers: 'Healthy',
-    mcp: 'Healthy',
-    runtime: 'Healthy',
-    voice: 'Healthy'
+    core: 'Healthy' as string,
+    providers: 'Healthy' as string,
+    mcp: 'Healthy' as string,
+    runtime: 'Healthy' as string,
+    voice: 'Healthy' as string
   };
   agentStatusList: any[] = [];
   defaultAgents = [
@@ -78,7 +73,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   };
 
   private systemDiagnosticStartListener = () => {
-    this.isSystemAwake = true; // Show the panel immediately
+    this.isSystemAwake = true;
     this.systemHealth = {
       core: 'Checking...',
       providers: 'Checking...',
@@ -121,11 +116,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         runtime: e.detail.runtime || 'Healthy'
       };
     }
-    
 
     if (e.detail && e.detail.agents) {
       this.agentStatusList = e.detail.agents.map((a: any) => {
-        // Find matching default agent to retain its unique identity color
         const defaultAgent = this.defaultAgents.find(da => da.name === a.name);
         return {
           ...a,
@@ -136,19 +129,18 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         };
       });
 
-      // Simulate lifecycle phases for all agents
       setTimeout(() => {
-        this.agentStatusList.forEach(a => { if (a.status !== 'Ready') a.status = 'Context Prep...'; });
+        this.agentStatusList.forEach((a: any) => { if (a.status !== 'Ready') a.status = 'Context Prep...'; });
       }, 2000);
       setTimeout(() => {
-        this.agentStatusList.forEach(a => { if (a.status !== 'Ready') a.status = 'Validating...'; });
+        this.agentStatusList.forEach((a: any) => { if (a.status !== 'Ready') a.status = 'Validating...'; });
       }, 3000);
     }
   };
 
   private agentReadyListener = (e: any) => {
     if (e.detail && e.detail.agentId) {
-      const agent = this.agentStatusList.find(a => a.id === e.detail.agentId);
+      const agent = this.agentStatusList.find((a: any) => a.id === e.detail.agentId);
       if (agent) {
         agent.status = 'Ready';
         agent.borderClass = 'border-green-400/50';
@@ -167,7 +159,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     };
   };
 
-  constructor(private readonly api: ApiService) {}
+  constructor(private readonly dashboardService: DashboardService) {}
 
   ngOnInit(): void {
     this.loadDashboard();
@@ -179,8 +171,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.addEventListener('system-wake-up-failed', this.wakeUpFailedListener);
     window.addEventListener('agent-ready', this.agentReadyListener);
     window.addEventListener('karma-speaking', (e: any) => this.isKarmaSpeaking = e.detail);
-    
-    // Simulate live hardware load
+
     this.hwInterval = setInterval(() => {
       this.cpuLoad = Math.max(10, Math.min(100, this.cpuLoad + (Math.random() * 10 - 5)));
       this.gpuLoad = Math.max(10, Math.min(100, this.gpuLoad + (Math.random() * 10 - 5)));
@@ -213,53 +204,56 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private loadDashboard(): void {
     this.loading = true;
-    
-    // Fetch Active Mission (Find first with status IN_PROGRESS or fallback to latest)
-    this.api.get<any[]>('/v1/missions')
+
+    this.dashboardService.getMissions()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (response: any) => {
-          const missions = response?.data || response || [];
+        next: (missions) => {
           if (missions.length > 0) {
             this.activeMission = missions.find((m: any) => m.status === 'IN_PROGRESS' || m.status === 'ACTIVE') || missions[0];
             if (this.activeMission?.createdAt) {
               this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             }
-          } else {
-            this.activeMission = this.getMockActiveMission();
           }
         },
         error: (err) => {
-          console.error('Failed to fetch missions, using fallback', err);
-          this.activeMission = this.getMockActiveMission();
+          console.error('Failed to fetch missions', err);
         }
       });
 
-    // Fetch Flows
-    this.api.get<any[]>('/v1/flows')
+    this.dashboardService.getFlows()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (response: any) => {
-          const flows = response?.data || response || [];
-          this.flowsList = flows.length > 0 ? flows : this.getMockFlows();
+        next: (flows) => {
+          this.flowsList = flows.map(f => ({
+            ...f,
+            icon: f.category === 'RESEARCH' ? 'manage_search'
+                : f.category === 'CONTENT' ? 'edit_note'
+                : f.category === 'MEDIA' ? 'movie'
+                : f.category === 'REVIEW' ? 'rate_review'
+                : f.category === 'PUBLISHING' ? 'publish'
+                : 'account_tree',
+            status: f.enabled ? 'ACTIVE' : 'PENDING'
+          }));
         },
         error: (err) => {
-          console.error('Failed to fetch flows, using fallback', err);
-          this.flowsList = this.getMockFlows();
+          console.error('Failed to fetch flows', err);
         }
       });
 
-    // Fetch Pending Approvals
-    this.api.get<any[]>('/v1/artifacts/pending-review')
+    this.dashboardService.getPendingApprovals()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (response: any) => {
-          const approvals = response?.data || response || [];
-          this.pendingApprovals = approvals.length > 0 ? approvals : this.getMockApprovals();
+        next: (approvals) => {
+          this.pendingApprovals = approvals.map(a => ({
+            ...a,
+            title: a.name || `Artifact #${a.id}`,
+            type: a.artifactType || 'DOCUMENT',
+            formattedDate: a.createdAt ? new Date(a.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'
+          }));
         },
         error: (err) => {
-          console.error('Failed to fetch pending approvals, using fallback', err);
-          this.pendingApprovals = this.getMockApprovals();
+          console.error('Failed to fetch pending approvals', err);
         }
       });
 
@@ -306,34 +300,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   triggerVoiceCommand(): void {
     window.dispatchEvent(new CustomEvent('trigger-operator-mic'));
-  }
-
-  // --- Mock Data Fallbacks ---
-  private getMockActiveMission(): any {
-    return {
-      name: 'AI Product Launch Campaign',
-      missionType: 'PRJ-2025-05-016',
-      status: 'IN_PROGRESS',
-      formattedDate: 'May 14, 10:30 AM'
-    };
-  }
-
-  private getMockFlows(): any[] {
-    return [
-      { id: 1, name: 'Research Flow', status: 'COMPLETED', icon: 'manage_search' },
-      { id: 2, name: 'Content Flow', status: 'COMPLETED', icon: 'edit_note' },
-      { id: 3, name: 'Media Flow', status: 'IN_PROGRESS', icon: 'movie' },
-      { id: 4, name: 'Review Flow', status: 'PENDING', icon: 'rate_review' },
-      { id: 5, name: 'Publishing Flow', status: 'PENDING', icon: 'publish' }
-    ];
-  }
-
-  private getMockApprovals(): any[] {
-    return [
-      { id: 1, title: 'YouTube Script', type: 'VIDEO_SCRIPT', formattedDate: '2m ago' },
-      { id: 2, title: 'Blog Post', type: 'BLOG_POST', formattedDate: '4m ago' },
-      { id: 3, title: 'LinkedIn Post', type: 'SOCIAL_POST', formattedDate: '6m ago' }
-    ];
   }
 
   private loadHardwareMock(): void {

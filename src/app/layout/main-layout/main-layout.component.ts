@@ -3,6 +3,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/rou
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../shared/services/api.service';
+import { AuthService } from '../../core/auth/auth.service';
 import { firstValueFrom } from 'rxjs';
 
 interface ChatMessage {
@@ -31,9 +32,38 @@ interface ChatMessage {
           <button (click)="toggleSidebar()" class="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all cursor-pointer">
             {{ showSidebar ? 'menu_open' : 'menu' }}
           </button>
-          <h1 class="text-xl font-bold text-on-surface tracking-tighter flex items-center gap-2">
+          <h1 class="text-xl font-bold text-on-surface tracking-tighter flex items-center gap-2 border-r border-outline-variant/30 pr-6 mr-2">
             KARMA <span class="text-primary font-light">OS</span>
           </h1>
+          
+          <!-- Workspace Selector -->
+          <div class="relative group cursor-pointer">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-outline-variant/20">
+              <span class="material-symbols-outlined text-primary text-sm">workspaces</span>
+              <div class="flex flex-col">
+                <span class="text-[9px] uppercase tracking-wider text-on-surface-variant leading-none font-bold">Workspace</span>
+                <span class="text-xs font-semibold text-on-surface leading-none mt-1">Alpha Video Agency</span>
+              </div>
+              <span class="material-symbols-outlined text-on-surface-variant text-sm ml-1">expand_more</span>
+            </div>
+            <!-- Dropdown -->
+            <div class="absolute top-full mt-2 left-0 w-48 bg-background border border-outline-variant/30 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+              <div class="p-2 flex flex-col gap-1">
+                <div class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 border border-primary/30 bg-primary/10">
+                   <span class="material-symbols-outlined text-primary text-sm">check</span>
+                   <span class="text-xs font-semibold text-primary">Alpha Video Agency</span>
+                </div>
+                <div class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 pl-8">
+                   <span class="text-xs text-on-surface-variant">Personal Sandbox</span>
+                </div>
+                <div class="h-px bg-outline-variant/20 my-1"></div>
+                <a routerLink="/workspaces" class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 text-decoration-none">
+                   <span class="material-symbols-outlined text-on-surface-variant text-sm">settings</span>
+                   <span class="text-xs text-on-surface-variant font-medium">Manage Workspaces</span>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="flex flex-col items-center">
           <span class="text-sm font-semibold text-on-surface">Good Morning, Chandrashekhar</span>
@@ -128,7 +158,7 @@ interface ChatMessage {
       </aside>
 
       <!-- MAIN CONTENT AREA -->
-      <main class="mt-20 p-6 h-[calc(100vh-160px)] overflow-hidden transition-all duration-300"
+      <main class="mt-16 p-4 h-[calc(100vh-144px)] overflow-hidden transition-all duration-300"
             [ngClass]="showSidebar ? 'ml-56' : 'ml-20'">
         <router-outlet />
       </main>
@@ -188,7 +218,7 @@ interface ChatMessage {
         </div>
       }
 
-      <footer class="fixed bottom-0 w-full h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-[#00e5ff] shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6">
+      <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-[#00e5ff] shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
         
         <!-- EXTREME LEFT: Wake up Karma -->
         <div class="absolute left-6 flex items-center">
@@ -261,6 +291,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   diagnosticMessage: string | null = null;
 
   protected readonly navItems = [
+    { path: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/workflows', label: 'Flows', icon: 'hub' },
     { path: '/agents', label: 'Agents', icon: 'smart_toy' },
@@ -275,7 +306,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { path: '/administration', label: 'Settings', icon: 'settings' },
   ];
 
-  constructor(private readonly router: Router, private readonly api: ApiService, private cdr: ChangeDetectorRef) {}
+  constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.updateTime();
@@ -294,10 +325,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
 
     // Initial Welcome Message
+    const displayName = this.auth.user()?.displayName || 'Operator';
     this.chatMessages = [
       {
         sender: 'karma',
-        text: 'Good morning, Operator Chandrashekhar. I am online and synced with your system state. How can I assist with your video automation workflows or AI configurations today?',
+        text: `Good morning, Operator ${displayName}. I am online and synced with your system state. How can I assist with your video automation workflows or AI configurations today?`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ];
@@ -349,58 +381,45 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   async wakeUpKarma() {
-    if (this.isSystemAwaking) return; // Prevent multiple concurrent executions
+    if (this.isSystemAwaking) return;
     this.isSystemAwaking = true;
-    this.showChat = false; // explicitly close chat if open to avoid confusion
+    this.showChat = false;
 
     this.chatMessages.push({ sender: 'karma', text: 'Waking up Karma OS. Running system diagnostic...', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
     
-    // Enable Voice
     this.karmaVoiceSpeechEnabled = true;
     if (!this.recognition) {
       this.initSpeech();
       this.startListening();
     }
 
-    // Run system diagnostic sequence
     try {
-      // 1. START DIAGNOSTIC
       this.diagnosticMessage = "Waking up Karma OS. Initiating sequence...";
       window.dispatchEvent(new CustomEvent('system-diagnostic-start'));
       await this.speak("Waking up Karma OS. Initiating sequence.");
-      
-      // 2. CHECK CORE
+
       this.diagnosticMessage = "Checking Core Systems...";
-      let corePromise = firstValueFrom(this.api.get('/v1/reports/dashboard')).catch(e => console.warn("Core check failed, but forcing Healthy for demo...", e));
       await this.speak("Checking Core Systems.");
-      await corePromise;
-      
-      this.diagnosticMessage = "Core Systems are Healthy.";
-      window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { core: 'Healthy' } }));
-      await this.speak("Core systems are healthy.");
-
-      // 3. CHECK PROVIDERS
-      this.diagnosticMessage = "Checking AI Providers...";
-      let providerPromise = firstValueFrom(this.api.get('/v1/providers')).catch(e => {
-        console.warn("Provider check failed...", e);
-        return null;
-      });
-      await this.speak("Checking A I Providers.");
-      
-      let provRes: any = await providerPromise;
-      let providerHealth = 'Offline';
-      if (provRes && provRes.data && provRes.data.length > 0) {
-        providerHealth = 'Online';
+      let coreRes: any = null;
+      try {
+        coreRes = await firstValueFrom(this.api.get('/v1/reports/dashboard'));
+      } catch (e) {
+        console.warn("Core check failed", e);
       }
+      const coreHealthy = coreRes?.data && coreRes.data !== null;
+      this.diagnosticMessage = coreHealthy ? "Core Systems are Healthy." : "Core Systems Unreachable.";
+      window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { core: coreHealthy ? 'Healthy' : 'ERROR' } }));
+      await this.speak(coreHealthy ? "Core systems are healthy." : "Warning. Core systems unreachable.");
 
-      // Simulate pinging actual providers for realism
-      this.diagnosticMessage = "Pinging OpenAI API Engine...";
-      await new Promise(r => setTimeout(r, 600));
-      this.diagnosticMessage = "Pinging Anthropic Claude Engine...";
-      await new Promise(r => setTimeout(r, 600));
-      this.diagnosticMessage = "Pinging Google Gemini Cluster...";
-      await new Promise(r => setTimeout(r, 600));
-      
+      this.diagnosticMessage = "Checking AI Providers...";
+      await this.speak("Checking A I Providers.");
+      let provRes: any = null;
+      try {
+        provRes = await firstValueFrom(this.api.get('/v1/providers'));
+      } catch (e) {
+        console.warn("Provider check failed", e);
+      }
+      const providerHealth = provRes?.data?.length > 0 ? 'Online' : 'Offline';
       if (providerHealth === 'Online') {
         this.diagnosticMessage = "AI Providers Online and Synced.";
         window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { providers: 'Online' } }));
@@ -410,49 +429,23 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { providers: 'Offline' } }));
         await this.speak("A I Providers are currently offline or unreachable.");
       }
-      
-      // 4. CHECK SUBSYSTEMS
-      this.diagnosticMessage = "Checking MCP Servers & Voice Engine...";
-      await this.speak("Checking M C P Servers and Voice Engine.");
-      
-      this.diagnosticMessage = "Subsystems Online.";
+
+      this.diagnosticMessage = "Checking Subsystems...";
+      await this.speak("Checking subsystems.");
       window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { mcp: 'Healthy', voice: 'Healthy' } }));
-      await this.speak("Subsystems online.");
-      
-      // 5. VERIFY UI TABS
-      this.diagnosticMessage = "Verifying UI Modules...";
-      await this.speak("Verifying user interface modules.");
-      for (const tab of this.navItems) {
-        this.diagnosticMessage = `Verified Module: ${tab.label}`;
-        await new Promise(r => setTimeout(r, 150)); // Rapid visual scan
-      }
-      this.diagnosticMessage = "All UI Modules Active.";
-      await this.speak("All interface modules are active and secure.");
-      
-      // 6. FETCH AGENTS
+
       this.diagnosticMessage = "Fetching Agent Runtime...";
-      let runtimeHealth = 'Healthy';
-      let agentsPromise = firstValueFrom(this.api.get('/v1/agents')).catch(e => {
-        console.warn("Agent fetch failed (likely unauthorized), using fallback agents...", e); 
-        runtimeHealth = 'Offline';
-        return [
-          { id: 'AG-001', name: 'Research Agent', icon: 'search', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-002', name: 'Planner Agent', icon: 'assignment', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-003', name: 'Script Agent', icon: 'description', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-004', name: 'Blog Agent', icon: 'feed', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-005', name: 'Image Agent', icon: 'image', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-006', name: 'Thumbnail Agent', icon: 'grid_view', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-007', name: 'Voice Agent', icon: 'mic', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-008', name: 'Video Agent', icon: 'videocam', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-009', name: 'Review Agent', icon: 'rate_review', colorClass: 'text-red-400', status: 'Offline' },
-          { id: 'AG-010', name: 'Publishing Agent', icon: 'publish', colorClass: 'text-red-400', status: 'Offline' }
-        ];
-      });
       await this.speak("Fetching Agent Runtime.");
-      
-      let agentsRes: any = await agentsPromise;
+      let agentsRes: any = null;
+      let runtimeHealth = 'Healthy';
+      try {
+        agentsRes = await firstValueFrom(this.api.get('/v1/agents'));
+      } catch (e) {
+        console.warn("Agent fetch failed", e);
+        runtimeHealth = 'Offline';
+      }
       const agents = agentsRes?.data || agentsRes || [];
-      
+
       if (runtimeHealth === 'Offline') {
         this.diagnosticMessage = "Agent Runtime Offline.";
         await this.speak("Warning. Agent Runtime is currently offline or unreachable.");
@@ -460,27 +453,22 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         this.diagnosticMessage = "Agent Runtime Synced.";
         await this.speak("Agent Runtime is online and synced.");
       }
-      
-      // Dispatch wake up event
-      window.dispatchEvent(new CustomEvent('system-wake-up', { detail: { agents: agents, runtime: runtimeHealth } }));
 
-      // Iterate through agents and vocalize
-      if (agents && agents.length > 0) {
+      window.dispatchEvent(new CustomEvent('system-wake-up', { detail: { agents, runtime: runtimeHealth } }));
+
+      if (agents.length > 0) {
         for (const agent of agents) {
           this.diagnosticMessage = `${agent.name} is Active and Ready for your command`;
-          // Dispatch individual agent ready event so the dashboard can animate them one by one
           window.dispatchEvent(new CustomEvent('agent-ready', { detail: { agentId: agent.id } }));
           await this.speak(`${agent.name} is active and ready for your command`);
         }
       }
 
-      this.diagnosticMessage = "System is healthy. All Agents are online and ready.";
-      await this.speak("System is healthy. All Agents are online and ready.");
-      
+      this.diagnosticMessage = "System diagnostic complete.";
+      await this.speak("System diagnostic complete. All systems accounted for.");
+
       this.isSystemAwaking = false;
-      setTimeout(() => {
-        this.diagnosticMessage = null;
-      }, 4000);
+      setTimeout(() => { this.diagnosticMessage = null; }, 4000);
 
     } catch (err) {
       console.error("Health check failed", err);

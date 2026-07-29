@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/auth/auth.service';
+import { ApiResponse } from '../models/api-response';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -22,22 +24,42 @@ export class ApiService {
   }
 
   get<T>(path: string) {
-    return this.http.get<T>(`${this.baseUrl}${path}`, { headers: this.headers() });
+    return this.http.get<ApiResponse<T>>(`${this.baseUrl}${path}`, { headers: this.headers() });
+  }
+
+  getData<T>(path: string, params?: HttpParams): Observable<T> {
+    return this.http.get<ApiResponse<T>>(`${this.baseUrl}${path}`, { headers: this.headers(), params })
+      .pipe(map(res => res.data));
   }
 
   post<T>(path: string, body: unknown) {
-    return this.http.post<T>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
+    return this.http.post<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
+  }
+
+  postData<T>(path: string, body: unknown): Observable<T> {
+    return this.http.post<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() })
+      .pipe(map(res => res.data));
   }
 
   put<T>(path: string, body: unknown) {
-    return this.http.put<T>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
+    return this.http.put<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
+  }
+
+  putData<T>(path: string, body: unknown): Observable<T> {
+    return this.http.put<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() })
+      .pipe(map(res => res.data));
   }
 
   patch<T = void>(path: string, body: unknown) {
-    return this.http.patch<T>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
+    return this.http.patch<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
   }
 
   delete<T>(path: string) {
-    return this.http.delete<T>(`${this.baseUrl}${path}`, { headers: this.headers() });
+    return this.http.delete<ApiResponse<T>>(`${this.baseUrl}${path}`, { headers: this.headers() });
+  }
+
+  deleteData<T>(path: string): Observable<T> {
+    return this.http.delete<ApiResponse<T>>(`${this.baseUrl}${path}`, { headers: this.headers() })
+      .pipe(map(res => res.data));
   }
 }

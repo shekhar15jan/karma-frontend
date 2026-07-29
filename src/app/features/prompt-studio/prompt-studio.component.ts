@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../shared/services/api.service';
 
 interface PromptTemplate {
   id: string;
@@ -28,24 +29,29 @@ interface PromptTemplate {
       </div>
 
       <div class="flex flex-grow gap-6 overflow-hidden">
-        <!-- Templates List -->
         <div class="lightning-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
           <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-2">Templates</h3>
-          <div class="flex flex-col gap-2">
-            @for (tpl of templates; track tpl.id) {
-              <div
-                class="flex flex-col gap-1 p-2.5 bg-white/5 hover:bg-white/10 rounded-lg border cursor-pointer transition-colors"
-                [ngClass]="selectedTemplate?.id === tpl.id ? 'border-primary' : 'border-outline-variant/30'"
-                (click)="selectTemplate(tpl)"
-              >
-                <span class="text-xs font-bold text-on-surface truncate">{{ tpl.name }}</span>
-                <span class="text-[8px] font-mono text-on-surface-variant">Updated: {{ tpl.lastUpdated }}</span>
-              </div>
-            }
-          </div>
+          @if (loading) {
+            <div class="flex items-center justify-center py-8">
+              <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          }
+          @if (!loading) {
+            <div class="flex flex-col gap-2">
+              @for (tpl of templates; track tpl.id) {
+                <div
+                  class="flex flex-col gap-1 p-2.5 bg-white/5 hover:bg-white/10 rounded-lg border cursor-pointer transition-colors"
+                  [ngClass]="selectedTemplate?.id === tpl.id ? 'border-primary' : 'border-outline-variant/30'"
+                  (click)="selectTemplate(tpl)"
+                >
+                  <span class="text-xs font-bold text-on-surface truncate">{{ tpl.name }}</span>
+                  <span class="text-[8px] font-mono text-on-surface-variant">Updated: {{ tpl.lastUpdated }}</span>
+                </div>
+              }
+            </div>
+          }
         </div>
 
-        <!-- Editor Canvas -->
         <div class="flex-grow flex flex-col gap-4 overflow-hidden">
           @if (selectedTemplate) {
             <div class="lightning-panel rounded-xl p-4 flex-grow flex flex-col gap-3 overflow-hidden">
@@ -57,7 +63,6 @@ interface PromptTemplate {
                 </button>
               </div>
 
-              <!-- Text editor container -->
               <div class="flex-grow relative overflow-hidden mt-1 border border-outline-variant/30 rounded-xl bg-background/40">
                 <textarea
                   class="absolute inset-0 w-full h-full p-4 bg-transparent text-xs font-mono text-on-surface focus:outline-none resize-none"
@@ -65,7 +70,6 @@ interface PromptTemplate {
                 ></textarea>
               </div>
 
-              <!-- Variables & Test Panel -->
               <div class="border-t border-outline-variant/20 pt-3 shrink-0 flex flex-col gap-2">
                 <h4 class="text-[10px] font-mono text-on-surface-variant uppercase mb-0">Parameters & Test Input</h4>
                 <div class="flex gap-4">
@@ -94,14 +98,35 @@ interface PromptTemplate {
     .no-scrollbar::-webkit-scrollbar { display: none; }
   `],
 })
-export class PromptStudioComponent {
-  protected readonly templates: PromptTemplate[] = [
-    { id: '1', name: 'Agent Research Template', lastUpdated: '10m ago', content: 'You are the KARMA Research Agent. Perform deep search and synthesize findings on the topic: {{topic}}.' },
-    { id: '2', name: 'Scriptwriter Engine', lastUpdated: '1h ago', content: 'Design a highly engaging video script outline based on this topic research overview: {{research_input}}.' },
-    { id: '3', name: 'SEO Keywords Architect', lastUpdated: '1d ago', content: 'Analyze the video script and list 10 trending search terms that are low competition but high volume.' },
-  ];
+export class PromptStudioComponent implements OnInit {
+  templates: PromptTemplate[] = [];
+  selectedTemplate: PromptTemplate | null = null;
+  loading = false;
 
-  protected selectedTemplate: PromptTemplate | null = null;
+  constructor(private readonly api: ApiService) {}
+
+  ngOnInit(): void {
+    this.loadTemplates();
+  }
+
+  loadTemplates(): void {
+    this.loading = true;
+    this.api.get<any[]>('/v1/prompts').subscribe({
+      next: (res) => {
+        const data = res?.data || res || [];
+        this.templates = data.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          lastUpdated: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Unknown',
+          content: p.content || ''
+        }));
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      }
+    });
+  }
 
   selectTemplate(tpl: PromptTemplate) {
     this.selectedTemplate = { ...tpl };
@@ -109,9 +134,5 @@ export class PromptStudioComponent {
 
   saveTemplate() {
     if (!this.selectedTemplate) return;
-    const idx = this.templates.findIndex(t => t.id === this.selectedTemplate!.id);
-    if (idx !== -1) {
-      this.templates[idx] = { ...this.selectedTemplate, lastUpdated: 'Just now' };
-    }
   }
 }
