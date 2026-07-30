@@ -1,6 +1,6 @@
 <div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
   <!-- Title / Tab Selection Header -->
-  <div class="lightning-panel p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+  <div class="glass-panel p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary text-2xl">settings</span>
       <div>
@@ -59,7 +59,7 @@
         </button>
       </div>
 
-      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+      <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col">
         <div class="overflow-y-auto no-scrollbar flex-grow">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -113,7 +113,7 @@
     <!-- Add User Modal Overlay -->
     @if (showAddUser) {
       <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddUser = false">
-        <div class="lightning-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="glass-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
           <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
             <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Add Authorized User</h4>
             <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddUser = false">&times;</button>
@@ -147,7 +147,7 @@
     <!-- Edit User Modal Overlay -->
     @if (editingUser) {
       <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="editingUser = null">
-        <div class="lightning-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="glass-panel rounded-2xl p-6 w-[420px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
           <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
             <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Modify Access Permissions</h4>
             <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="editingUser = null">&times;</button>
@@ -192,7 +192,7 @@
       <div class="flex-grow overflow-y-auto no-scrollbar pb-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           @for (role of roles; track role.id) {
-            <div class="lightning-panel rounded-xl p-5 flex flex-col gap-3 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25">
+            <div class="glass-panel rounded-xl p-5 flex flex-col gap-3 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25">
               <div class="flex justify-between items-center border-b border-outline-variant/20 pb-2.5">
                 <h4 class="text-xs font-bold uppercase tracking-wider text-primary-container mb-0">{{ role.name }}</h4>
               </div>
@@ -213,7 +213,7 @@
     <!-- Add Role Modal Overlay -->
     @if (showAddRole) {
       <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddRole = false">
-        <div class="lightning-panel rounded-2xl p-6 w-[500px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="glass-panel rounded-2xl p-6 w-[500px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
           <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
             <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Generate Access Matrix</h4>
             <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddRole = false">&times;</button>
@@ -258,7 +258,7 @@
         </button>
       </div>
 
-      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+      <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col">
         <div class="overflow-y-auto no-scrollbar flex-grow">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -303,7 +303,7 @@
         <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">System Log Trace</h3>
       </div>
 
-      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+      <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col">
         <div class="overflow-y-auto no-scrollbar flex-grow">
           <table class="w-full text-left border-collapse">
             <thead>

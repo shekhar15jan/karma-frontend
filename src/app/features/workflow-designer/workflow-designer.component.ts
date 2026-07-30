@@ -183,9 +183,20 @@ export class WorkflowDesignerComponent implements OnInit {
       });
   }
 
+  getMappedIcon(icon: string): string {
+    const iconMap: Record<string, string> = {
+      'book-open': 'menu_book',
+      'clipboard': 'assignment',
+      'check-circle': 'check_circle',
+      'file-text': 'article',
+      'video': 'videocam'
+    };
+    return iconMap[icon] || icon || 'smart_toy';
+  }
+
   getAgentIcon(agentId: string): string {
     const agent = this.agents.find(a => a.id === agentId);
-    return agent?.icon || 'smart_toy';
+    return this.getMappedIcon(agent?.icon || '');
   }
 
   getNodeX(nodeId: string): number {

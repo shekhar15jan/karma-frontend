@@ -1,6 +1,6 @@
 <div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
   <!-- Title / Controls Header -->
-  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+  <div class="glass-panel p-4 rounded-xl flex justify-between items-center shrink-0">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary text-2xl">key</span>
       <div>
@@ -31,7 +31,7 @@
     <div class="flex-grow overflow-y-auto no-scrollbar pb-6">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         @for (provider of providers; track provider.id) {
-          <div class="lightning-panel rounded-xl p-5 flex flex-col justify-between gap-4 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25 hover:border-primary/45 transition-colors">
+          <div class="glass-panel rounded-xl p-5 flex flex-col justify-between gap-4 shadow-[0_0_15px_rgba(0,229,255,0.05)] border border-outline-variant/25 hover:border-primary/45 transition-colors">
             <!-- Provider Card Header -->
             <div class="flex justify-between items-start">
               <div>
@@ -97,7 +97,7 @@
   <!-- Add Provider Modal Overlay -->
   @if (showAddProvider) {
     <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showAddProvider = false">
-      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+      <div class="glass-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
           <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Add AI Provider</h4>
           <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showAddProvider = false">&times;</button>
@@ -113,17 +113,19 @@
             <select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
               <option value="OPENAI">OpenAI</option>
               <option value="ANTHROPIC">Anthropic</option>
-              <option value="GEMINI">Google Gemini</option>
+              <option value="GEMINI">Google Gemini / Imagen</option>
               <option value="OPENROUTER">OpenRouter (200+ Models)</option>
-              <option value="OPENCODE">OpenCode (Local)</option>
-              <option value="OLLAMA">Local Ollama</option>
-              <option value="CUSTOM">Custom Endpoint</option>
+              <option value="OPENCODE">OpenCode Zen</option>
+              <option value="GROQ">Groq Cloud (Fast LLMs)</option>
+              <option value="STABILITY">Stability AI (Image)</option>
+              <option value="EDGE-TTS">Edge TTS (Voice)</option>
+              <option value="ELEVENLABS">ElevenLabs (Voice)</option>
             </select>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for OpenCode)</span></label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
-            <span class="text-[8px] text-on-surface-variant">For OpenRouter: get your key at openrouter.ai/keys · For OpenCode: leave blank</span>
+            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenAI/Anthropic: get your key from their dashboard · For OpenCode/Groq: paste your key · Edge TTS: leave blank</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Supported Models (comma-separated)</label>
@@ -142,7 +144,7 @@
   <!-- Config Modal Overlay -->
   @if (selectedProvider) {
     <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="dismissModal()">
-      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+      <div class="glass-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
           <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">Configure {{ selectedProvider.name }}</h4>
           <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="dismissModal()">&times;</button>

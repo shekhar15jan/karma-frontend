@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -7,6 +8,8 @@ import { ExecutionsService } from '../../shared/services/executions.service';
 import { MissionResponse } from '../../shared/models/mission.model';
 import { FlowResponse } from '../../shared/models/flow.model';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
+import { AgentsService } from '../../shared/services/agents.service';
+import { ProvidersService } from '../../shared/services/providers.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -58,9 +61,60 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   ];
 
   isKarmaSpeaking = false;
+  isOperatorSpeaking = false;
+  speechPulse = false;
+
+  private speechPulseHandler = () => {
+    this.speechPulse = true;
+    setTimeout(() => this.speechPulse = false, 100);
+  };
+  private karmaSpeakingHandler = (e: any) => { 
+    this.isKarmaSpeaking = e.detail; 
+    this.cdr.detectChanges(); 
+  };
+  private operatorSpeakingHandler = (e: any) => { 
+    this.isOperatorSpeaking = e.detail; 
+    this.cdr.detectChanges(); 
+  };
 
   // Floating Sidebar State
   showDiagnosticsSidebar = false;
+
+  toggleProvider(id: string): void {
+    if (this.expandedProviders.has(id)) {
+      this.expandedProviders.delete(id);
+    } else {
+      this.expandedProviders.add(id);
+    }
+  }
+
+  providerIconSafe(type: string): SafeHtml {
+    const t = (type || '').toLowerCase();
+    let svg: string;
+    if (t.includes('google') || t.includes('gemini'))
+      svg = '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>';
+    else if (t.includes('openai'))
+      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#10a37f"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">O</text></svg>';
+    else if (t.includes('anthropic') || t.includes('claude'))
+      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#d97706"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">C</text></svg>';
+    else if (t.includes('groq'))
+      svg = '<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#f97316"/></svg>';
+    else if (t.includes('opencode') || t.includes('zen'))
+      svg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#00e5ff" opacity="0.2"/><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="13" font-weight="bold" font-family="sans-serif">Z</text></svg>';
+    else if (t.includes('edge') || t.includes('tts'))
+      svg = '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="#0078d4"/><path d="M12 7v10M8 10l4-3 4 3" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>';
+    else if (t.includes('elevenlabs'))
+      svg = '<svg viewBox="0 0 24 24"><path d="M3 12h2v4H3zm4-6h2v16H7zm4-4h2v24h-2zm4 6h2v12h-2zm4-2h2v10h-2z" fill="#8b5cf6"/></svg>';
+    else if (t.includes('stability'))
+      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#a855f7"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">S</text></svg>';
+    else if (t.includes('ffmpeg'))
+      svg = '<svg viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="11" font-weight="bold" font-family="sans-serif">Ff</text></svg>';
+    else if (t.includes('openrouter'))
+      svg = '<svg viewBox="0 0 24 24"><polygon points="12,4 20,20 4,20" fill="#8b5cf6" opacity="0.3"/><polygon points="12,8 17,18 7,18" fill="#8b5cf6"/></svg>';
+    else
+      svg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#00e5ff" stroke-width="1.5"/><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="12" font-weight="bold" font-family="sans-serif">?</text></svg>';
+    return this.sanitizer.bypassSecurityTrustHtml(svg);
+  }
 
   triggerMission(missionId: string): void {
     this.executionsService.trigger(missionId).subscribe({
@@ -171,9 +225,16 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     };
   };
 
+  providersList: any[] = [];
+  expandedProviders: Set<string> = new Set();
+
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly executionsService: ExecutionsService,
+    private readonly agentsService: AgentsService,
+    private readonly providersService: ProvidersService,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -185,7 +246,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.addEventListener('system-wake-up', this.wakeUpListener);
     window.addEventListener('system-wake-up-failed', this.wakeUpFailedListener);
     window.addEventListener('agent-ready', this.agentReadyListener);
-    window.addEventListener('karma-speaking', (e: any) => this.isKarmaSpeaking = e.detail);
+    window.addEventListener('karma-speaking', this.karmaSpeakingHandler);
+    window.addEventListener('operator-speaking', this.operatorSpeakingHandler);
+    window.addEventListener('karma-speech-pulse', this.speechPulseHandler);
 
     this.hwInterval = setInterval(() => {
       this.cpuLoad = Math.max(10, Math.min(100, this.cpuLoad + (Math.random() * 10 - 5)));
@@ -215,6 +278,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.removeEventListener('system-wake-up', this.wakeUpListener);
     window.removeEventListener('system-wake-up-failed', this.wakeUpFailedListener);
     window.removeEventListener('agent-ready', this.agentReadyListener);
+    window.removeEventListener('karma-speaking', this.karmaSpeakingHandler);
+    window.removeEventListener('operator-speaking', this.operatorSpeakingHandler);
+    window.removeEventListener('karma-speech-pulse', this.speechPulseHandler);
   }
 
   private loadDashboard(): void {
@@ -260,6 +326,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (approvals) => {
+          if (approvals.length === 0) {
+            // Mock data for UI demo purposes if database is empty
+            approvals = [
+              { id: '1', name: 'Cyberpunk YouTube Script', artifactType: 'VIDEO_SCRIPT', reviewStatus: 'PENDING', createdAt: new Date().toISOString() },
+              { id: '2', name: 'Tech Review Thumbnail', artifactType: 'IMAGE', reviewStatus: 'PENDING', createdAt: new Date(Date.now() - 3600000).toISOString() },
+              { id: '3', name: 'AI LinkedIn Post', artifactType: 'SOCIAL_POST', reviewStatus: 'PENDING', createdAt: new Date(Date.now() - 7200000).toISOString() }
+            ] as any[];
+          }
           this.pendingApprovals = approvals.map(a => ({
             ...a,
             title: a.name || `Artifact #${a.id}`,
@@ -269,6 +343,50 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         },
         error: (err) => {
           console.error('Failed to fetch pending approvals', err);
+        }
+      });
+
+    this.providersService.getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (providers) => {
+          this.providersList = providers.filter(p => p.status !== 'DISCONNECTED' && p.status !== 'DELETED');
+        },
+        error: (err) => {
+          console.error('Failed to fetch providers', err);
+        }
+      });
+
+    this.agentsService.getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (agents) => {
+          // Map to match the expected format for the dashboard UI
+          this.agentStatusList = agents.map(a => {
+            const defaultAgent = this.defaultAgents.find(da => da.name === a.name);
+            
+            // Map the same non-material icons to Material icons we did in Agents Screen
+            const iconMap: Record<string, string> = {
+              'book-open': 'menu_book',
+              'clipboard': 'assignment',
+              'check-circle': 'check_circle',
+              'file-text': 'article',
+              'video': 'videocam'
+            };
+            const mappedIcon = iconMap[a.icon] || a.icon || 'smart_toy';
+
+            return {
+              ...a,
+              icon: mappedIcon,
+              status: a.status || 'Standby',
+              colorClass: defaultAgent ? defaultAgent.colorClass : 'text-primary',
+              borderClass: a.status === 'ACTIVE' ? 'border-green-400/30' : 'border-outline-variant/30',
+              pulseClass: ''
+            };
+          });
+        },
+        error: (err) => {
+          console.error('Failed to fetch agents', err);
         }
       });
 
@@ -290,7 +408,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     const coreY = coreRect.top + coreRect.height / 2 - containerRect.top;
 
     nodes.forEach((node) => {
-      const nodeInner = node.querySelector('.lightning-panel');
+      const nodeInner = node.querySelector('.glass-panel');
       if (!nodeInner) return;
       const nodeRect = nodeInner.getBoundingClientRect();
       const nodeX = nodeRect.left + nodeRect.width / 2 - containerRect.left;

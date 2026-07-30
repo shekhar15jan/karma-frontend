@@ -13,7 +13,7 @@ import { AuthService } from '../auth.service';
       <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,229,255,0.08)_0%,transparent_60%)] pointer-events-none"></div>
       <div class="absolute inset-0 pointer-events-none opacity-10 bg-[radial-gradient(rgba(0,229,255,0.15)_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
-      <div class="lightning-panel rounded-2xl p-8 w-[400px] flex flex-col gap-6 shadow-[0_0_50px_rgba(0,229,255,0.15)] relative z-10">
+      <div class="glass-panel rounded-2xl p-8 w-[400px] flex flex-col gap-6 shadow-[0_0_50px_rgba(0,229,255,0.15)] relative z-10">
         <!-- Logo Header -->
         <div class="flex flex-col items-center gap-2 mb-2">
           <div class="w-16 h-16 rounded-full bg-gradient-to-br from-[#00e5ff]/20 to-secondary/20 border border-[#00e5ff]/40 shadow-[0_0_20px_rgba(0,229,255,0.3)] flex items-center justify-center animate-[pulse_4s_infinite]">

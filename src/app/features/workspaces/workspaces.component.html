@@ -1,6 +1,6 @@
 <div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
   <!-- Title Header -->
-  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+  <div class="glass-panel p-4 rounded-xl flex justify-between items-center shrink-0">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary text-2xl">workspaces</span>
       <div>
@@ -24,7 +24,7 @@
     }
 
     @for (ws of workspaces; track ws.id) {
-      <div class="lightning-panel rounded-xl p-5 flex flex-col gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)] relative overflow-hidden group">
+      <div class="glass-panel rounded-xl p-5 flex flex-col gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)] relative overflow-hidden group">
         
         <!-- Status Indicator Strip -->
         <div class="absolute top-0 left-0 w-full h-1" [ngClass]="ws.status === 'ACTIVE' ? 'bg-green-400 shadow-[0_0_10px_#4ade80]' : 'bg-red-400'"></div>
@@ -60,7 +60,7 @@
   <!-- Create Modal Overlay -->
   @if (showCreateModal) {
     <div class="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div class="lightning-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative">
+      <div class="glass-panel rounded-2xl p-6 w-[480px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative">
         <button (click)="closeCreateModal()" class="absolute top-4 right-4 material-symbols-outlined text-on-surface-variant hover:text-on-surface cursor-pointer">close</button>
         
         <div>

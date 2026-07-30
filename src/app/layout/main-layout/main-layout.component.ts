@@ -27,7 +27,7 @@ interface ChatMessage {
       }
 
       <!-- TOP APP BAR -->
-      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/60 backdrop-blur-xl border-b border-[#00e5ff] shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
+      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/95 backdrop-blur-xl border-b border-[#00e5ff] shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
         <div class="flex items-center gap-6">
           <button (click)="toggleSidebar()" class="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all cursor-pointer">
             {{ showSidebar ? 'menu_open' : 'menu' }}
@@ -75,7 +75,7 @@ interface ChatMessage {
         <div class="flex items-center gap-4">
           <!-- Karma Voice output toggle (Speaking vs Muted) -->
           <div 
-            class="lightning-panel px-4 py-1.5 rounded-full flex items-center gap-3 cursor-pointer hover:bg-primary/15 transition-all"
+            class="glass-panel px-4 py-1.5 rounded-full flex items-center gap-3 cursor-pointer hover:bg-primary/15 transition-all"
             [style.box-shadow]="karmaVoiceSpeechEnabled ? '0 0 10px rgba(0, 229, 255, 0.2)' : ''"
             (click)="toggleKarmaVoiceSpeech()"
             title="Click to Mute/Unmute Karma TTS Speech"
@@ -136,9 +136,9 @@ interface ChatMessage {
         <div class="mt-auto px-4 pb-8 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
           <div class="relative flex items-center justify-center">
             <div class="rounded-full border border-primary/40 flex items-center justify-center p-1 group-hover:border-primary transition-all" 
-                 [ngClass]="{'w-24 h-24': showSidebar, 'w-12 h-12': !showSidebar, 'animate-pulse border-primary shadow-[0_0_30px_rgba(0,229,255,0.8)]': isKarmaSpeaking}">
-              <div class="w-full h-full rounded-full bg-[#00daf3]/10 overflow-hidden flex items-center justify-center group-hover:bg-[#00daf3]/20 transition-all" [ngClass]="{'bg-[#00daf3]/30': isKarmaSpeaking}">
-                <span class="material-symbols-outlined text-primary-container transition-all" [ngClass]="showSidebar ? 'text-5xl' : 'text-2xl'">face</span>
+                 [ngClass]="{'w-24 h-24': showSidebar, 'w-12 h-12': !showSidebar, 'animate-pulse border-white shadow-[0_0_20px_rgba(255,255,255,1)]': isKarmaSpeaking}">
+              <div class="w-full h-full rounded-full bg-[#00daf3]/10 overflow-hidden flex items-center justify-center group-hover:bg-[#00daf3]/20 transition-all">
+                <span class="material-symbols-outlined transition-all" [ngClass]="{'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]': isKarmaSpeaking, 'text-primary-container': !isKarmaSpeaking, 'text-5xl': showSidebar, 'text-2xl': !showSidebar}">face</span>
               </div>
             </div>
             <span class="absolute rounded-full border-2 border-background" 
@@ -146,7 +146,7 @@ interface ChatMessage {
           </div>
           @if (showSidebar) {
             <div class="text-center overflow-hidden transition-all duration-300">
-              <p class="text-[14px] font-bold tracking-widest uppercase mb-0 group-hover:text-primary transition-colors whitespace-nowrap" [class.text-primary]="isKarmaSpeaking" [class.glow-text]="isKarmaSpeaking">Karma AI</p>
+              <p class="text-[14px] font-bold tracking-widest uppercase mb-0 group-hover:text-primary transition-colors whitespace-nowrap" [class.text-white]="isKarmaSpeaking" [class.glow-text]="isKarmaSpeaking">Karma AI</p>
               <p class="text-[10px] text-on-surface-variant mb-0 whitespace-nowrap">{{ isKarmaSpeaking ? 'Speaking...' : 'Click to Open Chat' }}</p>
               <div class="flex items-center justify-center gap-1.5 mt-1">
                 <span class="w-2 h-2 rounded-full" [class.bg-green-500]="!isKarmaSpeaking" [class.bg-yellow-400]="isKarmaSpeaking"></span>
@@ -502,6 +502,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         this.voiceText = 'Always Listening...';
       };
 
+      this.recognition.onspeechstart = () => {
+        window.dispatchEvent(new CustomEvent('operator-speaking', { detail: true }));
+      };
+
+      this.recognition.onspeechend = () => {
+        window.dispatchEvent(new CustomEvent('operator-speaking', { detail: false }));
+      };
+
       this.recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         this.voiceText = `Heard: "${transcript}"`;
@@ -578,9 +586,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   private processCommand(command: string) {
     const cleanCmd = command.toLowerCase().trim();
-    const isExplain = cleanCmd.includes('explain') || cleanCmd.includes('what is') || cleanCmd.includes('tell me about');
-    
-    // Fuzzy phonetic matching for "Wake up Karma" misinterpretations
+
     const isWakeUpPhrase = cleanCmd.includes('wake') || 
                            cleanCmd.includes('break') || 
                            cleanCmd.includes('make') || 
@@ -592,90 +598,20 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (cleanCmd.includes('dashboard') || cleanCmd.includes('home') || cleanCmd.includes('mission control')) {
-      if (isExplain) {
-        this.reply('The Dashboard, or Mission Control, is your central hub. It provides a real-time overview of your system health, agent statuses, active workflows, and overall system load.');
-      } else {
-        this.router.navigate(['/dashboard']);
-        this.reply('Navigating to Dashboard');
+    const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
+    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage }).subscribe({
+      next: (res) => {
+        const reply = res.reply || 'I processed your request.';
+        this.reply(reply);
+        if (res.intent === 'navigate' && res.target) {
+          const route = '/' + res.target.replace(/^\//, '');
+          this.router.navigate([route]);
+        }
+      },
+      error: () => {
+        this.reply('I am having trouble connecting to my AI. Please try again.');
       }
-    } else if (cleanCmd.includes('flow') || cleanCmd.includes('workflow') || cleanCmd.includes('designer')) {
-      if (isExplain) {
-        this.reply('The Flows Designer is a visual canvas where you can orchestrate multi-agent workflows. You can drag and drop nodes to connect research, script generation, and video rendering steps together.');
-      } else {
-        this.router.navigate(['/workflows']);
-        this.reply('Opening Flows Designer');
-      }
-    } else if (cleanCmd.includes('agent') || cleanCmd.includes('roster')) {
-      if (isExplain) {
-        this.reply('The Agents Roster allows you to manage and configure your autonomous AI workers. Each agent specializes in a specific task, such as SEO optimization, script writing, or video editing.');
-      } else {
-        this.router.navigate(['/agents']);
-        this.reply('Opening Agent Roster');
-      }
-    } else if (cleanCmd.includes('provider') || cleanCmd.includes('key') || cleanCmd.includes('api')) {
-      if (isExplain) {
-        this.reply('The AI Providers configuration lets you connect external LLM APIs, such as Google Gemini or OpenAI, which act as the brain for your agents.');
-      } else {
-        this.router.navigate(['/providers']);
-        this.reply('Opening AI Providers Configuration');
-      }
-    } else if (cleanCmd.includes('publish') || cleanCmd.includes('social') || cleanCmd.includes('channel')) {
-      if (isExplain) {
-        this.reply('The Publishing manager allows you to connect your YouTube, Instagram, or TikTok accounts. Our Video Publisher agent uses this to automate uploads for you.');
-      } else {
-        this.router.navigate(['/publishing']);
-        this.reply('Opening Social Accounts Manager');
-      }
-    } else if (cleanCmd.includes('review') || cleanCmd.includes('draft')) {
-      if (isExplain) {
-        this.reply('The Reviews tab is where you approve video drafts generated by your agents before they are published. You can watch previews, edit scripts, or reject them with feedback.');
-      } else {
-        this.router.navigate(['/reviews']);
-        this.reply('Opening Video Approvals panel');
-      }
-    } else if (cleanCmd.includes('setting') || cleanCmd.includes('admin')) {
-      if (isExplain) {
-        this.reply('The Administration settings tab allows you to configure global system preferences, manage users, and setup encryption keys.');
-      } else {
-        this.router.navigate(['/administration']);
-        this.reply('Opening Administration settings');
-      }
-    } else if (cleanCmd.includes('calendar') || cleanCmd.includes('schedule')) {
-      if (isExplain) {
-        this.reply('The Calendar shows all of your scheduled video publications. You can drag and drop drafts onto specific dates to automate when they are uploaded to your connected social channels.');
-      } else {
-        this.router.navigate(['/calendar']);
-        this.reply('Opening Scheduling Calendar');
-      }
-    } else if (cleanCmd.includes('knowledge') || cleanCmd.includes('grounding')) {
-      if (isExplain) {
-        this.reply('The Knowledge Repository holds grounding documents, PDFs, and website data. Your agents read this data using Retrieval Augmented Generation to learn facts before generating videos.');
-      } else {
-        this.router.navigate(['/knowledge']);
-        this.reply('Opening Grounding Knowledge Repository');
-      }
-    } else if (cleanCmd.includes('marketplace') || cleanCmd.includes('store')) {
-      if (isExplain) {
-        this.reply('The Marketplace contains community-built workflow templates and agent personalities you can import into your own Karma OS.');
-      } else {
-        this.router.navigate(['/marketplace']);
-        this.reply('Opening Integration presets marketplace');
-      }
-    } else if (cleanCmd.includes('prompt') || cleanCmd.includes('instruction')) {
-      if (isExplain) {
-        this.reply('The Prompts Studio allows you to fine-tune the system instructions given to your agents, ensuring they generate content in your exact desired tone and format.');
-      } else {
-        this.router.navigate(['/prompts']);
-        this.reply('Opening Prompts section');
-      }
-    } else if (cleanCmd.includes('load') || cleanCmd.includes('cpu') || cleanCmd.includes('gpu') || cleanCmd.includes('status')) {
-      this.reply('The system hardware load is: CPU allocation is at 42% and GPU rendering core is active at 68%. All rendering channels are functioning normally.');
-    } else if (cleanCmd.includes('hello') || cleanCmd.includes('hi')) {
-      this.reply('Hello Operator! Synced with your active session. Ask me to open or explain any UI module.');
-    } else {
-      this.reply('I am sorry, I did not fully catch that. You can ask me to open a specific UI module, or ask me to explain how a section works.');
-    }
+    });
   }
 
   private reply(text: string) {
@@ -736,6 +672,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
+    
+    utterance.onboundary = () => {
+      window.dispatchEvent(new CustomEvent('karma-speech-pulse'));
+    };
     
     utterance.onend = () => { 
       item.resolve(); 

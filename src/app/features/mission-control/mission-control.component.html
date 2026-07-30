@@ -1,6 +1,6 @@
 <div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
   <!-- Title Header -->
-  <div class="lightning-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+  <div class="glass-panel p-4 rounded-xl flex justify-between items-center shrink-0">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
       <div>
@@ -13,7 +13,7 @@
   <!-- Resource Performance Stats Grid -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
     <!-- CPU panel -->
-    <div class="lightning-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+    <div class="glass-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
       <div class="flex justify-between items-center">
         <span class="text-[10px] font-mono text-on-surface-variant uppercase">CPU CORE ALLOCATION</span>
         <span class="text-xs font-bold text-primary">{{ cpuLoad }}%</span>
@@ -24,7 +24,7 @@
     </div>
 
     <!-- GPU panel -->
-    <div class="lightning-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+    <div class="glass-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
       <div class="flex justify-between items-center">
         <span class="text-[10px] font-mono text-on-surface-variant uppercase">GPU RENDERING CORE</span>
         <span class="text-xs font-bold text-[#00e5ff]">{{ gpuLoad }}%</span>
@@ -35,7 +35,7 @@
     </div>
 
     <!-- Task Queue panel -->
-    <div class="lightning-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+    <div class="glass-panel rounded-xl p-5 flex flex-col gap-3 border border-outline-variant/25 shadow-[0_0_15px_rgba(0,229,255,0.05)]">
       <div class="flex justify-between items-center">
         <span class="text-[10px] font-mono text-on-surface-variant uppercase">ACTIVE WORKER PIPELINE</span>
         <span class="text-xs font-bold text-green-400">{{ queueSize }} ACTIVE</span>
@@ -52,7 +52,7 @@
     <!-- Active Workers Pool -->
     <div class="flex flex-col gap-3 overflow-hidden">
       <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Active Threads</h3>
-      <div class="lightning-panel rounded-xl flex-grow overflow-y-auto no-scrollbar p-5 flex flex-col gap-4">
+      <div class="glass-panel rounded-xl flex-grow overflow-y-auto no-scrollbar p-5 flex flex-col gap-4">
         @for (w of workers; track w.id) {
           <div class="bg-white/5 border border-outline-variant/20 p-4 rounded-xl flex flex-col gap-3">
             <div class="flex justify-between items-center">
@@ -83,7 +83,7 @@
     <!-- Live Diagnostics Log Window -->
     <div class="flex flex-col gap-3 overflow-hidden">
       <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Live Log Diagnostics</h3>
-      <div class="lightning-panel rounded-xl flex-grow overflow-hidden flex flex-col p-4 bg-background/50 border border-outline-variant/20">
+      <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col p-4 bg-background/50 border border-outline-variant/20">
         <div class="flex-grow overflow-y-auto no-scrollbar font-mono text-[10px] text-green-400 space-y-1.5 leading-relaxed p-2 select-text">
           @for (log of logs; track $index) {
             <div>{{ log }}</div>

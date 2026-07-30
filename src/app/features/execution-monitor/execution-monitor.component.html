@@ -24,7 +24,7 @@
   @if (!loading && !error) {
     <div class="grid grid-cols-1 gap-4">
       @for (exec of executions; track exec.id) {
-        <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 cursor-pointer hover:border-primary/50 transition-colors"
+        <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 cursor-pointer hover:border-primary/50 transition-colors"
              [class.border-primary]="selectedExecution?.id === exec.id"
              (click)="selectExecution(exec)">
           <div class="flex justify-between items-center">

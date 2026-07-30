@@ -30,7 +30,7 @@ interface ArtifactVM {
         </div>
       </div>
 
-      <div class="lightning-panel p-3 rounded-xl flex items-center gap-3 shrink-0">
+      <div class="glass-panel p-3 rounded-xl flex items-center gap-3 shrink-0">
         <span class="text-[9px] uppercase font-mono text-on-surface-variant">Filter Vault:</span>
         <button class="px-3 py-1 rounded bg-primary/10 border border-primary/30 text-xs text-primary font-bold">All</button>
         <button class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-xs text-on-surface-variant">Documents</button>
@@ -48,7 +48,7 @@ interface ArtifactVM {
       @if (!loading) {
         <div class="grid grid-cols-4 gap-6">
           @for (artifact of artifacts; track artifact.id) {
-            <div class="lightning-panel rounded-xl p-4 flex flex-col justify-between hover:border-primary transition-all shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+            <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-primary transition-all shadow-[0_0_15px_rgba(0,229,255,0.05)]">
               <div class="flex items-start justify-between">
                 <div class="w-10 h-10 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <span class="material-symbols-outlined text-xl text-primary">{{ artifact.icon }}</span>

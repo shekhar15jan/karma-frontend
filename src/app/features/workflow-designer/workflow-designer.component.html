@@ -1,6 +1,6 @@
 <div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden">
   <!-- Toolbar -->
-  <div class="lightning-panel px-4 py-2 rounded-xl flex items-center justify-between mb-4 shrink-0">
+  <div class="glass-panel px-4 py-2 rounded-xl flex items-center justify-between mb-4 shrink-0">
     <div class="flex items-center gap-3">
       <span class="material-symbols-outlined text-primary">hub</span>
       <input
@@ -48,7 +48,7 @@
   <!-- Designer Body -->
   <div class="flex flex-grow overflow-hidden gap-6">
     <!-- Agent Palette (Left) -->
-    <div class="lightning-panel rounded-xl p-4 w-60 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
+    <div class="glass-panel rounded-xl p-4 w-60 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
       <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-2">Available Agents</h3>
       
       @if (loading) {
@@ -69,7 +69,7 @@
             (click)="addNode(agent)"
           >
             <div class="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-base text-primary">{{ agent.icon || 'smart_toy' }}</span>
+              <span class="material-symbols-outlined text-base text-primary">{{ getMappedIcon(agent.icon || '') }}</span>
             </div>
             <div class="overflow-hidden min-w-0">
               <p class="mb-0 text-xs font-bold text-on-surface truncate">{{ agent.name }}</p>
@@ -82,7 +82,7 @@
 
     <!-- Canvas Area (Center) -->
     <div 
-      class="lightning-panel rounded-xl flex-grow relative overflow-hidden bg-background/40 cursor-crosshair" 
+      class="glass-panel rounded-xl flex-grow relative overflow-hidden cursor-crosshair bg-background/40" 
       (click)="deselectNode()"
       (mousemove)="onCanvasMouseMove($event)"
       (mouseup)="onCanvasMouseUp()"
@@ -154,7 +154,7 @@
       <!-- Drag & Drop Nodes -->
       @for (node of nodes; track node.id) {
         <div
-          class="absolute w-36 lightning-panel rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] select-none z-20"
+          class="absolute w-36 glass-panel rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] select-none z-20"
           [style.left.px]="node.x"
           [style.top.px]="node.y"
           [class.border-primary]="selectedNode?.id === node.id"
@@ -188,7 +188,7 @@
     </div>
 
     <!-- Properties Panel (Right) -->
-    <div class="lightning-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
+    <div class="glass-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
       <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-2">Properties</h3>
       
       @if (!selectedNode) {

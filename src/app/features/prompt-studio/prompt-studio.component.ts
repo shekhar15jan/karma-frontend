@@ -29,7 +29,7 @@ interface PromptTemplate {
       </div>
 
       <div class="flex flex-grow gap-6 overflow-hidden">
-        <div class="lightning-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
+        <div class="glass-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
           <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-2">Templates</h3>
           @if (loading) {
             <div class="flex items-center justify-center py-8">
@@ -54,7 +54,7 @@ interface PromptTemplate {
 
         <div class="flex-grow flex flex-col gap-4 overflow-hidden">
           @if (selectedTemplate) {
-            <div class="lightning-panel rounded-xl p-4 flex-grow flex flex-col gap-3 overflow-hidden">
+            <div class="glass-panel rounded-xl p-4 flex-grow flex flex-col gap-3 overflow-hidden bg-background/40">
               <div class="flex justify-between items-center shrink-0">
                 <span class="text-xs font-bold text-primary-container font-mono uppercase">{{ selectedTemplate.name }}</span>
                 <button class="px-4 py-1 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5" (click)="saveTemplate()">
@@ -63,7 +63,7 @@ interface PromptTemplate {
                 </button>
               </div>
 
-              <div class="flex-grow relative overflow-hidden mt-1 border border-outline-variant/30 rounded-xl bg-background/40">
+              <div class="flex-grow relative overflow-hidden mt-1 border border-outline-variant/30 rounded-xl" style="backdrop-filter:blur(20px);background:rgba(255,255,255,0.06)">
                 <textarea
                   class="absolute inset-0 w-full h-full p-4 bg-transparent text-xs font-mono text-on-surface focus:outline-none resize-none"
                   [(ngModel)]="selectedTemplate.content"
@@ -85,7 +85,7 @@ interface PromptTemplate {
               </div>
             </div>
           } @else {
-            <div class="lightning-panel rounded-xl flex-grow flex flex-col items-center justify-center text-on-surface-variant gap-2">
+            <div class="glass-panel rounded-xl flex-grow flex flex-col items-center justify-center text-on-surface-variant gap-2">
               <span class="material-symbols-outlined text-4xl opacity-40">terminal</span>
               <p class="text-xs">Select a prompt template from the library to open the studio editor</p>
             </div>

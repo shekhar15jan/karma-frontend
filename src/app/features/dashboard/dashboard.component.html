@@ -2,7 +2,7 @@
   <!-- LEFT COLUMN -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-y-auto no-scrollbar">
     <!-- Active Mission -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
+    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
       <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
       @if (activeMission) {
         <div class="flex gap-3 items-start mt-1">
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Agents & Providers Tabbed Panel -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
+    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
       <div class="flex justify-between items-center shrink-0">
         <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">{{ leftPanelTab === 'agents' ? 'Agents' : 'AI Providers' }}</h3>
         <div class="flex items-center gap-3">
@@ -82,56 +82,35 @@
           </div>
         } @else {
           <div class="space-y-1.5">
-            <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-primary/20">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[14px] text-primary">psychology</span>
-                <span class="text-[10px]">OpenAI GPT-4o</span>
+            @for (provider of providersList; track provider.id) {
+              <div class="bg-white/5 rounded border border-outline-variant/30">
+                <div class="flex items-center justify-between p-1.5 cursor-pointer" (click)="toggleProvider(provider.id)">
+                  <div class="flex items-center gap-2 min-w-0 flex-grow">
+                    <span class="w-3.5 h-3.5 shrink-0 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" [innerHTML]="providerIconSafe(provider.providerType)"></span>
+                    <div class="min-w-0">
+                      <div class="text-[10px] truncate">{{ provider.name }}</div>
+                      <div class="text-[7px] text-on-surface-variant font-mono">{{ provider.models?.length || 0 }} models</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0 ml-1">
+                    @if (provider.models?.length) {
+                      <span class="text-[8px] text-on-surface-variant transition-transform" [style.transform]="expandedProviders.has(provider.id) ? 'rotate(90deg)' : 'none'">▸</span>
+                    }
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                  </div>
+                </div>
+                @if (expandedProviders.has(provider.id) && provider.models?.length) {
+                  <div class="px-2 pb-1.5 flex flex-wrap gap-1">
+                    @for (m of provider.models; track m) {
+                      <span class="text-[7px] px-1.5 py-0.5 bg-white/5 border border-outline-variant/20 rounded font-mono text-on-surface-variant">{{ m }}</span>
+                    }
+                  </div>
+                }
               </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[8px] text-green-400 font-bold">• Online</span>
-                <span class="px-1.5 py-0.5 bg-primary text-background text-[8px] rounded font-bold uppercase">Primary</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[14px] text-secondary">smart_toy</span>
-                <span class="text-[10px]">Claude 3.5 Sonnet</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[8px] text-green-400 font-bold">• Online</span>
-                <span class="px-1.5 py-0.5 bg-secondary/20 text-secondary text-[8px] rounded font-bold uppercase">Backup</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[14px] text-blue-400">google</span>
-                <span class="text-[10px]">Google Gemini 1.5</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[8px] text-green-400 font-bold">• Online</span>
-                <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[14px] text-orange-500">bolt</span>
-                <span class="text-[10px]">Groq Llama 3 70B</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[8px] text-green-400 font-bold">• Online</span>
-                <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-1.5 bg-white/5 rounded border border-outline-variant/30">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-[14px] text-on-surface-variant">token</span>
-                <span class="text-[10px]">Anthropic Claude</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[8px] text-green-400 font-bold">• Online</span>
-                <span class="px-1.5 py-0.5 bg-white/10 text-on-surface-variant text-[8px] rounded uppercase">Backup</span>
-              </div>
-            </div>
+            }
+            @if (providersList.length === 0) {
+              <div class="flex items-center justify-center p-3 text-on-surface-variant text-[9px]">No providers configured</div>
+            }
           </div>
         }
       </div>
@@ -141,7 +120,7 @@
   <!-- CENTER AREA -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-hidden">
     <!-- Flows Pipeline -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-4 shrink-0">
+    <div class="glass-panel rounded-xl p-4 flex flex-col gap-4 shrink-0">
       <div class="flex justify-between items-center">
         <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Flows</h3>
         <div class="flex items-center gap-2">
@@ -189,7 +168,7 @@
           <!-- Research (Top - 270deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]">
                 <span class="material-symbols-outlined text-green-400">search</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">RESEARCH</p>
@@ -199,7 +178,7 @@
           <!-- Script (45deg - Top Right) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
                 <span class="material-symbols-outlined text-green-400">description</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">SCRIPT</p>
@@ -209,7 +188,7 @@
           <!-- Blog (Right - 0deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
                 <span class="material-symbols-outlined text-green-400">feed</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">BLOG</p>
@@ -219,7 +198,7 @@
           <!-- SEO (135deg - Bottom Right) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-green-400">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
                 <span class="material-symbols-outlined text-green-400">bar_chart</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">SEO</p>
@@ -228,7 +207,7 @@
           </div>
           <!-- Karma Core (Center) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 260px; z-index: 10;">
-            <div class="w-32 h-32 rounded-full lightning-panel flex flex-col items-center justify-center transition-all duration-300 relative"
+            <div class="w-32 h-32 rounded-full glass-panel flex flex-col items-center justify-center transition-all duration-300 relative"
                  [ngClass]="isKarmaSpeaking ? 'border-[#00e5ff] shadow-[0_0_80px_rgba(0,229,255,0.8)] scale-110 animate-pulse' : 'border-primary shadow-[0_0_40px_rgba(0,229,255,0.3)]'">
               <!-- Inner Core -->
               <div class="absolute inset-0 m-2 rounded-full border border-[#00e5ff]/50 flex items-center justify-center transition-all duration-300"
@@ -241,7 +220,7 @@
           <!-- Voice (Bottom - 90deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-secondary shadow-[0_0_15px_rgba(209,188,255,0.3)]">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-secondary shadow-[0_0_15px_rgba(209,188,255,0.3)]">
                 <span class="material-symbols-outlined text-secondary">mic</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">VOICE</p>
@@ -251,7 +230,7 @@
           <!-- Video (225deg - Bottom Left) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-primary-container shadow-[0_0_15_rgba(0,229,255,0.3)]">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-primary-container shadow-[0_0_15_rgba(0,229,255,0.3)]">
                 <span class="material-symbols-outlined text-primary-container">videocam</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">VIDEO</p>
@@ -261,7 +240,7 @@
           <!-- Thumbnail (Left - 180deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-outline-variant/50">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-outline-variant/50">
                 <span class="material-symbols-outlined text-on-surface-variant">grid_view</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">THUMBNAIL</p>
@@ -271,7 +250,7 @@
           <!-- Image (315deg - Top Left) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full lightning-panel flex items-center justify-center border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.3)]">
+              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.3)]">
                 <span class="material-symbols-outlined text-orange-400">image</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase mb-0">IMAGE</p>
@@ -280,10 +259,15 @@
           </div>
         </div>
         <!-- Core Hub -->
-        <div class="relative z-10 w-52 h-52 rounded-full lightning-panel bg-gradient-to-br from-[#00e5ff]/20 via-background to-secondary/20 flex flex-col items-center justify-center">
+        <div class="relative z-10 w-52 h-52 rounded-full flex flex-col items-center justify-center">
+          <div class="absolute inset-0 rounded-full glass-panel bg-gradient-to-br from-[#00e5ff]/20 via-background to-secondary/20 transition-all duration-300"
+               [ngClass]="isKarmaSpeaking ? 'opacity-0' : ''"></div>
+          <div class="absolute inset-0 rounded-full transition-all duration-300"
+               [ngClass]="isKarmaSpeaking ? 'bg-white shadow-[0_0_100px_rgba(255,255,255,0.9)] border border-white' : 'opacity-0'"
+               [class.opacity-0]="speechPulse"></div>
           <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 rounded-full"></div>
           
-          <div class="w-36 h-36 rounded-full lightning-panel flex items-center justify-center relative z-10">
+          <div class="w-36 h-36 rounded-full glass-panel flex items-center justify-center relative z-10">
             <div class="text-center relative z-10">
               <h2 class="text-headline-md font-bold tracking-[0.2em] text-on-surface mb-0 leading-none">KARMA</h2>
               <h3 class="text-[12px] font-bold tracking-[0.5em] text-[#00e5ff] mb-0 mt-1">CORE</h3>
@@ -297,7 +281,7 @@
   <!-- RIGHT COLUMN -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-y-auto no-scrollbar">
     <!-- System Status -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
+    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
       <div class="flex justify-between items-center shrink-0">
         <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">System Status</h3>
         <div class="flex gap-2 text-[9px] font-label-mono uppercase tracking-widest">
@@ -394,12 +378,12 @@
     </div>
 
     <!-- Pending Approvals -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
+    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
       <div class="flex justify-between items-center shrink-0">
         <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Pending Approvals</h3>
         <button (click)="openModal('approvals')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
       </div>
-      <div class="space-y-2 overflow-y-auto flex-grow h-full pr-2 custom-scrollbar">
+      <div class="space-y-2 overflow-y-auto flex-grow h-full pr-2 no-scrollbar">
         @if (pendingApprovals && pendingApprovals.length > 0) {
           @for (approval of pendingApprovals; track approval.id) {
             <div class="flex items-start gap-3 p-2 bg-white/5 rounded-lg border border-primary/10 transition-colors hover:bg-white/10">
@@ -429,31 +413,57 @@
     </div>
 
     <!-- Voice Commands -->
-    <div class="lightning-panel rounded-xl p-4 flex flex-col gap-3 shrink-0">
-      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Voice Commands</h3>
-      <div class="flex items-center gap-3 py-1 border-b border-primary/20">
-        <div class="flex-grow overflow-hidden h-8">
-          <svg class="w-full h-full text-primary/60" viewBox="0 0 200 40">
-            <path d="M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20" fill="none" stroke="currentColor" stroke-width="1.5">
-              <animate attributeName="d" dur="2s" repeatCount="indefinite" values="M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20; M0 20 Q5 35 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20; M0 20 Q5 5 10 20 T20 20 T30 20 T40 20 T50 20 T60 20 T70 20 T80 20 T90 20 T100 20 T110 20 T120 20 T130 20 T140 20 T150 20 T160 20 T170 20 T180 20 T190 20 T200 20"></animate>
-            </path>
-          </svg>
-        </div>
-        <div (click)="triggerVoiceCommand()" class="w-10 h-10 rounded-full border border-primary flex items-center justify-center bg-primary/10 hover:bg-primary/25 cursor-pointer shadow-[0_0_12px_#00e5ff] shrink-0 transition-colors">
-          <span class="material-symbols-outlined text-[20px] text-primary">mic</span>
+    <div class="glass-panel rounded-xl p-4 flex flex-col shrink-0">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[11px] glow-text mb-0">Voice Commands</h3>
+        <div class="w-32 overflow-hidden h-5 flex items-center justify-end gap-[3px]">
+          @if (isOperatorSpeaking) {
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1.2s_ease-in-out_infinite_0.1s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_0.8s_ease-in-out_infinite_0.2s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1.1s_ease-in-out_infinite_0.3s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_0.9s_ease-in-out_infinite_0.4s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1.3s_ease-in-out_infinite_0.5s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_0.7s_ease-in-out_infinite_0.6s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite_0.7s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1.2s_ease-in-out_infinite_0.8s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_0.8s_ease-in-out_infinite_0.9s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_1.1s_ease-in-out_infinite_1.0s]"></div>
+            <div class="w-1 h-1 bg-primary rounded-full animate-[wave_0.9s_ease-in-out_infinite_1.1s]"></div>
+          } @else {
+            <svg width="100%" height="12" viewBox="0 0 100 12" preserveAspectRatio="none" class="text-primary/40">
+              <path d="M0,6 L5,1 L15,11 L25,1 L35,11 L45,1 L55,11 L65,1 L75,11 L85,1 L95,11 L100,6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            </svg>
+          }
         </div>
       </div>
-      <div class="text-[10px] font-mono text-primary-container uppercase tracking-wide py-1 text-center bg-white/5 border border-outline-variant/20 rounded-lg">
-        {{ heardCommand }}
-      </div>
-      <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] text-on-surface-variant font-medium">
-        <p class="mb-0">• "Wake up Karma"</p>
-        <p class="mb-0">• "Surprise Me Karma"</p>
-        <p class="mb-0">• "Run Research"</p>
-        <p class="mb-0">• "Generate Media"</p>
-        <p class="mb-0">• "Approve Script"</p>
-        <p class="mb-0">• "Publish Content"</p>
-        <p class="mb-0">• "Bye Bye Karma"</p>
+      
+      <div class="flex items-center justify-between flex-grow mt-2">
+        <!-- Command List -->
+        <div class="flex flex-col gap-y-[10px] text-[10px] text-on-surface-variant font-medium tracking-wide">
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Wake up Karma"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Surprise Me Karma"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Run Research"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Generate Media"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Approve Script"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Publish Content"</p>
+          <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Bye Bye Karma"</p>
+        </div>
+        
+        <!-- Square Box with 2 Borders for Mic -->
+        <div class="flex flex-col items-center justify-center p-3 border border-primary/30 outline outline-1 outline-offset-2 outline-primary/10 rounded-2xl w-[110px] h-[110px] bg-primary/5 ml-4">
+          <!-- Mic button -->
+          <div class="relative flex items-center justify-center w-[85px] h-[85px]">
+            <!-- Concentric rings -->
+            <div class="absolute w-[85px] h-[85px] rounded-full border border-primary/20 bg-primary/5"></div>
+            <div class="absolute w-[65px] h-[65px] rounded-full border border-dashed border-primary/40 animate-[spin_20s_linear_infinite]"></div>
+            
+            <div (click)="triggerVoiceCommand()" class="relative z-10 w-[46px] h-[46px] rounded-full border border-primary flex items-center justify-center bg-primary/20 hover:bg-primary/40 cursor-pointer shrink-0 transition-all shadow-[0_0_20px_#00e5ff]"
+                 [ngClass]="isOperatorSpeaking ? 'animate-pulse bg-primary/50 scale-110 shadow-[0_0_30px_#00e5ff]' : ''">
+              <span class="material-symbols-outlined text-[22px] text-primary">mic</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -475,7 +485,7 @@
       <button (click)="toggleDiagnosticsSidebar()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer p-0 text-[18px]">close</button>
     </div>
     
-    <div class="lightning-panel rounded-xl flex flex-col gap-2 p-3 bg-background/50 border border-outline-variant/20 flex-grow overflow-hidden">
+    <div class="glass-panel rounded-xl flex flex-col gap-2 p-3 bg-background/50 border border-outline-variant/20 flex-grow overflow-hidden">
       <div class="flex-grow overflow-y-auto custom-scrollbar font-mono text-[10px] text-green-400 space-y-1.5 leading-relaxed px-2 py-2 select-text bg-[#0a0a0a] border border-[#00e5ff]/20 rounded shadow-[inset_0_0_10px_rgba(0,229,255,0.1)]">
         @for (log of logs; track $index) {
           <div class="border-b border-white/5 pb-1 mb-1 last:border-0 opacity-90 hover:opacity-100 transition-opacity">{{ log }}</div>
@@ -491,7 +501,7 @@
     <!-- Click outside to close (invisible backdrop) -->
     <div class="absolute inset-0 cursor-pointer" (click)="closeModal()"></div>
     
-    <div class="bg-[#0f1418] border border-outline-variant/30 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-[600px] max-w-full max-h-[85vh] flex flex-col lightning-panel relative z-10 overflow-hidden transform-gpu animate-in fade-in zoom-in-95 duration-200">
+    <div class="border border-outline-variant/30 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-[600px] max-w-full max-h-[85vh] flex flex-col glass-panel relative z-10 overflow-hidden transform-gpu animate-in fade-in zoom-in-95 duration-200">
       
       <!-- Header -->
       <div class="flex justify-between items-center px-6 py-4 border-b border-outline-variant/30 bg-white/5 shrink-0">
@@ -540,58 +550,39 @@
         <!-- Providers Modal Content -->
         @if (activeModal === 'providers') {
           <div class="space-y-3">
-            <div class="p-4 bg-white/5 rounded-lg border border-primary/30 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/50"><span class="material-symbols-outlined">psychology</span></div>
-                <div>
-                  <h4 class="text-on-surface font-bold text-[13px] mb-0">OpenAI GPT-4o</h4>
-                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 120ms • Used for Core Logic</p>
+            @for (provider of providersList; track provider.id) {
+              <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/50">
+                      <span class="w-6 h-6 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" [innerHTML]="providerIconSafe(provider.providerType)"></span>
+                    </div>
+                    <div>
+                      <h4 class="text-on-surface font-bold text-[13px] mb-0">{{ provider.name }}</h4>
+                      <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5 font-mono uppercase">{{ provider.providerType }}</p>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="px-2 py-1 bg-green-400/20 text-green-400 text-[9px] rounded font-bold uppercase mb-1 inline-block">{{ provider.status }}</span>
+                  </div>
                 </div>
+                @if (provider.models?.length > 0) {
+                  <div class="mt-3 pt-3 border-t border-outline-variant/20">
+                    <p class="text-[9px] text-on-surface-variant font-mono uppercase tracking-wider mb-1.5">Models ({{ provider.models.length }})</p>
+                    <div class="flex flex-wrap gap-1.5">
+                      @for (m of provider.models; track m) {
+                        <span class="px-2 py-0.5 bg-white/5 border border-outline-variant/20 text-[9px] text-on-surface rounded font-mono">{{ m }}</span>
+                      }
+                    </div>
+                  </div>
+                }
               </div>
-              <div class="text-right">
-                <span class="px-2 py-1 bg-primary text-background text-[9px] rounded font-bold uppercase mb-1 inline-block">Primary Active</span>
-                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
+            }
+            @if (providersList.length === 0) {
+              <div class="p-6 text-center text-on-surface-variant text-xs">
+                No providers configured. Go to Provider Center to add one.
               </div>
-            </div>
-            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-secondary/20 text-secondary flex items-center justify-center border border-secondary/50"><span class="material-symbols-outlined">smart_toy</span></div>
-                <div>
-                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Claude 3.5 Sonnet</h4>
-                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 145ms • Used for Creative Writing</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="px-2 py-1 bg-secondary/20 text-secondary text-[9px] rounded font-bold uppercase mb-1 inline-block">Backup Active</span>
-                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
-              </div>
-            </div>
-            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-blue-400/20 text-blue-400 flex items-center justify-center border border-blue-400/50"><span class="material-symbols-outlined">google</span></div>
-                <div>
-                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Google Gemini 1.5 Pro</h4>
-                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Latency: 130ms • Used for Large Context</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="px-2 py-1 bg-white/10 text-on-surface-variant text-[9px] rounded uppercase mb-1 inline-block">Failover</span>
-                <p class="text-green-400 text-[10px] font-bold mb-0">Connected</p>
-              </div>
-            </div>
-            <div class="p-4 bg-white/5 rounded-lg border border-outline-variant/30 flex items-center justify-between opacity-60">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-orange-400/20 text-orange-400 flex items-center justify-center border border-orange-400/50"><span class="material-symbols-outlined">view_in_ar</span></div>
-                <div>
-                  <h4 class="text-on-surface font-bold text-[13px] mb-0">Local Ollama (Llama 3)</h4>
-                  <p class="text-[10px] text-on-surface-variant mb-0 mt-0.5">Local Server Unreachable</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="px-2 py-1 bg-white/10 text-on-surface-variant text-[9px] rounded uppercase mb-1 inline-block">Disabled</span>
-                <p class="text-red-400 text-[10px] font-bold mb-0">Offline</p>
-              </div>
-            </div>
+            }
           </div>
         }
 
