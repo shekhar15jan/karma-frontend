@@ -2,6 +2,8 @@ export interface WorkflowRunResponse {
   id: string;
   workflowId: string;
   projectId: string;
+  executionId: string;
+  missionId: string;
   workflowName: string;
   status: string;
   duration: number;

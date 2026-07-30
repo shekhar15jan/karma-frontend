@@ -111,8 +111,16 @@ export class ProviderCenterComponent implements OnInit {
   testConnection(provider: ProviderVM): void {
     this.testing = true;
     this.testResult = null;
-    this.testing = false;
-    this.testResult = { success: true, message: 'Connection test initiated. Check provider status.' };
+    this.providersService.testConnection(provider.id).subscribe({
+      next: (result) => {
+        this.testResult = result;
+        this.testing = false;
+      },
+      error: (err) => {
+        this.testResult = { success: false, message: err.error?.message || 'Connection test failed' };
+        this.testing = false;
+      }
+    });
   }
 
   dismissModal(): void {

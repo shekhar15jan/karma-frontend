@@ -51,6 +51,10 @@ export class MarketplaceComponent implements OnInit {
   }
 
   installItem(item: MarketplaceItem): void {
-    item.installed = true;
+    this.api.post(`/v1/skills/${item.id}/install`, {}).subscribe({
+      next: () => {
+        item.installed = true;
+      }
+    });
   }
 }

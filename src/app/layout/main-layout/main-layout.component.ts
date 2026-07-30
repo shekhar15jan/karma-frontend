@@ -258,6 +258,7 @@ interface ChatMessage {
     </div>
   `,
   styles: [`
+    :host { display: block; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
   `],
 })

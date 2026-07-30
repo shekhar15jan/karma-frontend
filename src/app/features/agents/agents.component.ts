@@ -43,6 +43,18 @@ export class AgentsComponent implements OnInit {
     this.selectedAgent = { ...agent };
   }
 
+  deleteAgent(agent: AgentResponse): void {
+    if (!confirm(`Delete agent "${agent.name}"?`)) return;
+    this.agentsService.delete(agent.id).subscribe({
+      next: () => {
+        this.agents = this.agents.filter(a => a.id !== agent.id);
+      },
+      error: (err) => {
+        console.error('Failed to delete agent', err);
+      }
+    });
+  }
+
   saveAgentSettings(): void {
     if (!this.selectedAgent) return;
     this.agentsService.update(this.selectedAgent.id, this.selectedAgent).subscribe({

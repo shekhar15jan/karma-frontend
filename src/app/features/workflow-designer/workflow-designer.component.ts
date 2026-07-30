@@ -41,6 +41,7 @@ export class WorkflowDesignerComponent implements OnInit {
   error: string | null = null;
   saving = false;
   running = false;
+  runResult: { executionId: string, missionId: string } | null = null;
 
   // Drag and Connect State
   isConnecting = false;
@@ -161,6 +162,7 @@ export class WorkflowDesignerComponent implements OnInit {
   runWorkflow(): void {
     this.running = true;
     this.error = null;
+    this.runResult = null;
     const payload = {
       name: this.workflowName,
       nodes: this.nodes,
@@ -169,10 +171,12 @@ export class WorkflowDesignerComponent implements OnInit {
     this.workflowsService.runWorkflow(payload)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
+        next: (result) => {
           this.running = false;
+          this.runResult = { executionId: result.executionId, missionId: result.missionId };
+          this.error = null;
         },
-        error: () => {
+        error: (err) => {
           this.error = 'Failed to run workflow.';
           this.running = false;
         }
@@ -190,8 +194,26 @@ export class WorkflowDesignerComponent implements OnInit {
   }
 
   getNodeY(nodeId: string): number {
-    const node = this.nodes.find(n => n.id === nodeId);
-    return node ? node.y + 40 : 0; // centered vertically (height is ~80px, half is 40px)
+    const n = this.nodes.find(x => x.id === nodeId);
+    // Return center Y of the node (approx 40px down)
+    return n ? n.y + 40 : 0;
+  }
+
+  getEdgeMidX(sourceId: string, targetId: string): number {
+    const x1 = this.getNodeX(sourceId);
+    const x2 = this.getNodeX(targetId);
+    return (x1 + x2) / 2;
+  }
+
+  getEdgeMidY(sourceId: string, targetId: string): number {
+    const y1 = this.getNodeY(sourceId);
+    const y2 = this.getNodeY(targetId);
+    return (y1 + y2) / 2;
+  }
+
+  deleteEdge(edgeId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.edges = this.edges.filter(e => e.id !== edgeId);
   }
 
   // Node Drag Handlers

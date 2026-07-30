@@ -26,4 +26,8 @@ export class ProvidersService {
   delete(id: string): Observable<void> {
     return this.api.delete<void>(`/v1/providers/${id}`).pipe(map(r => r.data));
   }
+
+  testConnection(id: string): Observable<{ success: boolean; message: string }> {
+    return this.api.post<{ success: boolean; message: string }>(`/v1/providers/${id}/test`, {}).pipe(map(r => r.data));
+  }
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DashboardService } from '../../shared/services/dashboard.service';
+import { ExecutionsService } from '../../shared/services/executions.service';
 import { MissionResponse } from '../../shared/models/mission.model';
 import { FlowResponse } from '../../shared/models/flow.model';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
@@ -60,6 +61,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Floating Sidebar State
   showDiagnosticsSidebar = false;
+
+  triggerMission(missionId: string): void {
+    this.executionsService.trigger(missionId).subscribe({
+      next: () => {
+        this.showToast('Mission execution triggered', 'play_arrow');
+      },
+      error: () => {
+        this.showToast('Failed to trigger mission', 'error');
+      }
+    });
+  }
 
   toggleDiagnosticsSidebar() {
     this.showDiagnosticsSidebar = !this.showDiagnosticsSidebar;
@@ -159,7 +171,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     };
   };
 
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly executionsService: ExecutionsService,
+  ) {}
 
   ngOnInit(): void {
     this.loadDashboard();

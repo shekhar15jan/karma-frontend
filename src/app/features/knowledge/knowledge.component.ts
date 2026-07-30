@@ -12,6 +12,14 @@ interface KnowledgeDoc {
   uploaded_at: string;
 }
 
+interface UploadResult {
+  success: boolean;
+  id?: string;
+  name?: string;
+  status?: string;
+  message?: string;
+}
+
 @Component({
   selector: 'app-knowledge',
   standalone: true,
@@ -22,6 +30,7 @@ interface KnowledgeDoc {
 export class KnowledgeComponent implements OnInit {
   docs: KnowledgeDoc[] = [];
   loading = false;
+  uploading = false;
   error: string | null = null;
 
   constructor(private readonly knowledgeService: KnowledgeService) {}
@@ -51,5 +60,46 @@ export class KnowledgeComponent implements OnInit {
         console.error(err);
       }
     });
+  }
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    this.uploading = true;
+    this.knowledgeService.uploadFile(file).subscribe({
+      next: (result: UploadResult) => {
+        this.uploading = false;
+        if (result.success) {
+          this.docs.unshift({
+            id: result.id || '',
+            name: result.name || file.name,
+            type: file.name.split('.').pop() || 'txt',
+            size: this.formatSize(file.size),
+            status: 'processing',
+            uploaded_at: new Date().toISOString()
+          });
+        }
+        input.value = '';
+      },
+      error: () => {
+        this.uploading = false;
+        input.value = '';
+      }
+    });
+  }
+
+  deleteDoc(doc: KnowledgeDoc): void {
+    this.knowledgeService.delete(doc.id).subscribe({
+      next: () => {
+        this.docs = this.docs.filter(d => d.id !== doc.id);
+      }
+    });
+  }
+
+  private formatSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 }

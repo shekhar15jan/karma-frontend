@@ -7,6 +7,10 @@ import { ArtifactResponse } from '../models/artifact.model';
 export class ArtifactsService {
   constructor(private readonly api: ApiService) {}
 
+  getAll(): Observable<ArtifactResponse[]> {
+    return this.api.get<ArtifactResponse[]>('/v1/artifacts').pipe(map(r => r.data));
+  }
+
   getByMission(missionId: string): Observable<ArtifactResponse[]> {
     return this.api.get<ArtifactResponse[]>(`/v1/artifacts?missionId=${missionId}`).pipe(map(r => r.data));
   }
@@ -17,5 +21,9 @@ export class ArtifactsService {
 
   getById(id: number): Observable<ArtifactResponse> {
     return this.api.get<ArtifactResponse>(`/v1/artifacts/${id}`).pipe(map(r => r.data));
+  }
+
+  updateReviewStatus(id: number, status: string): Observable<ArtifactResponse> {
+    return this.api.put<ArtifactResponse>(`/v1/artifacts/${id}/review?status=${status}`, {}).pipe(map(r => r.data));
   }
 }

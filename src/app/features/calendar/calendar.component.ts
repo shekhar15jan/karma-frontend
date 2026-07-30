@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ApiService } from '../../shared/services/api.service';
 
 interface ScheduledPublish {
   id: string;
@@ -17,14 +18,26 @@ interface ScheduledPublish {
   templateUrl: './calendar.component.html',
   styleUrls: ['./calendar.component.scss']
 })
-export class CalendarComponent {
+export class CalendarComponent implements OnInit {
   days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  schedule: ScheduledPublish[] = [
-    { id: '1', title: 'Viral AI Tech Trends', time: '10:00 AM', day: 'Monday', platform: 'youtube', status: 'completed' },
-    { id: '2', title: 'Spring Boot automation trick', time: '02:00 PM', day: 'Wednesday', platform: 'linkedin', status: 'pending' },
-    { id: '3', title: 'Product Launch teaser', time: '06:00 PM', day: 'Friday', platform: 'tiktok', status: 'pending' },
-    { id: '4', title: 'Why developers love Karma OS', time: '11:00 AM', day: 'Sunday', platform: 'instagram', status: 'pending' }
-  ];
+  schedule: ScheduledPublish[] = [];
+
+  constructor(private readonly api: ApiService) {}
+
+  ngOnInit(): void {
+    this.api.get<any[]>('/v1/calendar/events').subscribe({
+      next: (res) => {
+        this.schedule = (res?.data || []).map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          time: e.time || '10:00 AM',
+          day: e.day || 'Monday',
+          platform: e.platform || 'youtube',
+          status: e.status || 'completed'
+        }));
+      }
+    });
+  }
 
   getEventsForDay(day: string): ScheduledPublish[] {
     return this.schedule.filter(s => s.day === day);

@@ -60,10 +60,12 @@ export class ReviewsComponent implements OnInit {
   approveDraft(draft: VideoDraft): void {
     draft.status = 'approved';
     this.drafts = this.drafts.map(d => d.id === draft.id ? { ...draft } : d);
+    this.artifactsService.updateReviewStatus(Number(draft.id), 'APPROVED').subscribe();
   }
 
   rejectDraft(draft: VideoDraft): void {
     draft.status = 'rejected';
     this.drafts = this.drafts.map(d => d.id === draft.id ? { ...draft } : d);
+    this.artifactsService.updateReviewStatus(Number(draft.id), 'REJECTED').subscribe();
   }
 }

@@ -62,4 +62,13 @@ export class ApiService {
     return this.http.delete<ApiResponse<T>>(`${this.baseUrl}${path}`, { headers: this.headers() })
       .pipe(map(res => res.data));
   }
+
+  upload<T>(path: string, formData: FormData): Observable<ApiResponse<T>> {
+    const token = this.auth.getToken();
+    let h = new HttpHeaders();
+    if (token) {
+      h = h.set('Authorization', `Bearer ${token}`);
+    }
+    return this.http.post<ApiResponse<T>>(`${this.baseUrl}${path}`, formData, { headers: h });
+  }
 }

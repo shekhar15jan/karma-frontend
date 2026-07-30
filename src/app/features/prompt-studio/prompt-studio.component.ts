@@ -134,5 +134,14 @@ export class PromptStudioComponent implements OnInit {
 
   saveTemplate() {
     if (!this.selectedTemplate) return;
+    this.api.put(`/v1/prompts/${this.selectedTemplate.id}`, {
+      name: this.selectedTemplate.name,
+      content: this.selectedTemplate.content
+    }).subscribe({
+      next: () => {
+        this.loadTemplates();
+      },
+      error: () => {}
+    });
   }
 }

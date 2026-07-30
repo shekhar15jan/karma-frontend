@@ -54,8 +54,9 @@ export class PublishingComponent implements OnInit {
     this.loading = true;
     this.error = null;
     this.api.get<SocialChannel[]>('/v1/publishing/channels').subscribe({
-      next: () => {
-        this.channels = [];
+      next: (res) => {
+        const data = (res as any).data || res || [];
+        this.channels = Array.isArray(data) ? data : [];
         this.loadLogs();
       },
       error: () => {

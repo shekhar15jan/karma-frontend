@@ -91,7 +91,7 @@ export class ArtifactExplorerComponent implements OnInit {
 
   loadArtifacts(): void {
     this.loading = true;
-    this.artifactsService.getPendingReview().subscribe({
+    this.artifactsService.getAll().subscribe({
       next: (data) => {
         this.artifacts = data.map((a: ArtifactResponse) => ({
           id: String(a.id),

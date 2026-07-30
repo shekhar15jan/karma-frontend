@@ -58,9 +58,14 @@
             </div>
 
             <!-- Action buttons -->
-            <button class="w-full px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer" (click)="selectAgent(agent)">
-              <span class="material-symbols-outlined text-sm">settings</span> Configure
-            </button>
+            <div class="flex gap-2">
+              <button class="flex-1 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer" (click)="selectAgent(agent)">
+                <span class="material-symbols-outlined text-sm">settings</span> Configure
+              </button>
+              <button class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer" (click)="deleteAgent(agent)">
+                <span class="material-symbols-outlined text-sm">delete</span>
+              </button>
+            </div>
           </div>
         }
       </div>
