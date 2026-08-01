@@ -14,5 +14,6 @@ export interface PendingStepReviewResponse {
   inputData: string;
   outputData: string;
   retryCount: number;
+  maxRetries: number;
   createdAt: string;
 }

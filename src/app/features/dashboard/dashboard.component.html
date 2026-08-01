@@ -465,18 +465,24 @@
           <p class="mb-0 hover:text-primary transition-colors cursor-pointer">• "Bye Bye Karma"</p>
         </div>
         
-        <!-- Square Box with 2 Borders for Mic -->
-        <div class="flex flex-col items-center justify-center p-3 border border-primary/30 outline outline-1 outline-offset-2 outline-primary/10 rounded-2xl w-[110px] h-[110px] bg-primary/5 ml-4">
-          <!-- Mic button -->
-          <div class="relative flex items-center justify-center w-[85px] h-[85px]">
-            <!-- Concentric rings -->
-            <div class="absolute w-[85px] h-[85px] rounded-full border border-primary/20 bg-primary/5"></div>
-            <div class="absolute w-[65px] h-[65px] rounded-full border border-dashed border-primary/40 animate-[spin_20s_linear_infinite]"></div>
-            
-            <div (click)="triggerVoiceCommand()" class="relative z-10 w-[46px] h-[46px] rounded-full border border-primary flex items-center justify-center bg-primary/20 hover:bg-primary/40 cursor-pointer shrink-0 transition-all shadow-[0_0_20px_#00e5ff]"
-                 [ngClass]="isOperatorSpeaking ? 'animate-pulse bg-primary/50 scale-110 shadow-[0_0_30px_#00e5ff]' : ''">
-              <span class="material-symbols-outlined text-[22px] text-primary">mic</span>
+        <!-- Mic button with Rotating Cube -->
+        <div class="relative flex items-center justify-center w-[85px] h-[85px] ml-4">
+          <!-- Silently Rotating Cube -->
+          <div class="cube-container absolute inset-0 m-auto flex items-center justify-center z-0 pointer-events-none">
+            <div class="cube">
+              <!-- Cube Faces -->
+              <div class="cube-face cube-face-front shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
+              <div class="cube-face cube-face-back shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
+              <div class="cube-face cube-face-right shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
+              <div class="cube-face cube-face-left shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
+              <div class="cube-face cube-face-top shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
+              <div class="cube-face cube-face-bottom shadow-[0_0_10px_rgba(0,229,255,0.1)]"></div>
             </div>
+          </div>
+          
+          <div (click)="triggerVoiceCommand()" class="relative z-10 w-[46px] h-[46px] rounded-full border border-primary flex items-center justify-center bg-primary/20 hover:bg-primary/40 cursor-pointer shrink-0 transition-all shadow-[0_0_20px_#00e5ff]"
+               [ngClass]="isOperatorSpeaking ? 'animate-pulse bg-primary/50 scale-110 shadow-[0_0_30px_#00e5ff]' : ''">
+            <span class="material-symbols-outlined text-[22px] text-primary">mic</span>
           </div>
         </div>
       </div>

@@ -67,7 +67,7 @@ export class ReviewsComponent implements OnInit, OnDestroy {
         this.drafts = artifacts.map((a: ArtifactResponse) => ({
           id: String(a.id),
           title: a.name || 'Untitled Artifact',
-          duration: '00:30',
+          duration: this.estimateReadingMinutes(a.contentText || ''),
           scriptSnippet: a.contentText?.substring(0, 120) || '',
           fullContent: a.contentText || '',
           status: (a.reviewStatus === 'APPROVED' ? 'approved' : a.reviewStatus === 'REJECTED' ? 'rejected' : 'pending_review') as 'pending_review' | 'approved' | 'rejected'
@@ -189,5 +189,15 @@ export class ReviewsComponent implements OnInit, OnDestroy {
       case 'PUBLISH': return 'Publish';
       default: return type || 'Unknown';
     }
+  }
+
+  estimateReadingMinutes(content: string): string {
+    const words = (content || '').trim().split(/\s+/).filter(w => w.length > 0).length;
+    const minutes = Math.max(1, Math.round(words / 200));
+    return String(minutes);
+  }
+
+  stepRetriesExhausted(step: PendingStepReviewResponse): boolean {
+    return (step.retryCount ?? 0) >= (step.maxRetries || 3);
   }
 }

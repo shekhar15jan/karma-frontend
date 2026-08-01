@@ -44,8 +44,10 @@
                 <span>{{ step.flowName || 'Flow' }}</span>
                 <span>{{ stepTypeLabel(step.stepType) }} · step {{ step.stepOrder + 1 }}</span>
               </div>
-              @if (step.retryCount > 0) {
-                <span class="text-[8px] font-mono text-amber-400 uppercase">Rewritten {{ step.retryCount }}×</span>
+              @if (stepRetriesExhausted(step)) {
+                <span class="text-[8px] font-mono text-red-400 uppercase">Retries exhausted — next reject fails the execution</span>
+              } @else if (step.retryCount > 0) {
+                <span class="text-[8px] font-mono text-amber-400 uppercase">Rewritten {{ step.retryCount }}× of {{ step.maxRetries || 3 }}</span>
               }
             </div>
           }
@@ -87,6 +89,14 @@
                 ></textarea>
               </div>
 
+              <!-- Retry exhausted banner -->
+              @if (selectedStep && stepRetriesExhausted(selectedStep)) {
+                <div class="flex items-center gap-2 px-3 py-2 bg-red-600/10 border border-red-500/30 rounded-xl text-[10px] font-mono text-red-400">
+                  <span class="material-symbols-outlined text-sm">error</span>
+                  Rewrite limit reached ({{ selectedStep.retryCount }} of {{ selectedStep.maxRetries || 3 }}). Rejecting this step will fail the execution. Use Approve or cancel the mission.
+                </div>
+              }
+
               <!-- Actions -->
               <div class="flex gap-3 border-t border-outline-variant/20 pt-3">
                 <button
@@ -98,7 +108,8 @@
                 </button>
                 <button
                   class="px-4 py-2 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  [disabled]="submitting"
+                  [disabled]="submitting || (selectedStep && stepRetriesExhausted(selectedStep))"
+                  [title]="selectedStep && stepRetriesExhausted(selectedStep) ? 'Rewrite limit reached' : ''"
                   (click)="rejectStep(selectedStep)"
                 >
                   <span class="material-symbols-outlined text-sm">refresh</span> Reject & Rewrite

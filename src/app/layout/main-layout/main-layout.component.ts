@@ -14,6 +14,7 @@ interface ChatMessage {
   sender: 'user' | 'karma';
   text: string;
   time: string;
+  isTyping?: boolean;
 }
 
 @Component({
@@ -188,9 +189,17 @@ interface ChatMessage {
             @for (msg of chatMessages; track $index) {
               <div class="flex flex-col max-w-[85%]" [class]="msg.sender === 'user' ? 'self-end items-end' : 'self-start items-start'">
                 <span class="text-[8px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">{{ msg.sender === 'user' ? 'Operator' : 'Karma AI' }} &bull; {{ msg.time }}</span>
-                <div class="px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed"
-                  [class]="msg.sender === 'user' ? 'bg-primary/10 border border-primary/20 text-on-surface rounded-tr-none' : 'bg-white/5 border border-outline-variant/20 text-on-surface-variant rounded-tl-none'">
-                  {{ msg.text }}
+                <div class="px-4 py-3 rounded-2xl text-[13px] font-sans shadow-md"
+                     [class]="msg.sender === 'user' ? 'bg-primary/20 text-primary border border-primary/30 rounded-br-sm' : 'bg-surface-variant/80 text-on-surface border border-white/5 rounded-bl-sm'">
+                  @if (msg.isTyping) {
+                    <div class="flex items-center gap-1 h-5 px-1">
+                      <div class="w-1.5 h-1.5 bg-primary/70 rounded-full animate-[bounce_1s_infinite]"></div>
+                      <div class="w-1.5 h-1.5 bg-primary/70 rounded-full animate-[bounce_1s_infinite_0.2s]"></div>
+                      <div class="w-1.5 h-1.5 bg-primary/70 rounded-full animate-[bounce_1s_infinite_0.4s]"></div>
+                    </div>
+                  } @else {
+                    {{ msg.text }}
+                  }
                 </div>
               </div>
             }
@@ -238,9 +247,6 @@ interface ChatMessage {
             <span class="material-symbols-outlined text-[18px]">stop_circle</span> Stop Mission
           </button>
           <div class="h-6 w-px bg-white/10 mx-2"></div>
-          <button (click)="pauseMission()" class="px-6 py-2 bg-white/5 border border-white/10 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">pause</span> Pause
-          </button>
           <button (click)="publishNow()" class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">send</span> Publish
           </button>
@@ -273,7 +279,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private timerId: any;
 
   // Karma AI speech configuration
-  karmaVoiceSpeechEnabled = true;
+  karmaVoiceSpeechEnabled = false;
 
   // Speech Recognition States (Operator Mic)
   isListening = false;
@@ -298,7 +304,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   // Multilingual Support
   activeLanguage = 'en';
-  preferredVoice = 'en-IN-NeerjaNeural';
+  preferredVoice = 'en-US-AriaNeural';
   private readonly sttLanguageCodes: Record<string, string> = {
     en: 'en-US', hi: 'hi-IN', mr: 'mr-IN', ta: 'ta-IN', te: 'te-IN', bn: 'bn-IN',
     gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN', ur: 'ur-IN', fr: 'fr-FR', de: 'de-DE',
@@ -381,7 +387,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   private triggerOperatorMicListener = () => {
-    this.wakeUpKarma();
+    if (!this.isSystemAwaking) {
+      this.wakeUpKarma();
+    }
+    this.toggleKarmaVoiceSpeech();
   };
 
   ngOnDestroy() {
@@ -422,7 +431,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     this.chatMessages.push({ sender: 'karma', text: 'Waking up Karma OS. Running system diagnostic...', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
     
-    this.karmaVoiceSpeechEnabled = true;
+    this.karmaVoiceSpeechEnabled = false;
     if (!this.recognition) {
       this.initSpeech();
       this.startListening();
@@ -619,6 +628,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.processCommand(msg);
   }
 
+  karmaReply(humanText: string, lang?: string) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msg: ChatMessage = { sender: 'karma', text: humanText, time, isTyping: this.karmaVoiceSpeechEnabled };
+    this.chatMessages.push(msg);
+    this.showToast(humanText, 'graphic_eq');
+    this.speak(humanText, lang, msg);
+  }
+
   private processCommand(command: string) {
     const cleanCmd = command.toLowerCase().trim();
 
@@ -629,7 +646,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
                            cleanCmd.includes('backup');
 
     if (isWakeUpPhrase && (cleanCmd.includes('karma') || cleanCmd.includes('os'))) {
-      this.reply('Hello Chandrashekhar, I am ready.');
+      this.karmaReply('Hello Chandrashekhar, I am ready.');
       return;
     }
 
@@ -640,14 +657,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         if (res.intent === 'language' && res.target) {
           this.switchLanguage(res.target);
         }
-        this.reply(reply, res.language);
+        this.karmaReply(reply, res.language);
         if (res.intent === 'navigate' && res.target) {
           const route = '/' + res.target.replace(/^\//, '');
           this.router.navigate([route]);
         }
       },
       error: () => {
-        this.reply('I am having trouble connecting to my AI. Please try again.');
+        this.karmaReply('I am having trouble connecting to my AI. Please try again.');
       }
     });
   }
@@ -670,15 +687,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
   }
 
-  private reply(text: string, language?: string) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const lang = language || this.activeLanguage || 'en';
-    const humanText = this.humanizeForSpeech(text);
-    this.chatMessages.push({ sender: 'karma', text: humanText, time });
-    this.showToast(humanText, 'graphic_eq');
-    this.speak(humanText, lang);
-  }
-
   private humanizeForSpeech(text: string): string {
     if (!text) return text;
     return text
@@ -694,13 +702,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .trim();
   }
 
-  private speechQueue: { text: string, language: string, resolve: () => void }[] = [];
-  private isProcessingSpeechQueue = false;
+  // TTS Speech Queue
+  speechQueue: { text: string, language: string, resolve: () => void, msg?: ChatMessage }[] = [];
+  isProcessingSpeechQueue = false;
 
-  speak(text: string, language?: string): Promise<void> {
+  speak(text: string, language?: string, msg?: ChatMessage): Promise<void> {
     return new Promise((resolve) => {
       if (this.karmaVoiceSpeechEnabled && 'speechSynthesis' in window) {
-        this.speechQueue.push({ text, language: language || this.activeLanguage || 'en', resolve });
+        this.speechQueue.push({ text, language: language || this.activeLanguage || 'en', resolve, msg });
         if (!this.isProcessingSpeechQueue) {
           this.processSpeechQueue();
         }
@@ -735,10 +744,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
   }
 
-  private speakWithBrowser(item: { text: string, resolve: () => void }) {
+  private speakWithBrowser(item: { text: string, language: string, resolve: () => void, msg?: ChatMessage }) {
     const utterance = new SpeechSynthesisUtterance(item.text);
     
-    // Try to find a consistent female voice
+    // Try to set language
+    const langToUse = item.language || 'en';
     const voices = window.speechSynthesis.getVoices();
     
     let preferredVoice = voices.find(v => v.name.includes('Google US English'));
@@ -766,31 +776,68 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     
     utterance.onerror = () => { 
       item.resolve(); 
+      if (item.msg) item.msg.isTyping = false;
       this.processSpeechQueue(); 
+    };
+    
+    utterance.onstart = () => {
+      if (item.msg) item.msg.isTyping = false;
     };
     
     window.speechSynthesis.speak(utterance);
   }
 
-  private speakWithTts(item: { text: string, language: string, resolve: () => void }) {
+  private speakWithTts(item: { text: string, language: string, resolve: () => void, msg?: ChatMessage }) {
     const body: any = { text: item.text, language: item.language };
-    if (this.preferredVoice) body.voice = this.preferredVoice;
+    
+    // Map languages to native Edge TTS voices to override English default
+    if (item.language && !item.language.startsWith('en')) {
+      if (item.language.startsWith('mr')) body.voice = 'mr-IN-AarohiNeural';
+      else if (item.language.startsWith('hi')) body.voice = 'hi-IN-SwaraNeural';
+      else if (item.language.startsWith('ta')) body.voice = 'ta-IN-PallaviNeural';
+      else if (item.language.startsWith('te')) body.voice = 'te-IN-ShrutiNeural';
+      else if (item.language.startsWith('bn')) body.voice = 'bn-IN-TanishaaNeural';
+      else if (item.language.startsWith('gu')) body.voice = 'gu-IN-DhwaniNeural';
+      else if (item.language.startsWith('kn')) body.voice = 'kn-IN-SapnaNeural';
+      else if (item.language.startsWith('ml')) body.voice = 'ml-IN-SobhanaNeural';
+      else if (item.language.startsWith('ur')) body.voice = 'ur-IN-GulNeural';
+      else if (item.language.startsWith('fr')) body.voice = 'fr-FR-DeniseNeural';
+      else if (item.language.startsWith('de')) body.voice = 'de-DE-KatjaNeural';
+      else if (this.preferredVoice) body.voice = this.preferredVoice;
+    } else {
+      // Force an English voice for English text
+      body.voice = 'en-US-AriaNeural';
+    }
+
     this.api.postData<any>('/v1/voice/tts', body).subscribe({
       next: (res) => {
         const dataUri = res?.dataUri;
         if (dataUri) {
           const audio = new Audio(dataUri);
+          audio.onplay = () => {
+            if (item.msg) item.msg.isTyping = false;
+          };
           audio.onended = () => { item.resolve(); this.processSpeechQueue(); };
-          audio.onerror = () => { item.resolve(); this.processSpeechQueue(); };
-          audio.play().catch(() => { item.resolve(); this.processSpeechQueue(); });
+          audio.onerror = () => { 
+            console.warn('Audio playback error, falling back to browser TTS');
+            this.speakWithBrowser(item);
+          };
+          audio.play().catch((err) => { 
+            console.warn('Audio autoplay blocked or failed, falling back to browser TTS', err);
+            this.speakWithBrowser(item);
+          });
         } else {
-          item.resolve();
-          this.processSpeechQueue();
+          console.warn('No dataUri in TTS response, falling back to browser TTS', res);
+          if (res?.errorMessage) {
+            console.error('BACKEND TTS ERROR:', res.errorMessage);
+          }
+          this.speakWithBrowser(item);
         }
       },
-      error: () => {
-        item.resolve();
-        this.processSpeechQueue();
+      error: (err) => {
+        console.warn('TTS API error, falling back to browser TTS', err);
+        if (item.msg) item.msg.isTyping = false;
+        this.speakWithBrowser(item);
       }
     });
   }
@@ -833,7 +880,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   stopMission(): void {
     this.executionsService.getAll().subscribe({
       next: (executions) => {
-        const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING');
+        const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING' || e.status === 'WAITING' || e.status === 'PAUSED');
         if (!active) {
           this.showToast('No active missions to stop', 'info');
           return;
@@ -845,10 +892,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       },
       error: () => this.showToast('Failed to fetch executions', 'error')
     });
-  }
-
-  pauseMission(): void {
-    this.showToast('Pause is not supported by the execution engine', 'info');
   }
 
   publishNow(): void {

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Subject, interval, switchMap, takeUntil } from 'rxjs';
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
+import { SseService } from '../../shared/services/sse.service';
 import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
 import { WorkflowRunResponse } from '../../shared/models/workflow.model';
 
@@ -25,18 +26,22 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  isComplete() { return false; }
-  rerunStage(id: any) {}
-  cancelStage(id: any) {}
-  pipeline: any = { stages: [], total_duration: 0, artifacts_produced: 0, cost: 0 };
-
   constructor(
     private readonly executionsService: ExecutionsService,
     private readonly workflowsService: WorkflowsService,
+    private readonly sseService: SseService,
   ) {}
 
   ngOnInit(): void {
     this.loadData();
+    this.sseService.connect();
+    this.sseService.onMessage()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((msg) => {
+        if (msg.event.startsWith('execution.') || msg.event === 'step.completed') {
+          this.loadData();
+        }
+      });
     if (this.autoRefresh) {
       interval(10000)
         .pipe(

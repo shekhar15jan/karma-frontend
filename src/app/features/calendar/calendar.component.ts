@@ -7,8 +7,9 @@ interface ScheduledPublish {
   title: string;
   time: string;
   day: string;
-  platform: 'youtube' | 'tiktok' | 'instagram' | 'linkedin';
-  status: 'pending' | 'completed';
+  platform: string;
+  status: 'pending' | 'completed' | 'failed';
+  url?: string;
 }
 
 @Component({
@@ -30,10 +31,11 @@ export class CalendarComponent implements OnInit {
         this.schedule = (res?.data || []).map((e: any) => ({
           id: e.id,
           title: e.title,
-          time: e.time || '10:00 AM',
+          time: e.time || '10:00',
           day: e.day || 'Monday',
-          platform: e.platform || 'youtube',
-          status: e.status || 'completed'
+          platform: e.platform || 'webhook',
+          status: e.status || 'pending',
+          url: e.url
         }));
       }
     });

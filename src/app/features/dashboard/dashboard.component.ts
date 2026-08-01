@@ -116,8 +116,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   // Mission Creation State
   workspaces: WorkspaceResponse[] = [];
   projects: ProjectResponse[] = [];
-  selectedFlowIds: string[] = [];
-  isCreatingMission = false;
   showProjectModal = false;
   isCreatingProject = false;
   newProjectName = '';
@@ -181,50 +179,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       error: () => {
         this.isCreatingProject = false;
         this.showToast('Failed to create project', 'error');
-      }
-    });
-  }
-
-  toggleFlow(id: string): void {
-    const idx = this.selectedFlowIds.indexOf(id);
-    if (idx >= 0) {
-      this.selectedFlowIds.splice(idx, 1);
-    } else {
-      this.selectedFlowIds.push(id);
-    }
-  }
-
-  createMission(runAfterCreate: boolean): void {
-    if (!this.newMission.projectId || !this.newMission.name?.trim()) {
-      this.showToast('Project and Mission Name are required', 'error');
-      return;
-    }
-    this.isCreatingMission = true;
-    const payload = {
-      projectId: this.newMission.projectId,
-      name: this.newMission.name.trim(),
-      description: this.newMission.description?.trim() || undefined,
-      missionType: this.newMission.missionType,
-      priority: this.newMission.priority,
-      providerId: this.newMission.providerId || undefined,
-      selectedFlowIds: this.selectedFlowIds.length ? [...this.selectedFlowIds] : undefined
-    };
-    this.missionsService.create(payload).subscribe({
-      next: (created) => {
-        this.isCreatingMission = false;
-        this.showToast(`Mission "${created.name}" created`, 'check_circle');
-        this.activeModal = null;
-        this.loadMissions(this.newMission.projectId);
-        if (runAfterCreate) {
-          this.executionsService.trigger(created.id, this.runMode).subscribe({
-            next: () => this.showToast('Mission execution started', 'play_arrow'),
-            error: () => this.showToast('Failed to start execution', 'error')
-          });
-        }
-      },
-      error: (err) => {
-        this.isCreatingMission = false;
-        this.showToast('Failed to create mission: ' + (err?.error?.message || 'unknown error'), 'error');
       }
     });
   }

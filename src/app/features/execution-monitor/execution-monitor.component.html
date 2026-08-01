@@ -104,7 +104,7 @@
               }
             </div>
           }
-          @if (exec.status === 'RUNNING' || exec.status === 'PAUSED') {
+          @if (exec.status === 'RUNNING' || exec.status === 'PENDING' || exec.status === 'WAITING' || exec.status === 'PAUSED') {
             <button class="self-end px-3 py-1 bg-red-600/10 border border-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-600/20 transition-all cursor-pointer" (click)="$event.stopPropagation(); cancelExecution(exec.id)">
               Cancel
             </button>
