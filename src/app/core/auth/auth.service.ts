@@ -10,6 +10,7 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
+  role?: string;
 }
 
 export interface AuthLoginResponse {
@@ -116,7 +117,7 @@ export class AuthService {
     if (res.refreshToken) {
       localStorage.setItem(this.refreshTokenKey, res.refreshToken);
     }
-    const authUser: AuthUser = { id: res.userId, email: res.email, displayName: res.displayName };
+    const authUser: AuthUser = { id: res.userId, email: res.email, displayName: res.displayName, role: res.role };
     localStorage.setItem(this.userKey, JSON.stringify(authUser));
     this.user.set(authUser);
     this.isAuthenticated.set(true);

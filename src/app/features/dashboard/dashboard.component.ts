@@ -18,6 +18,9 @@ import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/ex
 import { AgentsService } from '../../shared/services/agents.service';
 import { ProvidersService } from '../../shared/services/providers.service';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
+import { KarmaActionService } from '../../shared/services/karma-action.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { ApiService } from '../../shared/services/api.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -116,6 +119,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   // Mission Creation State
   workspaces: WorkspaceResponse[] = [];
   projects: ProjectResponse[] = [];
+  isCreatingMission = false;
   showProjectModal = false;
   isCreatingProject = false;
   newProjectName = '';
@@ -179,6 +183,42 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       error: () => {
         this.isCreatingProject = false;
         this.showToast('Failed to create project', 'error');
+      }
+    });
+  }
+
+  createMission(runAfterCreate: boolean): void {
+    if (!this.newMission.projectId || !this.newMission.name?.trim()) {
+      this.showToast('Project and Mission Name are required', 'error');
+      return;
+    }
+    this.isCreatingMission = true;
+    const payload = {
+      projectId: this.newMission.projectId,
+      name: this.newMission.name.trim(),
+      description: this.newMission.description?.trim() || undefined,
+      missionType: this.newMission.missionType,
+      priority: this.newMission.priority,
+      providerId: this.newMission.providerId || undefined
+    };
+    this.missionsService.create(payload).subscribe({
+      next: (created) => {
+        this.isCreatingMission = false;
+        this.showToast(`Mission "${created.name}" created`, 'check_circle');
+        this.activeModal = null;
+        this.newMission.name = '';
+        this.newMission.description = '';
+        this.loadMissions(this.newMission.projectId);
+        if (runAfterCreate) {
+          this.executionsService.trigger(created.id, this.runMode).subscribe({
+            next: () => this.showToast('Mission execution started', 'play_arrow'),
+            error: () => this.showToast('Failed to start execution', 'error')
+          });
+        }
+      },
+      error: (err) => {
+        this.isCreatingMission = false;
+        this.showToast('Failed to create mission: ' + (err?.error?.message || 'unknown error'), 'error');
       }
     });
   }
@@ -438,6 +478,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly agentsService: AgentsService,
     private readonly providersService: ProvidersService,
     private readonly artifactsService: ArtifactsService,
+    private readonly karmaActions: KarmaActionService,
+    private readonly auth: AuthService,
+    private readonly api: ApiService,
     private readonly cdr: ChangeDetectorRef,
     private readonly sanitizer: DomSanitizer
   ) {}
@@ -445,6 +488,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit(): void {
     this.loadDashboard();
     this.bootstrapLogs();
+    this.karmaActions.onAction.pipe(takeUntil(this.destroy$)).subscribe(a => this.executeKarmaAction(a));
     window.addEventListener('heard-voice-command', this.heardVoiceListener);
     window.addEventListener('system-diagnostic-start', this.systemDiagnosticStartListener);
     window.addEventListener('system-diagnostic-core', this.systemDiagnosticCoreListener);
@@ -460,6 +504,238 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.loadFlowStatuses(this.activeMission.id);
       }
     }, 10000);
+  }
+
+  private reportActionOutcome(action: any, success: boolean, note?: string): void {
+    const eventId = action?.eventId || action?.params?.eventId;
+    if (!eventId) return;
+    this.api.postData('/v1/memory/feedback', { eventId, success, note }).subscribe({
+      error: () => console.warn('Failed to record action feedback', eventId)
+    });
+  }
+
+  private executeKarmaAction(action: any): void {
+    if (!action?.type) return;
+    const params = action.params || {};
+    const role = (this.auth.user()?.role || 'OPERATOR').toUpperCase();
+
+    const canOperate = (): boolean => {
+      if (role === 'ADMIN') return true;
+      if (role === 'OPERATOR') {
+        return ['navigate', 'open_modal', 'prefill_mission', 'create_workspace', 'create_project',
+                'create_mission', 'trigger_mission', 'set_run_mode', 'approve_artifact', 'reject_artifact',
+                'remember_memory']
+          .includes(action.type);
+      }
+      return false;
+    };
+
+    if (!canOperate()) {
+      this.showToast(`KARMA cannot perform this — your role (${role}) does not allow it`, 'lock');
+      return;
+    }
+
+    if (action.type === 'open_modal') {
+      const modal = String(params.modal || '');
+      if (modal === 'create-mission' || modal === 'flows' || modal === 'providers' || modal === 'agents' || modal === 'approvals') {
+        this.openModal(modal as any);
+        this.showToast(`KARMA opened the ${modal} view`, 'touch_app');
+        this.reportActionOutcome(action, true, `opened ${modal}`);
+      } else {
+        this.reportActionOutcome(action, false, 'unknown modal: ' + modal);
+      }
+      return;
+    }
+
+    if (action.type === 'prefill_mission') {
+      if (params.workspaceId && this.workspaces.some(w => w.id === params.workspaceId)) {
+        this.newMission.workspaceId = params.workspaceId;
+        this.newMission.projectId = '';
+        this.loadProjects(this.newMission.workspaceId, params.projectId);
+      }
+      if (params.name) this.newMission.name = params.name;
+      if (params.description) this.newMission.description = params.description;
+      if (params.missionType) this.newMission.missionType = params.missionType;
+      if (params.priority) this.newMission.priority = params.priority;
+      if (params.providerId) this.newMission.providerId = params.providerId;
+      if (params.runMode === 'AUTO' || params.runMode === 'REVIEW') this.runMode = params.runMode;
+      this.openModal('create-mission');
+      this.cdr.detectChanges();
+      this.reportActionOutcome(action, true, 'mission form pre-filled');
+      return;
+    }
+
+    if (action.type === 'set_run_mode') {
+      if (params.runMode === 'AUTO' || params.runMode === 'REVIEW') {
+        this.runMode = params.runMode;
+        this.showToast(`KARMA set run mode to ${params.runMode}`, 'toggle_on');
+        this.reportActionOutcome(action, true, `run mode ${params.runMode}`);
+      } else {
+        this.reportActionOutcome(action, false, 'invalid runMode');
+      }
+      return;
+    }
+
+    if (action.type === 'create_workspace') {
+      const name = String(params.name || '').trim();
+      if (!name) {
+        this.showToast('KARMA could not create workspace: name missing', 'error');
+        this.reportActionOutcome(action, false, 'name missing');
+        return;
+      }
+      this.workspacesService.create({ name, description: params.description }).subscribe({
+        next: (ws) => {
+          this.showToast(`KARMA created workspace "${ws.name}"`, 'check_circle');
+          this.loadWorkspacesAndMissions();
+          this.reportActionOutcome(action, true, `workspace "${ws.name}" created`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to create workspace: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'create failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'create_project') {
+      const workspaceId = String(params.workspaceId || '');
+      const name = String(params.name || '').trim();
+      if (!workspaceId || !name) {
+        this.showToast('KARMA could not create project: workspace or name missing', 'error');
+        this.reportActionOutcome(action, false, 'workspace/name missing');
+        return;
+      }
+      this.projectsService.create(workspaceId, name).subscribe({
+        next: (project) => {
+          this.showToast(`KARMA created project "${project.name}"`, 'check_circle');
+          this.loadWorkspacesAndMissions();
+          this.reportActionOutcome(action, true, `project "${project.name}" created`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to create project: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'create failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'create_mission') {
+      const projectId = String(params.projectId || '');
+      if (!projectId || !params.name) {
+        this.showToast('KARMA could not create mission: project or name missing', 'error');
+        this.reportActionOutcome(action, false, 'project/name missing');
+        return;
+      }
+      this.missionsService.create({
+        projectId,
+        name: String(params.name),
+        description: params.description,
+        missionType: params.missionType,
+        priority: params.priority,
+        providerId: params.providerId
+      }).subscribe({
+        next: (mission) => {
+          this.showToast(`KARMA created mission "${mission.name}"`, 'check_circle');
+          this.loadDashboard();
+          this.reportActionOutcome(action, true, `mission "${mission.name}" created`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to create mission: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'create failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'trigger_mission') {
+      const missionId = String(params.missionId || '');
+      if (!missionId) {
+        this.showToast('KARMA could not trigger: mission id missing', 'error');
+        this.reportActionOutcome(action, false, 'missionId missing');
+        return;
+      }
+      const mode = (params.runMode === 'AUTO' || params.runMode === 'REVIEW') ? params.runMode : this.runMode;
+      this.executionsService.trigger(missionId, mode).subscribe({
+        next: () => {
+          this.showToast(`KARMA started mission execution (${mode})`, 'play_arrow');
+          this.loadDashboard();
+          this.reportActionOutcome(action, true, `triggered mission ${missionId} (${mode})`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to trigger mission: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'trigger failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'approve_artifact' || action.type === 'reject_artifact') {
+      const id = String(params.id || '');
+      if (!id) {
+        this.showToast('KARMA could not review: artifact id missing', 'error');
+        this.reportActionOutcome(action, false, 'artifact id missing');
+        return;
+      }
+      const status = action.type === 'approve_artifact' ? 'APPROVED' : 'REJECTED';
+      this.artifactsService.updateReviewStatus(id, status).subscribe({
+        next: () => {
+          this.pendingApprovals = this.pendingApprovals.filter(a => a.id !== id);
+          this.showToast(`KARMA ${action.type === 'approve_artifact' ? 'approved' : 'rejected'} the artifact`, action.type === 'approve_artifact' ? 'check_circle' : 'cancel');
+          this.reportActionOutcome(action, true, `${action.type} artifact ${id}`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to review artifact: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'review failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'create_agent') {
+      const name = String(params.name || '').trim();
+      if (!name) {
+        this.showToast('KARMA could not create agent: name missing', 'error');
+        this.reportActionOutcome(action, false, 'name missing');
+        return;
+      }
+      this.agentsService.create({
+        name,
+        category: params.category,
+        description: params.description
+      } as any).subscribe({
+        next: (agent) => {
+          this.showToast(`KARMA created agent "${agent.name}"`, 'check_circle');
+          this.loadDashboard();
+          this.reportActionOutcome(action, true, `agent "${agent.name}" created`);
+        },
+        error: (err) => {
+          this.showToast('KARMA failed to create agent: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'create failed');
+        }
+      });
+      return;
+    }
+
+    if (action.type === 'remember_memory') {
+      const key = String(params.key || '').trim();
+      const value = String(params.value || '').trim();
+      if (!key || !value) {
+        this.showToast('KARMA could not remember: key or value missing', 'error');
+        this.reportActionOutcome(action, false, 'key/value missing');
+        return;
+      }
+      this.api.postData('/v1/memory/remember', { key, value }).subscribe({
+        next: () => {
+          this.showToast('KARMA will remember that', 'lightbulb');
+          this.reportActionOutcome(action, true, `remembered ${key}`);
+        },
+        error: (err) => {
+          this.showToast('KARMA could not save that memory: ' + (err?.error?.message || 'error'), 'error');
+          this.reportActionOutcome(action, false, err?.error?.message || 'remember failed');
+        }
+      });
+      return;
+    }
   }
 
   ngAfterViewInit(): void {
@@ -594,15 +870,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       });
   }
 
-  private loadProjects(workspaceId: string): void {
+  private loadProjects(workspaceId: string, preferredProjectId?: string): void {
     this.projectsService.getByWorkspace(workspaceId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (projects) => {
           this.projects = projects;
           if (projects.length === 0) return;
-          this.newMission.projectId = projects[0].id;
-          this.loadMissions(projects[0].id);
+          this.newMission.projectId = (preferredProjectId && projects.some(p => p.id === preferredProjectId))
+            ? preferredProjectId
+            : projects[0].id;
+          this.loadMissions(this.newMission.projectId);
         },
         error: (err) => {
           console.error('Failed to fetch projects', err);

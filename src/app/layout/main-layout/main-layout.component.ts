@@ -7,6 +7,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { VoicePreferencesService } from '../../shared/services/voice-preferences.service';
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkspacesService } from '../../shared/services/workspaces.service';
+import { KarmaActionService, KarmaUiAction } from '../../shared/services/karma-action.service';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -314,7 +315,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   protected workspaces: WorkspaceResponse[] = [];
   protected activeWorkspace: WorkspaceResponse | null = null;
 
-  protected readonly navItems = [
+  protected readonly allNavItems = [
     { path: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/workflows', label: 'Flows', icon: 'hub' },
@@ -326,10 +327,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { path: '/providers', label: 'AI Providers', icon: 'key' },
     { path: '/reviews', label: 'Reviews', icon: 'rate_review' },
     { path: '/publishing', label: 'Publishing', icon: 'publish' },
-    { path: '/administration', label: 'Settings', icon: 'settings' },
+    { path: '/administration', label: 'Settings', icon: 'settings', adminOnly: true },
   ];
 
-  constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef, private readonly voicePrefs: VoicePreferencesService, private readonly executionsService: ExecutionsService, private readonly workspacesService: WorkspacesService) {
+  protected get navItems(): Array<{ path: string; label: string; icon: string }> {
+    const role = (this.auth.user()?.role || 'OPERATOR').toUpperCase();
+    return this.allNavItems.filter(item => !item.adminOnly || role === 'ADMIN');
+  }
+
+  constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef, private readonly voicePrefs: VoicePreferencesService, private readonly executionsService: ExecutionsService, private readonly workspacesService: WorkspacesService, private readonly karmaActions: KarmaActionService) {
     effect(() => {
       if (!this.voicePrefs.loaded()) return;
       const lang = this.voicePrefs.language();
@@ -651,17 +657,19 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
 
     const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
-    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage }).subscribe({
+    const history = this.buildChatHistory();
+    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage, history }).subscribe({
       next: (res) => {
         const reply = res.reply || 'I processed your request.';
         if (res.intent === 'language' && res.target) {
           this.switchLanguage(res.target);
         }
         this.karmaReply(reply, res.language);
-        if (res.intent === 'navigate' && res.target) {
-          const route = '/' + res.target.replace(/^\//, '');
+        if (res.intent === 'navigate' && res.target && !res.action) {
+          const route = '/' + this.normalizeRoute(res.target);
           this.router.navigate([route]);
         }
+        this.handleKarmaAction(res);
       },
       error: () => {
         this.karmaReply('I am having trouble connecting to my AI. Please try again.');
@@ -669,8 +677,70 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     });
   }
 
-  private switchLanguage(code: string) {
-    const lang = this.sttLanguageCodes[code];
+  private normalizeRoute(page: string): string {
+    const key = String(page || '').toLowerCase().replace(/[\s_/-]+/g, '').trim();
+    const aliases: Record<string, string> = {
+      dashboard: 'dashboard',
+      missions: 'mission-control',
+      missioncontrol: 'mission-control',
+      mission: 'mission-control',
+      executions: 'executions',
+      execution: 'executions',
+      reviews: 'reviews',
+      publishing: 'publishing',
+      workspaces: 'workspaces',
+      agents: 'agents',
+      providers: 'providers',
+      calendar: 'calendar',
+      knowledge: 'knowledge',
+      prompts: 'prompts',
+      flows: 'workflows',
+      workflows: 'workflows',
+      workflow: 'workflows',
+      artifacts: 'artifacts',
+      analytics: 'analytics',
+      settings: 'administration',
+      administration: 'administration'
+    };
+    return aliases[key] || key || 'dashboard';
+  }
+
+  private dashboardActionTypes = [
+    'open_modal', 'prefill_mission', 'create_workspace', 'create_project', 'create_mission',
+    'trigger_mission', 'approve_artifact', 'reject_artifact', 'set_run_mode', 'create_agent', 'remember_memory'
+  ];
+
+  private handleKarmaAction(res: any): void {
+    const action: KarmaUiAction | undefined = res?.action;
+    if (!action?.type) return;
+
+    if (action.type === 'navigate' && action.params && action.params['page']) {
+      const route = '/' + this.normalizeRoute(String(action.params['page']));
+      this.router.navigate([route]).then(() => this.karmaActions.dispatch(action));
+      return;
+    }
+
+    if (this.dashboardActionTypes.includes(action.type)) {
+      const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
+      if (currentPage !== 'dashboard') {
+        this.router.navigate(['/dashboard']).then(() => this.karmaActions.dispatch(action));
+      } else {
+        this.karmaActions.dispatch(action);
+      }
+      return;
+    }
+
+    this.karmaActions.dispatch(action);
+  }
+
+  private buildChatHistory(): Array<{ role: string; content: string }> {
+    const lastTurns = this.chatMessages.slice(-10);
+    return lastTurns
+      .filter((m) => m.text && !m.isTyping)
+      .map((m) => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }));
+  }
+
+  private switchLanguage(code: string) {    const lang = this.sttLanguageCodes[code];
     if (!lang) return;
     this.activeLanguage = code;
     this.voicePrefs.save(code, this.voicePrefs.defaultVoiceFor(code)).catch(() => {});
