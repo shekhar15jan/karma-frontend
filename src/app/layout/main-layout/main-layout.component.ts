@@ -1,9 +1,13 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, effect } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../shared/services/api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { VoicePreferencesService } from '../../shared/services/voice-preferences.service';
+import { ExecutionsService } from '../../shared/services/executions.service';
+import { WorkspacesService } from '../../shared/services/workspaces.service';
+import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { firstValueFrom } from 'rxjs';
 
 interface ChatMessage {
@@ -42,20 +46,22 @@ interface ChatMessage {
               <span class="material-symbols-outlined text-primary text-sm">workspaces</span>
               <div class="flex flex-col">
                 <span class="text-[9px] uppercase tracking-wider text-on-surface-variant leading-none font-bold">Workspace</span>
-                <span class="text-xs font-semibold text-on-surface leading-none mt-1">Alpha Video Agency</span>
+                <span class="text-xs font-semibold text-on-surface leading-none mt-1">{{ activeWorkspace?.name || 'Select workspace' }}</span>
               </div>
               <span class="material-symbols-outlined text-on-surface-variant text-sm ml-1">expand_more</span>
             </div>
             <!-- Dropdown -->
             <div class="absolute top-full mt-2 left-0 w-48 bg-background border border-outline-variant/30 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
               <div class="p-2 flex flex-col gap-1">
-                <div class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 border border-primary/30 bg-primary/10">
-                   <span class="material-symbols-outlined text-primary text-sm">check</span>
-                   <span class="text-xs font-semibold text-primary">Alpha Video Agency</span>
-                </div>
-                <div class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 pl-8">
-                   <span class="text-xs text-on-surface-variant">Personal Sandbox</span>
-                </div>
+                @for (ws of workspaces; track ws.id) {
+                  <div (click)="selectWorkspace(ws)" class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2"
+                       [ngClass]="ws.id === activeWorkspace?.id ? 'border border-primary/30 bg-primary/10' : 'pl-8'">
+                    @if (ws.id === activeWorkspace?.id) {
+                      <span class="material-symbols-outlined text-primary text-sm">check</span>
+                    }
+                    <span class="text-xs font-semibold" [ngClass]="ws.id === activeWorkspace?.id ? 'text-primary' : 'text-on-surface-variant'">{{ ws.name }}</span>
+                  </div>
+                }
                 <div class="h-px bg-outline-variant/20 my-1"></div>
                 <a routerLink="/workspaces" class="px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer flex items-center gap-2 text-decoration-none">
                    <span class="material-symbols-outlined text-on-surface-variant text-sm">settings</span>
@@ -102,8 +108,7 @@ interface ChatMessage {
             <button (click)="showToast('Global Search coming soon', 'search')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Search">search</button>
             <button (click)="toggleChat()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Karma Chat Panel">chat_bubble</button>
             <div class="relative">
-              <button (click)="showToast('You have 3 unread system notifications', 'notifications')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Notifications">notifications</button>
-              <span class="absolute top-2 right-2 w-4 h-4 bg-primary-container text-[10px] text-on-primary font-bold flex items-center justify-center rounded-full shadow-[0_0_10px_#00e5ff]">3</span>
+              <button (click)="showToast('No new notifications', 'notifications')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Notifications">notifications</button>
             </div>
             <div class="ml-4 pl-4 border-l border-outline-variant/50 flex flex-col items-end">
               <span class="text-sm font-medium text-primary-container glow-text">{{ currentTime }}</span>
@@ -229,14 +234,14 @@ interface ChatMessage {
 
         <!-- CENTER: Mission Controls -->
         <div class="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-2xl border border-primary/30">
-          <button class="px-6 py-2 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/30 transition-all cursor-pointer">
+          <button (click)="stopMission()" class="px-6 py-2 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/30 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">stop_circle</span> Stop Mission
           </button>
           <div class="h-6 w-px bg-white/10 mx-2"></div>
-          <button class="px-6 py-2 bg-white/5 border border-white/10 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all cursor-pointer">
+          <button (click)="pauseMission()" class="px-6 py-2 bg-white/5 border border-white/10 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-white/10 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">pause</span> Pause
           </button>
-          <button class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
+          <button (click)="publishNow()" class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">send</span> Publish
           </button>
         </div>
@@ -250,7 +255,7 @@ interface ChatMessage {
               <span class="text-[8px] text-green-500/70 font-bold uppercase">Encryption Active</span>
             </div>
           </div>
-          <button class="px-6 py-2 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
+          <button (click)="logout()" class="px-6 py-2 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Bye Bye Karma
           </button>
         </div>
@@ -291,6 +296,18 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   // Diagnostic State
   diagnosticMessage: string | null = null;
 
+  // Multilingual Support
+  activeLanguage = 'en';
+  preferredVoice = 'en-IN-NeerjaNeural';
+  private readonly sttLanguageCodes: Record<string, string> = {
+    en: 'en-US', hi: 'hi-IN', mr: 'mr-IN', ta: 'ta-IN', te: 'te-IN', bn: 'bn-IN',
+    gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN', ur: 'ur-IN', fr: 'fr-FR', de: 'de-DE',
+    ja: 'ja-JP', zh: 'zh-CN'
+  };
+
+  protected workspaces: WorkspaceResponse[] = [];
+  protected activeWorkspace: WorkspaceResponse | null = null;
+
   protected readonly navItems = [
     { path: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -301,18 +318,35 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { path: '/knowledge', label: 'Knowledge', icon: 'menu_book' },
     { path: '/prompts', label: 'Prompts', icon: 'terminal' },
     { path: '/providers', label: 'AI Providers', icon: 'key' },
-    { path: '/marketplace', label: 'Marketplace', icon: 'storefront' },
     { path: '/reviews', label: 'Reviews', icon: 'rate_review' },
     { path: '/publishing', label: 'Publishing', icon: 'publish' },
     { path: '/administration', label: 'Settings', icon: 'settings' },
   ];
 
-  constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef) {}
+  constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef, private readonly voicePrefs: VoicePreferencesService, private readonly executionsService: ExecutionsService, private readonly workspacesService: WorkspacesService) {
+    effect(() => {
+      if (!this.voicePrefs.loaded()) return;
+      const lang = this.voicePrefs.language();
+      if (lang && lang !== this.activeLanguage) {
+        this.activeLanguage = lang;
+        if (this.recognition) {
+          this.recognition.lang = this.sttLanguageCodes[lang] || 'en-US';
+        }
+      }
+      this.preferredVoice = this.voicePrefs.voice();
+    });
+  }
 
   ngOnInit() {
     this.updateTime();
     this.timerId = setInterval(() => this.updateTime(), 1000);
     this.initSpeech();
+
+    // Load persisted voice & language preferences
+    this.voicePrefs.loadCatalog().catch(() => {});
+    this.voicePrefs.loadPreferences().catch(() => {});
+
+    this.loadWorkspaces();
 
     window.addEventListener('trigger-operator-mic', this.triggerOperatorMicListener);
     window.addEventListener('show-toast', this.toastListener);
@@ -420,7 +454,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       } catch (e) {
         console.warn("Provider check failed", e);
       }
-      const providerHealth = provRes?.data?.length > 0 ? 'Online' : 'Offline';
+      const providers = provRes?.data || [];
+      const providerHealth = providers.some((p: any) => p && p.status === 'CONNECTED') ? 'Online' : 'Offline';
       if (providerHealth === 'Online') {
         this.diagnosticMessage = "AI Providers Online and Synced.";
         window.dispatchEvent(new CustomEvent('system-diagnostic-core', { detail: { providers: 'Online' } }));
@@ -494,7 +529,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (Speech) {
       this.recognition = new Speech();
       this.recognition.continuous = false;
-      this.recognition.lang = 'en-US';
+      this.recognition.lang = this.sttLanguageCodes[this.activeLanguage] || 'en-US';
       this.recognition.interimResults = false;
 
       this.recognition.onstart = () => {
@@ -599,10 +634,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
 
     const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
-    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage }).subscribe({
+    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage }).subscribe({
       next: (res) => {
         const reply = res.reply || 'I processed your request.';
-        this.reply(reply);
+        if (res.intent === 'language' && res.target) {
+          this.switchLanguage(res.target);
+        }
+        this.reply(reply, res.language);
         if (res.intent === 'navigate' && res.target) {
           const route = '/' + res.target.replace(/^\//, '');
           this.router.navigate([route]);
@@ -614,20 +652,55 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     });
   }
 
-  private reply(text: string) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    this.chatMessages.push({ sender: 'karma', text, time });
-    this.showToast(text, 'graphic_eq');
-    this.speak(text);
+  private switchLanguage(code: string) {
+    const lang = this.sttLanguageCodes[code];
+    if (!lang) return;
+    this.activeLanguage = code;
+    this.voicePrefs.save(code, this.voicePrefs.defaultVoiceFor(code)).catch(() => {});
+    if (this.recognition) {
+      this.recognition.lang = lang;
+    }
+    if (this.isListening && this.karmaVoiceSpeechEnabled) {
+      this.stopListening();
+      setTimeout(() => {
+        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+          this.startListening();
+        }
+      }, 600);
+    }
   }
 
-  private speechQueue: { text: string, resolve: () => void }[] = [];
+  private reply(text: string, language?: string) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const lang = language || this.activeLanguage || 'en';
+    const humanText = this.humanizeForSpeech(text);
+    this.chatMessages.push({ sender: 'karma', text: humanText, time });
+    this.showToast(humanText, 'graphic_eq');
+    this.speak(humanText, lang);
+  }
+
+  private humanizeForSpeech(text: string): string {
+    if (!text) return text;
+    return text
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]*)`/g, '$1')
+      .replace(/\*\*([^*]*)\*\*/g, '$1')
+      .replace(/(^|\s)\*([^*\n]*)\*/g, '$1$2')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/^\s*[-*•]\s+/gm, ', ')
+      .replace(/→/g, ' to ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  private speechQueue: { text: string, language: string, resolve: () => void }[] = [];
   private isProcessingSpeechQueue = false;
 
-  speak(text: string): Promise<void> {
+  speak(text: string, language?: string): Promise<void> {
     return new Promise((resolve) => {
       if (this.karmaVoiceSpeechEnabled && 'speechSynthesis' in window) {
-        this.speechQueue.push({ text, resolve });
+        this.speechQueue.push({ text, language: language || this.activeLanguage || 'en', resolve });
         if (!this.isProcessingSpeechQueue) {
           this.processSpeechQueue();
         }
@@ -654,6 +727,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.stopListening(); // Ensure mic is off while processing queue
 
     const item = this.speechQueue.shift()!;
+    const useEdgeTts = (item.language && item.language !== 'en') || this.voicePrefs.configured();
+    if (useEdgeTts) {
+      this.speakWithTts(item);
+    } else {
+      this.speakWithBrowser(item);
+    }
+  }
+
+  private speakWithBrowser(item: { text: string, resolve: () => void }) {
     const utterance = new SpeechSynthesisUtterance(item.text);
     
     // Try to find a consistent female voice
@@ -690,6 +772,29 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     window.speechSynthesis.speak(utterance);
   }
 
+  private speakWithTts(item: { text: string, language: string, resolve: () => void }) {
+    const body: any = { text: item.text, language: item.language };
+    if (this.preferredVoice) body.voice = this.preferredVoice;
+    this.api.postData<any>('/v1/voice/tts', body).subscribe({
+      next: (res) => {
+        const dataUri = res?.dataUri;
+        if (dataUri) {
+          const audio = new Audio(dataUri);
+          audio.onended = () => { item.resolve(); this.processSpeechQueue(); };
+          audio.onerror = () => { item.resolve(); this.processSpeechQueue(); };
+          audio.play().catch(() => { item.resolve(); this.processSpeechQueue(); });
+        } else {
+          item.resolve();
+          this.processSpeechQueue();
+        }
+      },
+      error: () => {
+        item.resolve();
+        this.processSpeechQueue();
+      }
+    });
+  }
+
   showToast(message: string, icon: string) {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastMessage = message;
@@ -701,6 +806,58 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.toastIcon = '';
       this.cdr.detectChanges();
     }, 4500);
+  }
+
+  private static readonly ACTIVE_WS_KEY = 'karma_active_workspace';
+
+  loadWorkspaces(): void {
+    this.workspacesService.getAll().subscribe({
+      next: (data) => {
+        this.workspaces = data || [];
+        const savedId = localStorage.getItem(MainLayoutComponent.ACTIVE_WS_KEY);
+        const saved = savedId ? this.workspaces.find(w => w.id === savedId) : null;
+        this.activeWorkspace = saved || this.workspaces[0] || null;
+      },
+      error: () => {
+        this.workspaces = [];
+        this.activeWorkspace = null;
+      }
+    });
+  }
+
+  selectWorkspace(ws: WorkspaceResponse): void {
+    this.activeWorkspace = ws;
+    localStorage.setItem(MainLayoutComponent.ACTIVE_WS_KEY, ws.id);
+  }
+
+  stopMission(): void {
+    this.executionsService.getAll().subscribe({
+      next: (executions) => {
+        const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING');
+        if (!active) {
+          this.showToast('No active missions to stop', 'info');
+          return;
+        }
+        this.executionsService.cancel(active.id).subscribe({
+          next: () => this.showToast('Mission execution stopped', 'stop_circle'),
+          error: () => this.showToast('Failed to stop mission', 'error')
+        });
+      },
+      error: () => this.showToast('Failed to fetch executions', 'error')
+    });
+  }
+
+  pauseMission(): void {
+    this.showToast('Pause is not supported by the execution engine', 'info');
+  }
+
+  publishNow(): void {
+    this.router.navigate(['/publishing']);
+  }
+
+  logout(): void {
+    localStorage.removeItem(MainLayoutComponent.ACTIVE_WS_KEY);
+    this.auth.logout();
   }
 
   private updateTime() {

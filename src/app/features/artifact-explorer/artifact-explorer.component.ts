@@ -3,15 +3,6 @@ import { CommonModule } from '@angular/common';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
 
-interface ArtifactVM {
-  id: string;
-  name: string;
-  type: string;
-  size: string;
-  created: string;
-  icon: string;
-}
-
 @Component({
   selector: 'app-artifact-explorer',
   standalone: true,
@@ -32,11 +23,11 @@ interface ArtifactVM {
 
       <div class="glass-panel p-3 rounded-xl flex items-center gap-3 shrink-0">
         <span class="text-[9px] uppercase font-mono text-on-surface-variant">Filter Vault:</span>
-        <button class="px-3 py-1 rounded bg-primary/10 border border-primary/30 text-xs text-primary font-bold">All</button>
-        <button class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-xs text-on-surface-variant">Documents</button>
-        <button class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-xs text-on-surface-variant">Audio</button>
-        <button class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-xs text-on-surface-variant">Video</button>
-        <button class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-xs text-on-surface-variant">Images</button>
+        <button (click)="filter = 'ALL'" [ngClass]="filter === 'ALL' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs font-bold">All</button>
+        <button (click)="filter = 'DOCUMENT'" [ngClass]="filter === 'DOCUMENT' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Documents</button>
+        <button (click)="filter = 'AUDIO'" [ngClass]="filter === 'AUDIO' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Audio</button>
+        <button (click)="filter = 'VIDEO'" [ngClass]="filter === 'VIDEO' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Video</button>
+        <button (click)="filter = 'IMAGE'" [ngClass]="filter === 'IMAGE' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Images</button>
       </div>
 
       @if (loading) {
@@ -45,27 +36,39 @@ interface ArtifactVM {
         </div>
       }
 
+      @if (!loading && filteredArtifacts.length === 0) {
+        <div class="text-center py-16 text-on-surface-variant">
+          <span class="material-symbols-outlined text-3xl">inventory_2</span>
+          <p class="text-xs mt-2">No artifacts found</p>
+        </div>
+      }
+
       @if (!loading) {
         <div class="grid grid-cols-4 gap-6">
-          @for (artifact of artifacts; track artifact.id) {
+          @for (artifact of filteredArtifacts; track artifact.id) {
             <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-primary transition-all shadow-[0_0_15px_rgba(0,229,255,0.05)]">
               <div class="flex items-start justify-between">
                 <div class="w-10 h-10 rounded bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <span class="material-symbols-outlined text-xl text-primary">{{ artifact.icon }}</span>
+                  <span class="material-symbols-outlined text-xl text-primary">{{ iconFor(artifact.artifactType) }}</span>
                 </div>
-                <span class="text-[8px] font-mono text-on-surface-variant uppercase">{{ artifact.type }}</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[8px] font-mono text-on-surface-variant uppercase">{{ artifact.artifactType }}</span>
+                  <span class="w-1.5 h-1.5 rounded-full"
+                        [class]="artifact.reviewStatus === 'APPROVED' ? 'bg-green-400' : artifact.reviewStatus === 'REJECTED' ? 'bg-red-400' : 'bg-yellow-400 animate-pulse'"
+                        [title]="'Review: ' + artifact.reviewStatus"></span>
+                </div>
               </div>
-              
+
               <div class="mt-4 mb-3">
-                <h4 class="text-xs font-bold text-on-surface truncate mb-1">{{ artifact.name }}</h4>
+                <h4 class="text-xs font-bold text-on-surface truncate mb-1" [title]="artifact.name">{{ artifact.name }}</h4>
                 <p class="text-[9px] text-on-surface-variant mb-0 font-mono">
-                  {{ artifact.created }}
+                  {{ formatDate(artifact.createdAt) }}
                 </p>
               </div>
 
               <div class="flex gap-2 border-t border-outline-variant/20 pt-2.5">
-                <button class="flex-grow py-1 bg-white/5 border border-outline-variant/30 text-[9px] rounded font-bold hover:bg-white/10 transition-colors">Preview</button>
-                <button class="px-2 py-1 bg-primary/10 border border-primary/30 text-[9px] rounded hover:bg-primary/20 transition-colors flex items-center justify-center">
+                <button (click)="openPreview(artifact)" class="flex-grow py-1 bg-white/5 border border-outline-variant/30 text-[9px] rounded font-bold hover:bg-white/10 transition-colors">Preview</button>
+                <button (click)="download(artifact)" class="px-2 py-1 bg-primary/10 border border-primary/30 text-[9px] rounded hover:bg-primary/20 transition-colors flex items-center justify-center">
                   <span class="material-symbols-outlined text-xs text-primary">download</span>
                 </button>
               </div>
@@ -74,16 +77,45 @@ interface ArtifactVM {
         </div>
       }
     </div>
+
+    @if (selected) {
+      <div class="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <div class="absolute inset-0 cursor-pointer" (click)="closePreview()"></div>
+        <div class="border border-outline-variant/30 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-[760px] max-w-full max-h-[85vh] flex flex-col glass-panel relative z-10 overflow-hidden">
+          <div class="flex justify-between items-center px-6 py-4 border-b border-outline-variant/30 bg-white/5 shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="material-symbols-outlined text-primary text-[18px]">{{ iconFor(selected.artifactType) }}</span>
+              <div class="min-w-0">
+                <h2 class="text-primary-container font-display tracking-widest text-[14px] uppercase glow-text mb-0 truncate">{{ selected.name }}</h2>
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase">{{ selected.artifactType }} · {{ selected.reviewStatus }} · v{{ selected.currentVersion || 1 }}</span>
+              </div>
+            </div>
+            <button (click)="closePreview()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer">close</button>
+          </div>
+          <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+            <pre class="text-[12px] font-mono text-on-surface whitespace-pre-wrap break-words leading-relaxed">{{ selected.contentText || 'No content available.' }}</pre>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .no-scrollbar::-webkit-scrollbar { display: none; }
   `],
 })
 export class ArtifactExplorerComponent implements OnInit {
-  artifacts: ArtifactVM[] = [];
+  artifacts: ArtifactResponse[] = [];
+  selected: ArtifactResponse | null = null;
+  filter: string = 'ALL';
   loading = false;
 
   constructor(private readonly artifactsService: ArtifactsService) {}
+
+  get filteredArtifacts(): ArtifactResponse[] {
+    if (this.filter === 'ALL') return this.artifacts;
+    const target = this.filter;
+    return this.artifacts.filter(a => a.artifactType?.toUpperCase().includes(target));
+  }
 
   ngOnInit(): void {
     this.loadArtifacts();
@@ -93,19 +125,46 @@ export class ArtifactExplorerComponent implements OnInit {
     this.loading = true;
     this.artifactsService.getAll().subscribe({
       next: (data) => {
-        this.artifacts = data.map((a: ArtifactResponse) => ({
-          id: String(a.id),
-          name: a.name || `Artifact #${a.id}`,
-          type: a.artifactType?.toLowerCase() || 'document',
-          size: '1 MB',
-          created: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : 'Unknown',
-          icon: a.artifactType === 'VIDEO' ? 'videocam' : a.artifactType === 'AUDIO' ? 'mic' : a.artifactType === 'IMAGE' ? 'image' : 'description'
-        }));
+        this.artifacts = data;
         this.loading = false;
       },
       error: () => {
         this.loading = false;
       }
     });
+  }
+
+  iconFor(type: string): string {
+    const t = (type || '').toUpperCase();
+    if (t === 'VIDEO' || t === 'MEDIA_ASSET') return 'videocam';
+    if (t === 'AUDIO' || t === 'VOICE') return 'mic';
+    if (t === 'IMAGE' || t === 'THUMBNAIL') return 'image';
+    if (t === 'SCRIPT' || t === 'VIDEO_SCRIPT') return 'description';
+    if (t === 'BLOG_POST' || t === 'ARTICLE') return 'article';
+    return 'description';
+  }
+
+  formatDate(iso: string): string {
+    if (!iso) return 'Unknown';
+    return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  openPreview(artifact: ArtifactResponse): void {
+    this.selected = artifact;
+  }
+
+  closePreview(): void {
+    this.selected = null;
+  }
+
+  download(artifact: ArtifactResponse): void {
+    const content = artifact.contentText || '';
+    const blob = new Blob([content], { type: artifact.contentType || 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${artifact.name || 'artifact'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }

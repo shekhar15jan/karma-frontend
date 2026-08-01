@@ -1,6 +1,7 @@
 export interface ExecutionResponse {
   id: string;
   missionId: string;
+  mode: string;
   status: string;
   startedAt: string;
   completedAt: string;
@@ -20,6 +21,7 @@ export interface ExecutionStepResponse {
   stepOrder: number;
   stepType: string;
   status: string;
+  reviewStatus: string;
   inputData: string;
   outputData: string;
   promptUsed: string;

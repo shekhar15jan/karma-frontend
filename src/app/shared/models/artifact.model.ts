@@ -1,5 +1,5 @@
 export interface ArtifactResponse {
-  id: number;
+  id: string;
   missionId: string;
   executionStepId: string;
   name: string;

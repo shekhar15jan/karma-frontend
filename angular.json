@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "aurora-studio": {
+    "karma-studio": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -75,10 +75,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "aurora-studio:build:production"
+              "buildTarget": "karma-studio:build:production"
             },
             "development": {
-              "buildTarget": "aurora-studio:build:development"
+              "buildTarget": "karma-studio:build:development"
             }
           },
           "defaultConfiguration": "development"

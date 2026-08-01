@@ -46,6 +46,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'agents/:id/trace',
+        loadComponent: () =>
+          import('./features/agent-trace/agent-trace.component').then(
+            (m) => m.AgentTraceComponent,
+          ),
+      },
+      {
         path: 'calendar',
         loadComponent: () =>
           import('./features/calendar/calendar.component').then(
@@ -57,13 +64,6 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/knowledge/knowledge.component').then(
             (m) => m.KnowledgeComponent,
-          ),
-      },
-      {
-        path: 'marketplace',
-        loadComponent: () =>
-          import('./features/marketplace/marketplace.component').then(
-            (m) => m.MarketplaceComponent,
           ),
       },
       {

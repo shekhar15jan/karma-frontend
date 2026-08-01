@@ -17,6 +17,7 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
   executions: ExecutionResponse[] = [];
   selectedExecution: ExecutionResponse | null = null;
   steps: ExecutionStepResponse[] = [];
+  expandedStepId: string | null = null;
   workflowRuns: WorkflowRunResponse[] = [];
   loading = true;
   error: string | null = null;
@@ -83,6 +84,7 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
 
   selectExecution(execution: ExecutionResponse): void {
     this.selectedExecution = execution;
+    this.expandedStepId = null;
     this.executionsService.getSteps(execution.id).subscribe({
       next: (steps) => {
         this.steps = steps;
@@ -99,6 +101,10 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleStep(step: ExecutionStepResponse): void {
+    this.expandedStepId = this.expandedStepId === step.id ? null : step.id;
+  }
+
   getStatusIcon(status: string): string {
     const map: Record<string, string> = {
       PENDING: 'schedule',
@@ -106,6 +112,8 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
       COMPLETED: 'check_circle',
       FAILED: 'error',
       CANCELLED: 'cancel',
+      WAITING: 'rate_review',
+      RESTARTED: 'restart_alt',
       PAUSED: 'pause_circle',
     };
     return map[status] || 'help';
@@ -118,6 +126,8 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
       COMPLETED: 'text-green-400',
       FAILED: 'text-red-400',
       CANCELLED: 'text-orange-400',
+      WAITING: 'text-yellow-400',
+      RESTARTED: 'text-amber-400',
       PAUSED: 'text-yellow-400',
     };
     return map[status] || 'text-on-surface-variant';
@@ -132,5 +142,10 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
     if (h > 0) return `${h}h ${m}m ${sec}s`;
     if (m > 0) return `${m}m ${sec}s`;
     return `${sec}s`;
+  }
+
+  formatCost(cost: number): string {
+    if (cost == null) return '0';
+    return cost.toFixed(6);
   }
 }

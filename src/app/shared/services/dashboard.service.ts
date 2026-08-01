@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { MissionResponse } from '../models/mission.model';
 import { FlowResponse } from '../models/flow.model';
@@ -9,15 +10,16 @@ import { ArtifactResponse } from '../models/artifact.model';
 export class DashboardService {
   constructor(private readonly api: ApiService) {}
 
-  getMissions(): Observable<MissionResponse[]> {
-    return this.api.get<MissionResponse[]>('/v1/missions').pipe(map(r => r.data));
+  getMissions(projectId?: string): Observable<MissionResponse[]> {
+    const params = projectId ? new HttpParams().set('projectId', projectId) : undefined;
+    return this.api.getData<MissionResponse[]>('/v1/missions', params);
   }
 
   getFlows(): Observable<FlowResponse[]> {
-    return this.api.get<FlowResponse[]>('/v1/flows').pipe(map(r => r.data));
+    return this.api.getData<FlowResponse[]>('/v1/flows');
   }
 
   getPendingApprovals(): Observable<ArtifactResponse[]> {
-    return this.api.get<ArtifactResponse[]>('/v1/artifacts/pending-review').pipe(map(r => r.data));
+    return this.api.getData<ArtifactResponse[]>('/v1/artifacts/pending-review');
   }
 }

@@ -19,11 +19,11 @@ export class ArtifactsService {
     return this.api.get<ArtifactResponse[]>('/v1/artifacts/pending-review').pipe(map(r => r.data));
   }
 
-  getById(id: number): Observable<ArtifactResponse> {
+  getById(id: string): Observable<ArtifactResponse> {
     return this.api.get<ArtifactResponse>(`/v1/artifacts/${id}`).pipe(map(r => r.data));
   }
 
-  updateReviewStatus(id: number, status: string): Observable<ArtifactResponse> {
+  updateReviewStatus(id: string, status: string): Observable<ArtifactResponse> {
     return this.api.put<ArtifactResponse>(`/v1/artifacts/${id}/review?status=${status}`, {}).pipe(map(r => r.data));
   }
 }

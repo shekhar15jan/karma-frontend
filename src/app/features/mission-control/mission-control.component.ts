@@ -32,6 +32,7 @@ export class MissionControlComponent implements OnInit, OnDestroy {
   error: string | null = null;
 
   private destroy$ = new Subject<void>();
+  private refreshInterval: any;
 
   constructor(
     private readonly missionsService: MissionsService,
@@ -39,16 +40,23 @@ export class MissionControlComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    this.logs = [
+      `[SYS] ${stamp} - Mission Control online, awaiting execution data...`
+    ];
     this.loadExecutions();
+    this.refreshInterval = setInterval(() => this.loadExecutions(), 10000);
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
   }
 
   private loadExecutions(): void {
-    this.loading = true;
     this.error = null;
 
     this.executionsService.getAll()
@@ -57,16 +65,16 @@ export class MissionControlComponent implements OnInit, OnDestroy {
         next: (executions) => {
           this.executions = executions;
           if (executions.length > 0) {
-            this.loadSteps(executions[0].id);
-            this.workers = executions.slice(0, 4).map((ex, i) => ({
-              id: ex.id.substring(0, 4),
-              name: `Execution ${i + 1}`,
+            const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING') || executions[0];
+            this.loadSteps(active.id);
+            this.workers = executions.slice(0, 6).map((ex, i) => ({
+              id: ex.id.substring(0, 8),
+              name: `Exec ${ex.id.substring(0, 8)}`,
               task: `Mission ${ex.missionId?.substring(0, 8) || 'N/A'}`,
-              progress: ex.status === 'COMPLETED' ? 100 : ex.status === 'RUNNING' ? 45 : 0,
+              progress: ex.status === 'COMPLETED' ? 100 : ex.status === 'RUNNING' ? 50 : 0,
               status: (ex.status === 'RUNNING' ? 'running' : ex.status === 'COMPLETED' ? 'idle' : 'paused') as 'running' | 'idle' | 'paused',
             }));
-            this.cpuLoad = executions.filter(e => e.status === 'RUNNING').length * 15;
-            this.gpuLoad = executions.filter(e => e.status === 'RUNNING').length * 20;
+            this.queueSize = executions.filter(e => e.status === 'PENDING').length;
           }
           this.loading = false;
         },
@@ -84,7 +92,26 @@ export class MissionControlComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (steps) => {
           this.steps = steps;
-          this.queueSize = steps.filter(s => s.status === 'PENDING').length;
+          const pending = steps.filter(s => s.status === 'PENDING').length;
+          const running = steps.filter(s => s.status === 'RUNNING').length;
+          const completed = steps.filter(s => s.status === 'COMPLETED').length;
+          const total = steps.length;
+
+          this.queueSize = pending;
+          this.cpuLoad = total > 0 ? Math.min(100, Math.round(((completed + running) / total) * 100)) : 0;
+          this.gpuLoad = total > 0 ? Math.min(100, Math.round((running / total) * 100) * 3) : 0;
+
+          const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          const entry = (level: string, msg: string) => `[${level}] ${stamp} - ${msg}`;
+          const fresh = [
+            entry('SYS', `Execution ${executionId.substring(0, 8)} sync`),
+            entry('OK', `${completed} of ${total} steps completed`),
+          ];
+          if (running > 0) fresh.push(entry('RUN', `${running} step(s) actively executing`));
+          if (pending > 0) fresh.push(entry('WARN', `${pending} step(s) waiting in queue`));
+          const failed = steps.filter(s => s.status === 'FAILED').length;
+          if (failed > 0) fresh.push(entry('FAIL', `${failed} step(s) failed`));
+          this.logs = [...fresh.reverse(), ...this.logs].slice(0, 40);
         },
         error: (err) => {
           console.error('Failed to load steps', err);

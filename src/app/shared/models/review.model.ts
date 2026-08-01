@@ -1,6 +1,7 @@
 export interface ReviewResponse {
-  id: number;
-  artifactId: number;
+  id: string;
+  artifactId: string;
+  stepId: string;
   reviewerId: string;
   decision: string;
   comments: string;
@@ -9,8 +10,8 @@ export interface ReviewResponse {
 }
 
 export interface PublicationResponse {
-  id: number;
-  artifactId: number;
+  id: string;
+  artifactId: string;
   destination: string;
   status: string;
   url: string;

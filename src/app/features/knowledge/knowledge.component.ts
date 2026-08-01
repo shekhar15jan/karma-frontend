@@ -47,9 +47,9 @@ export class KnowledgeComponent implements OnInit {
         this.docs = data.map((k: KnowledgePackResponse) => ({
           id: k.id,
           name: k.name,
-          type: 'txt',
+          type: (k.category || 'pack').toLowerCase(),
           size: '1 MB',
-          status: 'ready' as const,
+          status: (k.status === 'INDEXING' || k.status === 'DRAFT' ? 'processing' : 'ready') as 'ready' | 'processing',
           uploaded_at: k.createdAt
         }));
         this.loading = false;

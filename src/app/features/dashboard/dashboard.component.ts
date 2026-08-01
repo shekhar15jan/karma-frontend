@@ -1,27 +1,48 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DashboardService } from '../../shared/services/dashboard.service';
 import { ExecutionsService } from '../../shared/services/executions.service';
+import { MissionsService } from '../../shared/services/missions.service';
+import { WorkspacesService } from '../../shared/services/workspaces.service';
+import { ProjectsService } from '../../shared/services/projects.service';
 import { MissionResponse } from '../../shared/models/mission.model';
+import { WorkspaceResponse } from '../../shared/models/workspace.model';
+import { ProjectResponse } from '../../shared/models/project.model';
 import { FlowResponse } from '../../shared/models/flow.model';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
+import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
 import { AgentsService } from '../../shared/services/agents.service';
 import { ProvidersService } from '../../shared/services/providers.service';
+import { ArtifactsService } from '../../shared/services/artifacts.service';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   activeMission: (MissionResponse & { formattedDate?: string }) | null = null;
   flowsList: (FlowResponse & { icon?: string; status?: string })[] = [];
+  selectedFlowForDiagram: (FlowResponse & { icon?: string; status?: string }) | null = null;
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
+  missionProgress = 0;
+
+  hudNodes = [
+    { key: 'research', label: 'RESEARCH', icon: 'search', left: 260, top: 50 },
+    { key: 'script', label: 'SCRIPT', icon: 'description', left: 408, top: 112 },
+    { key: 'blog', label: 'BLOG', icon: 'feed', left: 470, top: 260 },
+    { key: 'seo', label: 'SEO', icon: 'bar_chart', left: 408, top: 408 },
+    { key: 'voice', label: 'VOICE', icon: 'mic', left: 260, top: 470 },
+    { key: 'video', label: 'VIDEO', icon: 'videocam', left: 112, top: 408 },
+    { key: 'thumbnail', label: 'THUMBNAIL', icon: 'grid_view', left: 50, top: 260 },
+    { key: 'image', label: 'IMAGE', icon: 'image', left: 112, top: 112 },
+  ];
 
   // Hardware Diagnostics State
   cpuLoad: number = 42;
@@ -29,11 +50,23 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   queueSize: number = 14;
   workers: { id: number; name: string; task: string; status: string; progress: number }[] = [];
   logs: string[] = [];
-  private hwInterval: any;
+
+  private flowStatusInterval: any;
+  private flowStepMap = new Map<string, string>();
 
   loading = false;
   error: string | null = null;
+  runMode: 'AUTO' | 'REVIEW' = 'REVIEW';
   heardCommand = 'Say "Wake up Karma" to begin';
+
+  @ViewChild('flowsContainer') flowsContainer!: ElementRef;
+
+  scrollFlows(direction: number) {
+    if (this.flowsContainer) {
+      const scrollAmount = 200;
+      this.flowsContainer.nativeElement.scrollBy({ left: scrollAmount * direction, behavior: 'smooth' });
+    }
+  }
 
   // Wake Up Sequence States
   isSystemAwake = false;
@@ -80,6 +113,153 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   // Floating Sidebar State
   showDiagnosticsSidebar = false;
 
+  // Mission Creation State
+  workspaces: WorkspaceResponse[] = [];
+  projects: ProjectResponse[] = [];
+  selectedFlowIds: string[] = [];
+  isCreatingMission = false;
+  showProjectModal = false;
+  isCreatingProject = false;
+  newProjectName = '';
+  newMission = {
+    workspaceId: '' as string,
+    projectId: '' as string,
+    name: '' as string,
+    description: '' as string,
+    missionType: 'VIDEO' as string,
+    priority: 'MEDIUM' as string,
+    providerId: '' as string
+  };
+
+  onWorkspaceChange(): void {
+    this.projects = [];
+    this.newMission.projectId = '';
+    if (this.newMission.workspaceId) {
+      this.loadProjects(this.newMission.workspaceId);
+    }
+  }
+
+  onProjectChange(): void {
+    if (this.newMission.projectId) {
+      this.loadMissions(this.newMission.projectId);
+    }
+  }
+
+  openProjectModal(): void {
+    this.newProjectName = '';
+    this.showProjectModal = true;
+  }
+
+  closeProjectModal(): void {
+    this.showProjectModal = false;
+  }
+
+  getWorkspaceName(): string {
+    return this.workspaces.find(w => w.id === this.newMission.workspaceId)?.name || 'Select a workspace first';
+  }
+
+  createProject(): void {
+    if (!this.newMission.workspaceId) {
+      this.showToast('Select a workspace first', 'error');
+      return;
+    }
+    if (!this.newProjectName.trim()) {
+      this.showToast('Project name is required', 'error');
+      return;
+    }
+    this.isCreatingProject = true;
+    this.projectsService.create(this.newMission.workspaceId, this.newProjectName.trim()).subscribe({
+      next: (project) => {
+        this.isCreatingProject = false;
+        this.showProjectModal = false;
+        this.newProjectName = '';
+        this.newMission.projectId = project.id;
+        this.loadProjects(this.newMission.workspaceId);
+        this.loadMissions(project.id);
+        this.showToast(`Project "${project.name}" created`, 'check_circle');
+      },
+      error: () => {
+        this.isCreatingProject = false;
+        this.showToast('Failed to create project', 'error');
+      }
+    });
+  }
+
+  toggleFlow(id: string): void {
+    const idx = this.selectedFlowIds.indexOf(id);
+    if (idx >= 0) {
+      this.selectedFlowIds.splice(idx, 1);
+    } else {
+      this.selectedFlowIds.push(id);
+    }
+  }
+
+  createMission(runAfterCreate: boolean): void {
+    if (!this.newMission.projectId || !this.newMission.name?.trim()) {
+      this.showToast('Project and Mission Name are required', 'error');
+      return;
+    }
+    this.isCreatingMission = true;
+    const payload = {
+      projectId: this.newMission.projectId,
+      name: this.newMission.name.trim(),
+      description: this.newMission.description?.trim() || undefined,
+      missionType: this.newMission.missionType,
+      priority: this.newMission.priority,
+      providerId: this.newMission.providerId || undefined,
+      selectedFlowIds: this.selectedFlowIds.length ? [...this.selectedFlowIds] : undefined
+    };
+    this.missionsService.create(payload).subscribe({
+      next: (created) => {
+        this.isCreatingMission = false;
+        this.showToast(`Mission "${created.name}" created`, 'check_circle');
+        this.activeModal = null;
+        this.loadMissions(this.newMission.projectId);
+        if (runAfterCreate) {
+          this.executionsService.trigger(created.id, this.runMode).subscribe({
+            next: () => this.showToast('Mission execution started', 'play_arrow'),
+            error: () => this.showToast('Failed to start execution', 'error')
+          });
+        }
+      },
+      error: (err) => {
+        this.isCreatingMission = false;
+        this.showToast('Failed to create mission: ' + (err?.error?.message || 'unknown error'), 'error');
+      }
+    });
+  }
+
+  isAgentReady(status: string): boolean {
+    return status === 'Ready' || status === 'Healthy' || status === 'ACTIVE' || status === 'ONLINE';
+  }
+
+  hudState(key: string): { text: string; cls: string; border: string; pulse: boolean } {
+    const flow = this.flowsList.find(f =>
+      key === 'seo'
+        ? f.category === 'PLANNING'
+        : (f.name || '').toLowerCase().includes(key) || f.category.toLowerCase().includes(key)
+    );
+    if (!flow) return { text: 'Idle', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+    switch (flow.status) {
+      case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
+      case 'IN_PROGRESS':
+      case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
+      case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
+      default: return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+    }
+  }
+
+  flowBadge(flow: any): { text: string; cls: string; border: string; pulse: boolean } {
+    if (!flow) return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+    switch (flow.status) {
+      case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
+      case 'IN_PROGRESS':
+      case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
+      case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
+      default: return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+    }
+  }
+
   toggleProvider(id: string): void {
     if (this.expandedProviders.has(id)) {
       this.expandedProviders.delete(id);
@@ -117,9 +297,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   triggerMission(missionId: string): void {
-    this.executionsService.trigger(missionId).subscribe({
+    this.executionsService.trigger(missionId, this.runMode).subscribe({
       next: () => {
-        this.showToast('Mission execution triggered', 'play_arrow');
+        this.showToast(`Mission execution triggered (${this.runMode})`, 'play_arrow');
       },
       error: () => {
         this.showToast('Failed to trigger mission', 'error');
@@ -165,14 +345,87 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, icon } }));
   }
 
-  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | null = null;
+  approveArtifact(approval: any): void {
+    this.artifactsService.updateReviewStatus(approval.id, 'APPROVED').subscribe({
+      next: () => {
+        this.pendingApprovals = this.pendingApprovals.filter(a => a.id !== approval.id);
+        this.showToast('Approved ' + (approval.title || approval.name || 'artifact'), 'check_circle');
+      },
+      error: () => this.showToast('Failed to approve artifact', 'error')
+    });
+  }
 
-  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads') {
+  rejectArtifact(approval: any): void {
+    this.artifactsService.updateReviewStatus(approval.id, 'REJECTED').subscribe({
+      next: () => {
+        this.pendingApprovals = this.pendingApprovals.filter(a => a.id !== approval.id);
+        this.showToast('Rejected ' + (approval.title || approval.name || 'artifact'), 'cancel');
+      },
+      error: () => this.showToast('Failed to reject artifact', 'error')
+    });
+  }
+
+  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | null = null;
+
+  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission') {
     this.activeModal = modalType;
+  }
+
+  openFlowDiagram(flow: (FlowResponse & { icon?: string; status?: string })) {
+    this.selectedFlowForDiagram = flow;
+    this.activeModal = 'flow-diagram';
+    this.cdr.detectChanges();
   }
 
   closeModal() {
     this.activeModal = null;
+    this.selectedFlowForDiagram = null;
+    this.cdr.detectChanges();
+  }
+
+  get selectedFlowAgents(): any[] {
+    if (!this.selectedFlowForDiagram) return [];
+    
+    // Use the actual agent IDs returned by the backend for this specific flow
+    if (this.selectedFlowForDiagram.agentIds && this.selectedFlowForDiagram.agentIds.length > 0) {
+      // Map to real agents and ensure they have necessary display properties
+      return this.agentStatusList
+        .filter(a => this.selectedFlowForDiagram!.agentIds.includes(a.id))
+        .map(agent => ({
+          ...agent,
+          icon: agent.category?.toLowerCase().includes('video') ? 'movie' :
+                agent.category?.toLowerCase().includes('voice') ? 'mic' :
+                agent.category?.toLowerCase().includes('content') ? 'article' : 'smart_toy',
+          colorClass: agent.status === 'Ready' || agent.status === 'Healthy' ? 'text-green-400 bg-green-400/20' : 
+                     agent.status === 'Offline' ? 'text-red-400 bg-red-400/20' : 'text-gray-400 bg-gray-400/20'
+        }));
+    }
+    
+    // Fallback if no agentIds are provided (dummy fallback mapping based on flow name/category)
+    const name = this.selectedFlowForDiagram.name?.toLowerCase() || '';
+    
+    let matchedAgents = [];
+    if (name.includes('video')) {
+      matchedAgents = [
+        { name: 'Video Generator', icon: 'movie', colorClass: 'text-purple-400 bg-purple-400/20' },
+        { name: 'Voice Synthesis', icon: 'mic', colorClass: 'text-pink-400 bg-pink-400/20' }
+      ];
+    } else if (name.includes('blog') || name.includes('content') || name.includes('script')) {
+      matchedAgents = [
+        { name: 'Blog Writer', icon: 'article', colorClass: 'text-blue-400 bg-blue-400/20' },
+        { name: 'SEO Optimizer', icon: 'bar_chart', colorClass: 'text-green-400 bg-green-400/20' }
+      ];
+    } else if (name.includes('image') || name.includes('thumb')) {
+      matchedAgents = [
+        { name: 'Image Generator', icon: 'image', colorClass: 'text-yellow-400 bg-yellow-400/20' }
+      ];
+    } else {
+      matchedAgents = [
+        { name: 'System Agent', icon: 'smart_toy', colorClass: 'text-gray-400 bg-gray-400/20' }
+      ];
+    }
+    
+    return matchedAgents;
   }
 
   private wakeUpListener = (e: any) => {
@@ -186,21 +439,15 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (e.detail && e.detail.agents) {
       this.agentStatusList = e.detail.agents.map((a: any) => {
         const defaultAgent = this.defaultAgents.find(da => da.name === a.name);
+        const offline = a.status === 'Offline' || a.status === 'DISCONNECTED';
         return {
           ...a,
-          status: a.status || 'Standby',
+          status: a.status || 'ACTIVE',
           colorClass: defaultAgent ? defaultAgent.colorClass : (a.colorClass || 'text-on-surface-variant'),
-          borderClass: a.status === 'Offline' ? 'border-red-400/30' : 'border-outline-variant/30',
-          pulseClass: ''
+          borderClass: offline ? 'border-red-400/30' : 'border-green-400/50',
+          pulseClass: offline ? '' : 'animate-pulse shadow-[0_0_10px_rgba(74,222,128,0.2)]'
         };
       });
-
-      setTimeout(() => {
-        this.agentStatusList.forEach((a: any) => { if (a.status !== 'Ready') a.status = 'Context Prep...'; });
-      }, 2000);
-      setTimeout(() => {
-        this.agentStatusList.forEach((a: any) => { if (a.status !== 'Ready') a.status = 'Validating...'; });
-      }, 3000);
     }
   };
 
@@ -231,15 +478,19 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly executionsService: ExecutionsService,
+    private readonly missionsService: MissionsService,
+    private readonly workspacesService: WorkspacesService,
+    private readonly projectsService: ProjectsService,
     private readonly agentsService: AgentsService,
     private readonly providersService: ProvidersService,
+    private readonly artifactsService: ArtifactsService,
     private readonly cdr: ChangeDetectorRef,
     private readonly sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
     this.loadDashboard();
-    this.loadHardwareMock();
+    this.bootstrapLogs();
     window.addEventListener('heard-voice-command', this.heardVoiceListener);
     window.addEventListener('system-diagnostic-start', this.systemDiagnosticStartListener);
     window.addEventListener('system-diagnostic-core', this.systemDiagnosticCoreListener);
@@ -250,10 +501,11 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.addEventListener('operator-speaking', this.operatorSpeakingHandler);
     window.addEventListener('karma-speech-pulse', this.speechPulseHandler);
 
-    this.hwInterval = setInterval(() => {
-      this.cpuLoad = Math.max(10, Math.min(100, this.cpuLoad + (Math.random() * 10 - 5)));
-      this.gpuLoad = Math.max(10, Math.min(100, this.gpuLoad + (Math.random() * 10 - 5)));
-    }, 2000);
+    this.flowStatusInterval = setInterval(() => {
+      if (this.activeMission?.id) {
+        this.loadFlowStatuses(this.activeMission.id);
+      }
+    }, 10000);
   }
 
   ngAfterViewInit(): void {
@@ -268,8 +520,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.drawInterval) {
       clearInterval(this.drawInterval);
     }
-    if (this.hwInterval) {
-      clearInterval(this.hwInterval);
+    if (this.flowStatusInterval) {
+      clearInterval(this.flowStatusInterval);
     }
     window.removeEventListener('resize', this.resizeListener);
     window.removeEventListener('heard-voice-command', this.heardVoiceListener);
@@ -286,21 +538,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private loadDashboard(): void {
     this.loading = true;
 
-    this.dashboardService.getMissions()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (missions) => {
-          if (missions.length > 0) {
-            this.activeMission = missions.find((m: any) => m.status === 'IN_PROGRESS' || m.status === 'ACTIVE') || missions[0];
-            if (this.activeMission?.createdAt) {
-              this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            }
-          }
-        },
-        error: (err) => {
-          console.error('Failed to fetch missions', err);
-        }
-      });
+    this.loadWorkspacesAndMissions();
 
     this.dashboardService.getFlows()
       .pipe(takeUntil(this.destroy$))
@@ -314,8 +552,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
                 : f.category === 'REVIEW' ? 'rate_review'
                 : f.category === 'PUBLISHING' ? 'publish'
                 : 'account_tree',
-            status: f.enabled ? 'ACTIVE' : 'PENDING'
+            status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
           }));
+          this.applyFlowStatusesToFlows();
         },
         error: (err) => {
           console.error('Failed to fetch flows', err);
@@ -326,14 +565,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (approvals) => {
-          if (approvals.length === 0) {
-            // Mock data for UI demo purposes if database is empty
-            approvals = [
-              { id: '1', name: 'Cyberpunk YouTube Script', artifactType: 'VIDEO_SCRIPT', reviewStatus: 'PENDING', createdAt: new Date().toISOString() },
-              { id: '2', name: 'Tech Review Thumbnail', artifactType: 'IMAGE', reviewStatus: 'PENDING', createdAt: new Date(Date.now() - 3600000).toISOString() },
-              { id: '3', name: 'AI LinkedIn Post', artifactType: 'SOCIAL_POST', reviewStatus: 'PENDING', createdAt: new Date(Date.now() - 7200000).toISOString() }
-            ] as any[];
-          }
           this.pendingApprovals = approvals.map(a => ({
             ...a,
             title: a.name || `Artifact #${a.id}`,
@@ -393,6 +624,136 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loading = false;
   }
 
+  private loadWorkspacesAndMissions(): void {
+    this.workspacesService.getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (workspaces) => {
+          this.workspaces = workspaces;
+          if (workspaces.length === 0) return;
+          this.newMission.workspaceId = workspaces[0].id;
+          this.loadProjects(workspaces[0].id);
+        },
+        error: (err) => {
+          console.error('Failed to fetch workspaces', err);
+        }
+      });
+  }
+
+  private loadProjects(workspaceId: string): void {
+    this.projectsService.getByWorkspace(workspaceId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (projects) => {
+          this.projects = projects;
+          if (projects.length === 0) return;
+          this.newMission.projectId = projects[0].id;
+          this.loadMissions(projects[0].id);
+        },
+        error: (err) => {
+          console.error('Failed to fetch projects', err);
+        }
+      });
+  }
+
+  private loadMissions(projectId: string): void {
+    this.dashboardService.getMissions(projectId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (missions) => {
+          this.activeMission = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING') || missions[0] || null;
+          if (this.activeMission?.createdAt) {
+            this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          }
+          if (typeof this.activeMission?.progress === 'number') {
+            this.missionProgress = Math.round(this.activeMission.progress);
+          }
+          if (this.activeMission?.id) {
+            this.loadFlowStatuses(this.activeMission.id);
+          }
+        },
+        error: (err) => {
+          console.error('Failed to fetch missions', err);
+        }
+      });
+  }
+
+  private loadFlowStatuses(missionId: string): void {
+    this.executionsService.getAll(missionId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (executions) => {
+          if (executions.length === 0) return;
+          const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING') || executions[0];
+          this.executionsService.getSteps(active.id)
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({
+              next: (steps) => {
+                this.applyFlowStatuses(steps);
+                this.updateOperationalMetrics(steps, executions, active.id);
+              },
+              error: () => {}
+            });
+        },
+        error: () => {}
+      });
+  }
+
+  private applyFlowStatuses(steps: ExecutionStepResponse[]): void {
+    const byFlow = new Map<string, ExecutionStepResponse[]>();
+    for (const step of steps) {
+      const arr = byFlow.get(step.flowId) || [];
+      arr.push(step);
+      byFlow.set(step.flowId, arr);
+    }
+    this.flowStepMap.clear();
+    byFlow.forEach((flowSteps, flowId) => {
+      if (flowSteps.some(s => s.status === 'RUNNING')) this.flowStepMap.set(flowId, 'IN_PROGRESS');
+      else if (flowSteps.some(s => s.status === 'FAILED')) this.flowStepMap.set(flowId, 'FAILED');
+      else if (flowSteps.every(s => s.status === 'COMPLETED')) this.flowStepMap.set(flowId, 'COMPLETED');
+      else this.flowStepMap.set(flowId, 'PENDING');
+    });
+    this.applyFlowStatusesToFlows();
+  }
+
+  private updateOperationalMetrics(steps: ExecutionStepResponse[], executions: ExecutionResponse[], executionId: string): void {
+    const total = steps.length;
+    const completed = steps.filter(s => s.status === 'COMPLETED').length;
+    const running = steps.filter(s => s.status === 'RUNNING').length;
+    const pending = steps.filter(s => s.status === 'PENDING').length;
+
+    this.missionProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    this.queueSize = pending + executions.filter(e => e.status === 'PENDING').length;
+    this.cpuLoad = total > 0 ? Math.min(100, Math.round(((completed + running) / total) * 100)) : 0;
+    this.gpuLoad = total > 0 ? Math.min(100, Math.round((running / total) * 100) * 3) : 0;
+
+    this.workers = executions.slice(0, 6).map((ex, i) => ({
+      id: i + 1,
+      name: `Exec-${ex.id.substring(0, 8)}`,
+      task: ex.status === 'RUNNING' ? 'Executing agents' : ex.status === 'COMPLETED' ? 'Completed' : ex.status === 'FAILED' ? 'Failed' : 'Queued',
+      status: ex.status === 'RUNNING' ? 'running' : ex.status === 'COMPLETED' ? 'idle' : 'paused',
+      progress: ex.status === 'COMPLETED' ? 100 : ex.status === 'RUNNING' ? 50 : 0
+    }));
+
+    const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const newLogs = [
+      `[SYS] ${stamp} - Execution ${executionId.substring(0, 8)} sync`,
+      `[OK]  ${stamp} - ${completed} of ${total} steps completed`,
+    ];
+    if (running > 0) newLogs.push(`[RUN] ${stamp} - ${running} step(s) actively executing`);
+    if (pending > 0) newLogs.push(`[WARN] ${stamp} - ${pending} step(s) waiting in queue`);
+    const failed = steps.filter(s => s.status === 'FAILED').length;
+    if (failed > 0) newLogs.push(`[FAIL] ${stamp} - ${failed} step(s) failed`);
+    this.logs = [...newLogs.reverse(), ...this.logs].slice(0, 30);
+  }
+
+  private applyFlowStatusesToFlows(): void {
+    this.flowsList = this.flowsList.map(f => ({
+      ...f,
+      status: this.flowStepMap.get(f.id) || f.status || 'PENDING'
+    }));
+  }
+
   private drawConnections(): void {
     const container = document.getElementById('connection-lines-container');
     if (!container) return;
@@ -435,22 +796,13 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.dispatchEvent(new CustomEvent('trigger-operator-mic'));
   }
 
-  private loadHardwareMock(): void {
-    this.workers = [
-      { id: 1, name: 'Thread-Core-01', task: 'LLM Response Generation', status: 'running', progress: 78 },
-      { id: 2, name: 'Thread-Core-02', task: 'Frame Rendering Pipeline', status: 'running', progress: 45 },
-      { id: 3, name: 'Thread-Audio-01', task: 'TTS Voice Synthesis', status: 'running', progress: 92 },
-      { id: 4, name: 'Thread-IO-01', task: 'Database Sync', status: 'idle', progress: 0 },
-      { id: 5, name: 'Thread-Net-01', task: 'API Webhook Polling', status: 'running', progress: 15 },
-    ];
+  private bootstrapLogs(): void {
+    const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     this.logs = [
-      '[SYS] 14:32:01 - Initializing core sub-systems...',
-      '[OK]  14:32:01 - PostgreSQL connection established',
-      '[OK]  14:32:02 - Redis cache warmed up (0.4s)',
-      '[SYS] 14:32:05 - Mounting Agent Runtime Engine',
-      '[OK]  14:32:05 - Verified 5 local agents ready',
-      '[WARN] 14:32:10 - Provider \'Ollama\' unreachable on localhost:11434',
-      '[SYS] 14:32:15 - Awaiting active mission dispatch...'
+      `[SYS] ${stamp} - Initializing core sub-systems...`,
+      `[OK]  ${stamp} - PostgreSQL connection established`,
+      `[SYS] ${stamp} - Mounting Agent Runtime Engine`,
+      `[SYS] ${stamp} - Awaiting active mission dispatch...`
     ];
   }
 }

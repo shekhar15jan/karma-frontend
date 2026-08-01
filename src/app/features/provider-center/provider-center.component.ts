@@ -4,16 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { ProvidersService } from '../../shared/services/providers.service';
 import { ProviderResponse } from '../../shared/models/provider.model';
 
-interface ProviderHealth {
-  latencyMs: number;
-  errorRate: number;
-  requestsLastHour: number;
-}
-
-interface ProviderVM extends ProviderResponse {
-  metrics: ProviderHealth;
-}
-
 @Component({
   selector: 'app-provider-center',
   standalone: true,
@@ -22,9 +12,9 @@ interface ProviderVM extends ProviderResponse {
   styleUrls: ['./provider-center.component.scss'],
 })
 export class ProviderCenterComponent implements OnInit {
-  providers: ProviderVM[] = [];
+  providers: ProviderResponse[] = [];
   loading = false;
-  selectedProvider: ProviderVM | null = null;
+  selectedProvider: ProviderResponse | null = null;
   config: { api_key?: string; base_url?: string } = {};
   testing = false;
   testResult: { success: boolean; message: string } | null = null;
@@ -33,22 +23,39 @@ export class ProviderCenterComponent implements OnInit {
   showAddProvider = false;
   newProvider: Partial<ProviderResponse> = {};
   newProviderApiKey = '';
+  newProviderEndpoint = '';
   modelInputString = '';
-  healthData = new Map<string, any>();
+
+  isAdmin = false;
 
   constructor(private readonly providersService: ProvidersService) {}
 
   ngOnInit(): void {
+    this.isAdmin = this.isAdminUser();
     this.loadProviders();
+  }
+
+  isAdminUser(): boolean {
+    const token = localStorage.getItem('karma_token');
+    if (!token) return false;
+    try {
+      const payload = token.split('.')[1];
+      const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      const roles: string[] = json?.roles ?? [];
+      return roles.includes('ROLE_ADMIN');
+    } catch {
+      return false;
+    }
   }
 
   addProvider(): void {
     const models = this.modelInputString.split(',').map(m => m.trim()).filter(m => m.length > 0);
     const body: any = {
       name: this.newProvider.name || 'Custom Provider',
-      providerType: this.newProvider.providerType || 'CUSTOM',
-      models: models.length ? models : ['custom-model-1'],
+      providerType: this.newProvider.providerType || 'openai',
+      models: models.length ? models : ['gpt-4o-mini'],
       apiKey: this.newProviderApiKey || undefined,
+      apiEndpoint: this.newProviderEndpoint || undefined,
     };
 
     this.providersService.create(body).subscribe({
@@ -56,6 +63,7 @@ export class ProviderCenterComponent implements OnInit {
         this.showAddProvider = false;
         this.newProvider = {};
         this.newProviderApiKey = '';
+        this.newProviderEndpoint = '';
         this.modelInputString = '';
         this.loadProviders();
       },
@@ -69,10 +77,7 @@ export class ProviderCenterComponent implements OnInit {
     this.loading = true;
     this.providersService.getAll().subscribe({
       next: (data) => {
-        this.providers = data.map(p => ({
-          ...p,
-          metrics: { latencyMs: 100, errorRate: 0.1, requestsLastHour: 0 }
-        }));
+        this.providers = data;
         this.loading = false;
       },
       error: (err) => {
@@ -82,9 +87,9 @@ export class ProviderCenterComponent implements OnInit {
     });
   }
 
-  openConfig(provider: ProviderVM): void {
+  openConfig(provider: ProviderResponse): void {
     this.selectedProvider = provider;
-    this.config = {};
+    this.config = { base_url: provider.apiEndpoint || '' };
     this.testResult = null;
   }
 
@@ -93,7 +98,7 @@ export class ProviderCenterComponent implements OnInit {
     const body: any = {
       name: this.selectedProvider.name,
       providerType: this.selectedProvider.providerType,
-      apiEndpoint: this.selectedProvider.apiEndpoint,
+      apiEndpoint: this.config.base_url || undefined,
       apiKey: this.config.api_key || undefined,
     };
     this.providersService.update(this.selectedProvider.id, body).subscribe({
@@ -108,7 +113,19 @@ export class ProviderCenterComponent implements OnInit {
     });
   }
 
-  testConnection(provider: ProviderVM): void {
+  deleteProvider(provider: ProviderResponse): void {
+    if (!confirm(`Delete provider "${provider.name}"? This cannot be undone.`)) return;
+    this.providersService.delete(provider.id).subscribe({
+      next: () => {
+        this.loadProviders();
+      },
+      error: (err) => {
+        console.error('Failed to delete provider', err);
+      }
+    });
+  }
+
+  testConnection(provider: ProviderResponse): void {
     this.testing = true;
     this.testResult = null;
     this.providersService.testConnection(provider.id).subscribe({

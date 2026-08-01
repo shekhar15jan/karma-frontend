@@ -50,11 +50,12 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  height: 1.5px;
-  background: linear-gradient(90deg, transparent, #00e5ff, transparent);
+  height: 1px;
+  background: white;
+  border-top: 1px solid white;
   transform-origin: left center;
   z-index: 0;
-  filter: drop-shadow(0 0 4px #00e5ff);
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.8));
 }
 
 .glow-text { text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
@@ -72,4 +73,35 @@ html, body {
 @keyframes wave {
   0%, 100% { height: 4px; }
   50% { height: 24px; }
+}
+/* 3D Spinning Cube */
+.cube-container {
+  width: 85px;
+  height: 85px;
+  perspective: 600px;
+}
+.cube {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: spin-cube 15s linear infinite;
+}
+.cube-face {
+  position: absolute;
+  width: 85px;
+  height: 85px;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.05);
+}
+.cube-face-front  { transform: rotateY(0deg) translateZ(42.5px); }
+.cube-face-back   { transform: rotateY(180deg) translateZ(42.5px); }
+.cube-face-right  { transform: rotateY(90deg) translateZ(42.5px); }
+.cube-face-left   { transform: rotateY(-90deg) translateZ(42.5px); }
+.cube-face-top    { transform: rotateX(90deg) translateZ(42.5px); }
+.cube-face-bottom { transform: rotateX(-90deg) translateZ(42.5px); }
+
+@keyframes spin-cube {
+  0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(180deg); }
 }

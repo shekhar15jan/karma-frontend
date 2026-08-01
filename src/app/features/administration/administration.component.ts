@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminService } from '../../shared/services/admin.service';
+import { VoicePreferencesService, VoiceLanguage } from '../../shared/services/voice-preferences.service';
 import { AuditEventResponse, SettingsResponse } from '../../shared/models/settings.model';
 
 interface AdminUser {
@@ -58,10 +59,49 @@ export class AdministrationComponent implements OnInit {
     'admin:users', 'admin:roles', 'admin:settings', 'admin:audit',
   ];
 
-  constructor(private readonly adminService: AdminService) {}
+  // Voice & Language preferences
+  voiceLanguages: VoiceLanguage[] = [];
+  voiceOptions: string[] = [];
+  selectedVoiceLanguage = 'en';
+  selectedVoice = 'en-IN-NeerjaNeural';
+  voiceSaving = false;
+  voiceSaved = false;
+
+  constructor(private readonly adminService: AdminService,
+              private readonly voicePrefs: VoicePreferencesService) {}
 
   ngOnInit(): void {
     this.loadTab('users');
+    this.loadVoicePreferences();
+  }
+
+  private loadVoicePreferences(): void {
+    this.voicePrefs.loadCatalog().then(() => {
+      this.voiceLanguages = this.voicePrefs.languages();
+      this.voiceOptions = this.voicePrefs.voicesForLanguage(this.selectedVoiceLanguage);
+    });
+    this.voicePrefs.loadPreferences().then(() => {
+      this.selectedVoiceLanguage = this.voicePrefs.language();
+      this.selectedVoice = this.voicePrefs.voice();
+      this.voiceOptions = this.voicePrefs.voicesForLanguage(this.selectedVoiceLanguage);
+    });
+  }
+
+  onVoiceLanguageChange(): void {
+    this.voiceOptions = this.voicePrefs.voicesForLanguage(this.selectedVoiceLanguage);
+    if (!this.voiceOptions.includes(this.selectedVoice)) {
+      this.selectedVoice = this.voicePrefs.defaultVoiceFor(this.selectedVoiceLanguage);
+    }
+  }
+
+  saveVoiceSettings(): void {
+    this.voiceSaving = true;
+    this.voiceSaved = false;
+    this.voicePrefs.save(this.selectedVoiceLanguage, this.selectedVoice).then(() => {
+      this.voiceSaving = false;
+      this.voiceSaved = true;
+      setTimeout(() => (this.voiceSaved = false), 3000);
+    });
   }
 
   switchTab(tab: string): void {
@@ -73,15 +113,48 @@ export class AdministrationComponent implements OnInit {
     this.loading = true;
     this.error = null;
     switch (tab) {
+      case 'users':
+        this.adminService.getUsers().subscribe({
+          next: (res: any) => {
+            this.users = res || [];
+            this.loading = false;
+          },
+          error: (err) => {
+            this.error = 'Failed to load users.';
+            this.loading = false;
+            console.error(err);
+          },
+        });
+        break;
+      case 'roles':
+        this.adminService.getRoles().subscribe({
+          next: (res: any) => {
+            this.roles = res || [];
+            this.loading = false;
+          },
+          error: (err) => {
+            this.error = 'Failed to load roles.';
+            this.loading = false;
+            console.error(err);
+          },
+        });
+        break;
       case 'settings':
         this.adminService.getSettings().subscribe({
-          next: (res) => {
-            this.settings = res?.settingsData ? Object.entries(res.settingsData).map(([key, value]) => ({
+          next: (res: any) => {
+            let raw: Record<string, unknown> = {};
+            const settingsData = res?.settingsData;
+            if (typeof settingsData === 'string' && settingsData.trim()) {
+              try { raw = JSON.parse(settingsData); } catch { raw = {}; }
+            } else if (settingsData && typeof settingsData === 'object') {
+              raw = settingsData;
+            }
+            this.settings = Object.entries(raw).map(([key, value]) => ({
               key,
               value: String(value),
               description: '',
               category: 'General'
-            })) : [];
+            }));
             this.loading = false;
           },
           error: (err) => {
@@ -121,6 +194,7 @@ export class AdministrationComponent implements OnInit {
 
   saveUser(): void {
     if (!this.editingUser) return;
+    this.users = this.users.map(u => u.id === this.editingUser!.id ? { ...this.editingUser! } : u);
     this.editingUser = null;
   }
 
@@ -148,7 +222,7 @@ export class AdministrationComponent implements OnInit {
       acc[s.key] = s.value;
       return acc;
     }, {});
-    this.adminService.saveSettings({ settingsData: data }).subscribe({
+    this.adminService.saveSettings({ settingsData: JSON.stringify(data) }).subscribe({
       next: () => this.loadTab('settings'),
       error: (err) => console.error('Failed to save settings', err)
     });

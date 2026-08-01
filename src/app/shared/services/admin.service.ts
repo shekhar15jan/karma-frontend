@@ -22,4 +22,12 @@ export class AdminService {
   saveSettings(data: unknown): Observable<SettingsResponse> {
     return this.api.put<SettingsResponse>('/v1/settings', data).pipe(map(r => r.data));
   }
+
+  getUsers(): Observable<unknown[]> {
+    return this.api.get<unknown[]>('/v1/admin/users').pipe(map(r => r.data));
+  }
+
+  getRoles(): Observable<unknown[]> {
+    return this.api.get<unknown[]>('/v1/admin/roles').pipe(map(r => r.data));
+  }
 }

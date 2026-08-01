@@ -258,6 +258,51 @@
         </button>
       </div>
 
+      <!-- Voice & Language Settings Card -->
+      <div class="glass-panel rounded-xl p-5 flex flex-col gap-4 border border-primary/20 shadow-[0_0_15px_rgba(0,229,255,0.05)] shrink-0">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-2.5">
+          <div class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-primary text-lg">record_voice_over</span>
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">Voice &amp; Language</h4>
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-0.5 block">Karma AI reply language &amp; spoken voice</span>
+            </div>
+          </div>
+          <button class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50" (click)="saveVoiceSettings()" [disabled]="voiceSaving">
+            <span class="material-symbols-outlined text-sm">{{ voiceSaving ? 'hourglass_top' : 'save' }}</span>
+            {{ voiceSaving ? 'Saving...' : 'Save Voice Settings' }}
+          </button>
+        </div>
+
+        @if (voiceSaved) {
+          <div class="flex items-center gap-2 text-green-400 text-[10px] font-mono uppercase tracking-wider">
+            <span class="material-symbols-outlined text-sm">check_circle</span> Voice &amp; language preferences saved — active for Karma AI immediately.
+          </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="space-y-1.5">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase block">Karma AI Reply Language</label>
+            <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer" [(ngModel)]="selectedVoiceLanguage" (ngModelChange)="onVoiceLanguageChange()">
+              @for (lang of voiceLanguages; track lang.code) {
+                <option [ngValue]="lang.code">{{ lang.name }} ({{ lang.code }})</option>
+              }
+            </select>
+            <span class="text-[9px] font-mono text-on-surface-variant block leading-relaxed">Karma AI answers and speech will use this language. You can also switch anytime by saying "speak in hindi" / "speak in marathi" and so on.</span>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase block">Spoken Voice</label>
+            <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer" [(ngModel)]="selectedVoice">
+              @for (voice of voiceOptions; track voice) {
+                <option [ngValue]="voice">{{ voice }}</option>
+              }
+            </select>
+            <span class="text-[9px] font-mono text-on-surface-variant block leading-relaxed">Edge TTS neural voice used to speak Karma AI replies. Voices are filtered by the selected language.</span>
+          </div>
+        </div>
+      </div>
+
       <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col">
         <div class="overflow-y-auto no-scrollbar flex-grow">
           <table class="w-full text-left border-collapse">

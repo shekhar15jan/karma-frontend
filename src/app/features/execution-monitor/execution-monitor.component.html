@@ -31,9 +31,13 @@
             <div class="flex items-center gap-3">
               <span class="material-symbols-outlined" [class]="getStatusClass(exec.status)">{{ getStatusIcon(exec.status) }}</span>
               <span class="text-xs font-bold text-on-surface">Execution {{ exec.id.substring(0, 8) }}</span>
+              <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border"
+                    [ngClass]="exec.mode === 'AUTO' ? 'bg-white/5 text-on-surface-variant border-outline-variant/30' : 'bg-primary/10 text-primary border-primary/30'">
+                {{ exec.mode || 'REVIEW' }}
+              </span>
             </div>
             <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
-                  [ngClass]="exec.status === 'COMPLETED' ? 'bg-green-400/20 text-green-400' : exec.status === 'RUNNING' ? 'bg-blue-400/20 text-blue-400' : exec.status === 'FAILED' ? 'bg-red-400/20 text-red-400' : 'bg-white/10 text-on-surface-variant'">
+                  [ngClass]="exec.status === 'COMPLETED' ? 'bg-green-400/20 text-green-400' : exec.status === 'RUNNING' ? 'bg-blue-400/20 text-blue-400' : exec.status === 'FAILED' ? 'bg-red-400/20 text-red-400' : exec.status === 'WAITING' ? 'bg-yellow-400/20 text-yellow-400' : 'bg-white/10 text-on-surface-variant'">
               {{ exec.status }}
             </span>
           </div>
@@ -45,15 +49,57 @@
           @if (selectedExecution?.id === exec.id && steps.length > 0) {
             <div class="border-t border-outline-variant/20 pt-3 space-y-2">
               @for (step of steps; track step.id) {
-                <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
-                  <div class="flex items-center gap-2 text-[10px]">
-                    <span class="material-symbols-outlined text-[12px]" [class]="step.status === 'COMPLETED' ? 'text-green-400' : step.status === 'RUNNING' ? 'text-blue-400' : 'text-on-surface-variant'">
-                      {{ step.status === 'COMPLETED' ? 'check_circle' : step.status === 'RUNNING' ? 'sync' : 'schedule' }}
-                    </span>
-                    <span>Step {{ step.id.substring(0, 6) }}</span>
-                    <span class="text-on-surface-variant">{{ step.stepType }}</span>
+                <div class="p-2 bg-white/5 rounded-lg">
+                  <div class="flex items-center justify-between cursor-pointer" (click)="toggleStep(step)">
+                    <div class="flex items-center gap-2 text-[10px]">
+                      <span class="material-symbols-outlined text-[12px]" [class]="step.status === 'COMPLETED' ? 'text-green-400' : step.status === 'RUNNING' ? 'text-blue-400' : 'text-on-surface-variant'">
+                        {{ step.status === 'COMPLETED' ? 'check_circle' : step.status === 'RUNNING' ? 'sync' : 'schedule' }}
+                      </span>
+                      <span>Step {{ step.id.substring(0, 6) }}</span>
+                      <span class="text-on-surface-variant">{{ step.stepType }}</span>
+                      @if (step.reviewStatus === 'PENDING_REVIEW') {
+                        <span class="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-400 border border-orange-500/30">awaiting review</span>
+                      } @else if (step.reviewStatus === 'REJECTED') {
+                        <span class="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/30">rejected</span>
+                      }
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <span class="text-[8px] font-mono text-on-surface-variant">{{ step.latencyMs }}ms</span>
+                      <span class="material-symbols-outlined text-[12px] text-on-surface-variant transition-transform" [style.transform]="expandedStepId === step.id ? 'rotate(90deg)' : 'none'">chevron_right</span>
+                    </div>
                   </div>
-                  <span class="text-[8px] font-mono text-on-surface-variant">{{ step.latencyMs }}ms</span>
+                  @if (expandedStepId === step.id) {
+                    <div class="mt-2 space-y-2 border-t border-outline-variant/20 pt-2">
+                      @if (step.modelUsed) {
+                        <div class="text-[9px] font-mono text-on-surface-variant">
+                          <span class="text-primary">MODEL:</span> {{ step.modelUsed }} | <span class="text-primary">TOKENS:</span> {{ step.totalTokens }} | <span class="text-primary">COST:</span> ${{ formatCost(step.cost) }}
+                        </div>
+                      }
+                      @if (step.errorMessage) {
+                        <div class="text-[9px] font-mono text-red-400 whitespace-pre-wrap break-words">{{ step.errorMessage }}</div>
+                      }
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        @if (step.inputData) {
+                          <div>
+                            <p class="text-[8px] uppercase tracking-wider text-on-surface-variant font-bold mb-1">Input</p>
+                            <pre class="text-[9px] font-mono text-on-surface-variant whitespace-pre-wrap break-words max-h-40 overflow-y-auto custom-scrollbar bg-background/40 rounded p-2">{{ step.inputData }}</pre>
+                          </div>
+                        }
+                        @if (step.promptUsed) {
+                          <div>
+                            <p class="text-[8px] uppercase tracking-wider text-on-surface-variant font-bold mb-1">Prompt Used</p>
+                            <pre class="text-[9px] font-mono text-on-surface-variant whitespace-pre-wrap break-words max-h-40 overflow-y-auto custom-scrollbar bg-background/40 rounded p-2">{{ step.promptUsed }}</pre>
+                          </div>
+                        }
+                      </div>
+                      @if (step.outputData) {
+                        <div>
+                          <p class="text-[8px] uppercase tracking-wider text-primary font-bold mb-1">Output</p>
+                          <pre class="text-[10px] font-mono text-on-surface whitespace-pre-wrap break-words max-h-60 overflow-y-auto custom-scrollbar bg-background/40 rounded p-2 border border-primary/20">{{ step.outputData }}</pre>
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
               }
             </div>

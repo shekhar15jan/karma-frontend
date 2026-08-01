@@ -1,4 +1,4 @@
-<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-y-auto select-none gap-6 pr-1">
   <!-- Title / Header -->
   <div class="glass-panel p-4 rounded-xl flex justify-between items-center shrink-0">
     <div class="flex items-center gap-3">
@@ -23,16 +23,15 @@
 
   @if (!loading) {
     <!-- Social Accounts Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 shrink-0">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 shrink-0">
       @for (channel of channels; track channel.id) {
-        <div class="glass-panel rounded-xl p-5 flex flex-col justify-between gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+        <div class="glass-panel rounded-xl p-3.5 flex flex-col justify-between gap-2.5 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)]">
           <div class="flex justify-between items-start">
             <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-xl" 
-                [class]="channel.platform === 'youtube' ? 'text-red-500' : channel.platform === 'instagram' ? 'text-pink-500' : channel.platform === 'linkedin' ? 'text-blue-500' : 'text-primary'">
-                {{ channel.platform === 'youtube' ? 'video_library' : channel.platform === 'instagram' ? 'photo_camera' : channel.platform === 'linkedin' ? 'work' : 'bolt' }}
+              <span class="material-symbols-outlined text-xl" [class]="platformMeta(channel.platform).color">
+                {{ platformMeta(channel.platform).icon }}
               </span>
-              <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">{{ channel.platform }}</h4>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">{{ channel.custom ? channel.name : channel.platform }}</h4>
             </div>
             
             <div class="flex items-center gap-1 bg-white/5 border border-outline-variant/30 px-2 py-0.5 rounded-full">
@@ -46,8 +45,14 @@
           </div>
 
           <!-- Account Details -->
-          <div class="space-y-1 py-1">
-            @if (channel.status === 'connected') {
+          <div class="space-y-0.5 py-0.5">
+            @if (channel.custom) {
+              <p class="text-xs font-bold text-on-surface mb-0.5">{{ channel.name }}</p>
+              <p class="text-[10px] font-mono text-primary-container mb-0 truncate">{{ channel.handle || 'No endpoint configured' }}</p>
+              <p class="text-[9px] text-on-surface-variant mt-1 mb-0 capitalize">
+                {{ channel.authType || 'Custom' }} &bull; {{ channel.contentFormat || 'text' }}
+              </p>
+            } @else if (channel.status === 'connected') {
               <p class="text-xs font-bold text-on-surface mb-0.5">{{ channel.name }}</p>
               <p class="text-[10px] font-mono text-primary-container mb-0">{{ channel.handle }}</p>
               <p class="text-[9px] text-on-surface-variant mt-1 mb-0">{{ channel.stats?.followers }} &bull; {{ channel.stats?.videos_count }} videos</p>
@@ -58,8 +63,22 @@
           </div>
 
           <!-- Button controls -->
-          <div>
-            @if (channel.status === 'connected') {
+          <div class="flex flex-col gap-2">
+            @if (channel.custom) {
+              <div class="flex gap-2">
+                <button class="flex-1 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="openCustomModal(channel)">
+                  Edit
+                </button>
+                <button class="px-3 py-1.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="removeChannel(channel)">
+                  Remove
+                </button>
+              </div>
+              @if (channel.status === 'connected') {
+                <button class="w-full px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-outline-variant/30 text-on-surface-variant text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="disconnectChannel(channel)">
+                  Unlink Account
+                </button>
+              }
+            } @else if (channel.status === 'connected') {
               <button class="w-full px-3 py-1.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all cursor-pointer" (click)="disconnectChannel(channel)">
                 Unlink Account
               </button>
@@ -71,13 +90,20 @@
           </div>
         </div>
       }
+
+      <!-- Add Custom Channel tile -->
+      <div class="glass-panel rounded-xl p-3.5 flex flex-col items-center justify-center gap-1.5 border border-dashed border-outline-variant/40 hover:border-primary/60 transition-colors cursor-pointer min-h-[132px]" (click)="openCustomModal()">
+        <span class="material-symbols-outlined text-3xl text-primary">add_circle</span>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0">Add Custom Channel</h4>
+        <span class="text-[9px] text-on-surface-variant text-center leading-relaxed">Your blog, website, or any<br/>custom publishing endpoint</span>
+      </div>
     </div>
 
     <!-- Recent Publications Table -->
-    <div class="flex-grow flex flex-col overflow-hidden gap-4 mt-2">
+    <div class="flex flex-col overflow-hidden gap-4 mt-2 h-[380px] shrink-0">
       <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-0">Publication History</h3>
       
-      <div class="glass-panel rounded-xl flex-grow overflow-hidden flex flex-col">
+      <div class="glass-panel rounded-xl flex flex-col overflow-hidden h-full">
         <div class="overflow-y-auto no-scrollbar flex-grow">
           <table class="w-full text-left border-collapse">
             <thead>
@@ -95,9 +121,8 @@
                   <td class="py-2.5 px-4 font-bold">{{ pub.title }}</td>
                   <td class="py-2.5 px-4">
                     <div class="flex items-center gap-2">
-                      <span class="material-symbols-outlined text-sm" 
-                        [class]="pub.platform === 'youtube' ? 'text-red-500' : pub.platform === 'instagram' ? 'text-pink-500' : pub.platform === 'linkedin' ? 'text-blue-500' : 'text-primary'">
-                        {{ pub.platform === 'youtube' ? 'video_library' : pub.platform === 'instagram' ? 'photo_camera' : pub.platform === 'linkedin' ? 'work' : 'bolt' }}
+                      <span class="material-symbols-outlined text-sm" [class]="platformMeta(pub.platform).color">
+                        {{ platformMeta(pub.platform).icon }}
                       </span>
                       <span class="capitalize text-[10px] font-bold">{{ pub.platform }}</span>
                     </div>
@@ -147,6 +172,68 @@
         <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
           <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showLinkModal = false">Cancel</button>
           <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="linkChannel()">Link Channel Account</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Custom Channel Modal -->
+  @if (showCustomModal) {
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="showCustomModal = false">
+      <div class="glass-panel rounded-2xl p-6 w-[520px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+          <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">{{ editingCustomId ? 'Edit Custom Channel' : 'Add Custom Channel' }}</h4>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="showCustomModal = false">&times;</button>
+        </div>
+
+        <div class="flex flex-col gap-4 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+          <p class="text-xs text-on-surface-variant leading-relaxed mb-0">Publish to your own blog, website, or any custom API endpoint.</p>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Channel Name *</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="customName" placeholder="e.g. My Blog Website" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Platform / Type</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="customPlatform" placeholder="e.g. Blog, Newsletter, Podcast, custom" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Endpoint</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="customEndpoint" placeholder="https://myblog.com/api/publish" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Auth Type</label>
+              <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="customAuthType">
+                <option value="Bearer">Bearer Token</option>
+                <option value="Basic">Basic Auth</option>
+                <option value="API-Key">API Key Header</option>
+                <option value="OAuth">OAuth 2.0</option>
+                <option value="None">No Auth</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[9px] font-mono text-on-surface-variant uppercase">Content Format</label>
+              <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="customContentFormat">
+                <option value="text/markdown">Markdown</option>
+                <option value="text/html">HTML</option>
+                <option value="application/json">JSON</option>
+                <option value="text/plain">Plain Text</option>
+              </select>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Auth Token / Secret</label>
+            <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="customAuthToken" placeholder="Enter token or leave blank to keep existing" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Notes</label>
+            <textarea rows="2" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary resize-none" [(ngModel)]="customNotes" placeholder="Optional notes about this channel"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="showCustomModal = false">Cancel</button>
+          <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer" (click)="saveCustomChannel()">Save Channel</button>
         </div>
       </div>
     </div>

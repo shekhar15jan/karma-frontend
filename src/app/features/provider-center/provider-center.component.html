@@ -41,9 +41,9 @@
               
               <div class="flex items-center gap-1.5 bg-white/5 border border-outline-variant/30 px-2.5 py-0.5 rounded-full">
                 <span class="w-2 h-2 rounded-full" 
-                  [class]="provider.status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : provider.status === 'error' ? 'bg-red-500' : 'bg-white/20'"></span>
+                  [class]="provider.status === 'CONNECTED' ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : provider.status === 'ERROR' ? 'bg-red-500' : 'bg-white/20'"></span>
                 <span class="text-[9px] font-bold uppercase tracking-wider"
-                  [class]="provider.status === 'connected' ? 'text-green-400' : provider.status === 'error' ? 'text-red-400' : 'text-on-surface-variant'">
+                  [class]="provider.status === 'CONNECTED' ? 'text-green-400' : provider.status === 'ERROR' ? 'text-red-400' : 'text-on-surface-variant'">
                   {{ provider.status }}
                 </span>
               </div>
@@ -61,22 +61,12 @@
               </div>
             </div>
 
-            <!-- Health & Connection Metrics -->
-            <div class="grid grid-cols-3 gap-2 py-2 border-y border-outline-variant/20 text-center bg-white/5 rounded-lg">
-              <div>
-                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Latency</span>
-                <span class="text-xs font-bold text-on-surface">{{ provider.metrics.latencyMs || '—' }}ms</span>
-              </div>
-              <div>
-                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Error Rate</span>
-                <span class="text-xs font-bold text-on-surface" [class.text-red-400]="(provider.metrics.errorRate || 0) > 0">
-                  {{ provider.metrics.errorRate || '—' }}%
-                </span>
-              </div>
-              <div>
-                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Usage/hr</span>
-                <span class="text-xs font-bold text-on-surface">{{ provider.metrics.requestsLastHour || '—' }}</span>
-              </div>
+            <!-- Connection Status -->
+            <div class="py-2 border-y border-outline-variant/20 text-center bg-white/5 rounded-lg">
+              <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Connection</span>
+              <span class="text-xs font-bold" [class]="provider.status === 'CONNECTED' ? 'text-green-400' : provider.status === 'ERROR' ? 'text-red-400' : 'text-on-surface'">
+                {{ provider.status === 'CONNECTED' ? 'Connected' : provider.status === 'ERROR' ? 'Error' : 'Disconnected' }}
+              </span>
             </div>
 
             <!-- Action Buttons -->
@@ -87,6 +77,11 @@
               <button class="px-3 py-1.5 bg-white/5 border border-outline-variant/30 hover:bg-white/10 text-on-surface-variant text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer" (click)="testConnection(provider)" [disabled]="testing">
                 <span class="material-symbols-outlined text-sm">power</span> Test
               </button>
+              @if (isAdmin) {
+                <button class="px-3 py-1.5 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer" (click)="deleteProvider(provider)">
+                  <span class="material-symbols-outlined text-sm">delete</span>
+                </button>
+              }
             </div>
           </div>
         }
@@ -111,21 +106,26 @@
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Type</label>
             <select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
-              <option value="OPENAI">OpenAI</option>
-              <option value="ANTHROPIC">Anthropic</option>
-              <option value="GEMINI">Google Gemini / Imagen</option>
-              <option value="OPENROUTER">OpenRouter (200+ Models)</option>
-              <option value="OPENCODE">OpenCode Zen</option>
-              <option value="GROQ">Groq Cloud (Fast LLMs)</option>
-              <option value="STABILITY">Stability AI (Image)</option>
-              <option value="EDGE-TTS">Edge TTS (Voice)</option>
-              <option value="ELEVENLABS">ElevenLabs (Voice)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="google">Google Gemini / Imagen</option>
+              <option value="openrouter">OpenRouter (200+ Models)</option>
+              <option value="opencode">OpenCode Zen</option>
+              <option value="groq">Groq Cloud (Fast LLMs)</option>
+              <option value="stability">Stability AI (Image)</option>
+              <option value="edge-tts">Edge TTS (Voice)</option>
+              <option value="elevenlabs">ElevenLabs (Voice)</option>
+              <option value="ffmpeg">FFmpeg Local (Video)</option>
             </select>
           </div>
           <div class="space-y-1">
-            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for OpenCode)</span></label>
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / FFmpeg)</span></label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
             <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenAI/Anthropic: get your key from their dashboard · For OpenCode/Groq: paste your key · Edge TTS: leave blank</span>
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>
+            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProviderEndpoint" placeholder="https://api.openai.com/v1" />
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Supported Models (comma-separated)</label>
@@ -154,7 +154,7 @@
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Secret API Key</label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="config.api_key" placeholder="sk-••••••••••••••••••••" />
-            <span class="text-[8px] text-on-surface-variant leading-relaxed">Enter your platform security token. API keys are stored securely inside localStorage.</span>
+            <span class="text-[8px] text-on-surface-variant leading-relaxed">Enter your platform security token. API keys are encrypted before being stored on the server and are never exposed in plain text.</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>
