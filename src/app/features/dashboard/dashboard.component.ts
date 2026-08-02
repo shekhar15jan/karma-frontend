@@ -132,6 +132,59 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     priority: 'MEDIUM' as string,
     providerId: '' as string
   };
+  selectedFlowIds: string[] = [];
+  flowsPresetDirty = false;
+  private missionTypePresets: Record<string, string[]> = {
+    VIDEO: ['Research', 'Script', 'Video', 'Publishing'],
+    BLOG: ['Research', 'Blog', 'Publishing'],
+    SCRIPT: ['Research', 'Script'],
+    VOICE: ['Voice'],
+    THUMBNAIL: ['Thumbnail'],
+    WORKFLOW: ['Research', 'Script', 'Video', 'Publishing'],
+  };
+
+  private flowByName(name: string): (FlowResponse & { icon?: string; status?: string }) | undefined {
+    return this.flowsList.find(f => (f.name || '').toLowerCase().includes(name.toLowerCase()));
+  }
+
+  applyFlowPreset(): void {
+    if (this.flowsPresetDirty) return;
+    const preset = this.missionTypePresets[this.newMission.missionType] || [];
+    this.selectedFlowIds = preset
+      .map(name => this.flowByName(name)?.id)
+      .filter((id): id is string => !!id);
+  }
+
+  isFlowSelected(flowId: string): boolean {
+    return this.selectedFlowIds.includes(flowId);
+  }
+
+  toggleFlow(flowId: string): void {
+    this.flowsPresetDirty = true;
+    const idx = this.selectedFlowIds.indexOf(flowId);
+    if (idx >= 0) {
+      this.selectedFlowIds.splice(idx, 1);
+    } else {
+      this.selectedFlowIds.push(flowId);
+    }
+  }
+
+  toggleAllFlows(): void {
+    this.flowsPresetDirty = true;
+    this.selectedFlowIds = this.allFlowsSelected()
+      ? []
+      : this.flowsList.filter(f => f.enabled !== false).map(f => f.id);
+  }
+
+  allFlowsSelected(): boolean {
+    const enabled = this.flowsList.filter(f => f.enabled !== false);
+    return enabled.length > 0 && this.selectedFlowIds.length === enabled.length;
+  }
+
+  onMissionTypeChange(): void {
+    this.flowsPresetDirty = false;
+    this.applyFlowPreset();
+  }
 
   onWorkspaceChange(): void {
     this.projects = [];
@@ -180,9 +233,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.loadMissions(project.id);
         this.showToast(`Project "${project.name}" created`, 'check_circle');
       },
-      error: () => {
+      error: (err) => {
         this.isCreatingProject = false;
-        this.showToast('Failed to create project', 'error');
+        this.showToast('Failed to create project: ' + (err?.error?.message || err?.message || 'unknown error'), 'error');
       }
     });
   }
@@ -199,7 +252,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       description: this.newMission.description?.trim() || undefined,
       missionType: this.newMission.missionType,
       priority: this.newMission.priority,
-      providerId: this.newMission.providerId || undefined
+      providerId: this.newMission.providerId || undefined,
+      selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined
     };
     this.missionsService.create(payload).subscribe({
       next: (created) => {
@@ -208,6 +262,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.activeModal = null;
         this.newMission.name = '';
         this.newMission.description = '';
+        this.flowsPresetDirty = false;
+        this.applyFlowPreset();
         this.loadMissions(this.newMission.projectId);
         if (runAfterCreate) {
           this.executionsService.trigger(created.id, this.runMode).subscribe({
@@ -785,6 +841,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
             status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
           }));
           this.applyFlowStatusesToFlows();
+          this.applyFlowPreset();
         },
         error: (err) => {
           console.error('Failed to fetch flows', err);
@@ -893,7 +950,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (missions) => {
-          this.activeMission = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING') || missions[0] || null;
+          this.activeMission = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING') || null;
           if (this.activeMission?.createdAt) {
             this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           }

@@ -31,6 +31,9 @@ interface PromptTemplate {
       <div class="flex flex-grow gap-6 overflow-hidden">
         <div class="glass-panel rounded-xl p-4 w-64 flex flex-col gap-3 shrink-0 overflow-y-auto no-scrollbar">
           <h3 class="text-xs font-semibold text-primary uppercase tracking-widest leading-none glow-text mb-2">Templates</h3>
+          <button class="px-3 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="newTemplate()">
+            <span class="material-symbols-outlined text-sm">add</span> New Template
+          </button>
           @if (loading) {
             <div class="flex items-center justify-center py-8">
               <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -55,12 +58,24 @@ interface PromptTemplate {
         <div class="flex-grow flex flex-col gap-4 overflow-hidden">
           @if (selectedTemplate) {
             <div class="glass-panel rounded-xl p-4 flex-grow flex flex-col gap-3 overflow-hidden bg-background/40">
-              <div class="flex justify-between items-center shrink-0">
-                <span class="text-xs font-bold text-primary-container font-mono uppercase">{{ selectedTemplate.name }}</span>
-                <button class="px-4 py-1 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5" (click)="saveTemplate()">
-                  <span class="material-symbols-outlined text-sm">save</span>
-                  <span>Save Template</span>
-                </button>
+              <div class="flex justify-between items-center shrink-0 gap-3">
+                @if (isNewTemplate) {
+                  <input class="flex-grow bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs font-bold text-primary-container font-mono focus:outline-none focus:border-primary" [(ngModel)]="selectedTemplate.name" placeholder="Prompt name" />
+                } @else {
+                  <span class="text-xs font-bold text-primary-container font-mono uppercase">{{ selectedTemplate.name }}</span>
+                }
+                <div class="flex items-center gap-2 shrink-0">
+                  @if (!isNewTemplate) {
+                    <button class="px-3 py-1 bg-red-600/10 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg hover:bg-red-600/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="deleteTemplate()" [disabled]="deleting">
+                      <span class="material-symbols-outlined text-sm">delete</span>
+                      <span>Delete</span>
+                    </button>
+                  }
+                  <button class="px-4 py-1 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="saveTemplate()" [disabled]="saving">
+                    <span class="material-symbols-outlined text-sm">save</span>
+                    <span>{{ saving ? 'Saving...' : 'Save Template' }}</span>
+                  </button>
+                </div>
               </div>
 
               <div class="flex-grow relative overflow-hidden mt-1 border border-outline-variant/30 rounded-xl" style="backdrop-filter:blur(20px);background:rgba(255,255,255,0.06)">
@@ -102,6 +117,9 @@ export class PromptStudioComponent implements OnInit {
   templates: PromptTemplate[] = [];
   selectedTemplate: PromptTemplate | null = null;
   loading = false;
+  saving = false;
+  deleting = false;
+  isNewTemplate = false;
 
   constructor(private readonly api: ApiService) {}
 
@@ -130,18 +148,49 @@ export class PromptStudioComponent implements OnInit {
 
   selectTemplate(tpl: PromptTemplate) {
     this.selectedTemplate = { ...tpl };
+    this.isNewTemplate = false;
+  }
+
+  newTemplate() {
+    this.selectedTemplate = { id: '', name: 'Untitled Prompt', lastUpdated: 'New', content: '' };
+    this.isNewTemplate = true;
   }
 
   saveTemplate() {
-    if (!this.selectedTemplate) return;
-    this.api.put(`/v1/prompts/${this.selectedTemplate.id}`, {
+    if (!this.selectedTemplate || !this.selectedTemplate.name.trim()) return;
+    this.saving = true;
+    const payload = {
       name: this.selectedTemplate.name,
       content: this.selectedTemplate.content
-    }).subscribe({
+    };
+    const op = this.isNewTemplate
+      ? this.api.post('/v1/prompts', payload)
+      : this.api.put(`/v1/prompts/${this.selectedTemplate.id}`, payload);
+    op.subscribe({
       next: () => {
+        this.saving = false;
         this.loadTemplates();
       },
-      error: () => {}
+      error: () => {
+        this.saving = false;
+      }
+    });
+  }
+
+  deleteTemplate() {
+    if (!this.selectedTemplate || this.isNewTemplate) return;
+    if (!confirm(`Delete prompt "${this.selectedTemplate.name}"?`)) return;
+    this.deleting = true;
+    this.api.delete(`/v1/prompts/${this.selectedTemplate.id}`).subscribe({
+      next: () => {
+        this.deleting = false;
+        const id = this.selectedTemplate!.id;
+        this.selectedTemplate = null;
+        this.templates = this.templates.filter(t => t.id !== id);
+      },
+      error: () => {
+        this.deleting = false;
+      }
     });
   }
 }

@@ -34,9 +34,14 @@
             <h3 class="text-sm font-bold text-on-surface mb-1">{{ ws.name }}</h3>
             <p class="text-[10px] text-on-surface-variant line-clamp-2 leading-relaxed">{{ ws.description || 'No description provided.' }}</p>
           </div>
-          <button (click)="archiveWorkspace(ws)" title="Archive Workspace" class="material-symbols-outlined text-on-surface-variant hover:text-red-400 transition-colors text-lg opacity-0 group-hover:opacity-100 cursor-pointer">
-            archive
-          </button>
+          <div class="flex items-start gap-2">
+            <button (click)="openEditModal(ws)" title="Edit Workspace" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-lg opacity-0 group-hover:opacity-100 cursor-pointer">
+              edit
+            </button>
+            <button (click)="archiveWorkspace(ws)" title="Archive Workspace" class="material-symbols-outlined text-on-surface-variant hover:text-red-400 transition-colors text-lg opacity-0 group-hover:opacity-100 cursor-pointer">
+              archive
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-white/5">
@@ -54,9 +59,30 @@
           </div>
         </div>
 
-        <button (click)="openProjectModal(ws)" class="w-full flex items-center justify-center gap-1.5 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer">
-          <span class="material-symbols-outlined text-[12px]">add</span> New Project
-        </button>
+        <div class="flex flex-col gap-1.5">
+          <button (click)="toggleExpand(ws)" class="w-full flex items-center justify-center gap-1.5 py-1.5 bg-white/5 hover:bg-white/10 border border-outline-variant/20 text-on-surface-variant hover:text-primary text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[12px]">{{ isExpanded(ws) ? 'expand_less' : 'expand_more' }}</span> {{ isExpanded(ws) ? 'Hide Projects' : 'View Projects' }} ({{ projectsOf(ws).length }})
+          </button>
+          @if (isExpanded(ws)) {
+            <div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto no-scrollbar pr-1">
+              @if (projectsOf(ws).length === 0) {
+                <div class="text-[10px] text-on-surface-variant/60 italic px-1">No projects yet.</div>
+              }
+              @for (project of projectsOf(ws); track project.id) {
+                <div class="flex items-center justify-between gap-2 px-2 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="material-symbols-outlined text-[12px] text-primary shrink-0">folder</span>
+                    <span class="text-[11px] text-on-surface truncate">{{ project.name }}</span>
+                  </div>
+                  <span class="text-[9px] font-mono text-on-surface-variant shrink-0">{{ project.missionCount }} missions</span>
+                </div>
+              }
+            </div>
+          }
+          <button (click)="openProjectModal(ws)" class="w-full flex items-center justify-center gap-1.5 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[12px]">add</span> New Project
+          </button>
+        </div>
       </div>
     }
   </div>
@@ -97,8 +123,8 @@
         <button (click)="closeCreateModal()" class="absolute top-4 right-4 material-symbols-outlined text-on-surface-variant hover:text-on-surface cursor-pointer">close</button>
         
         <div>
-          <h3 class="text-lg font-bold text-on-surface mb-1">Create New Workspace</h3>
-          <p class="text-xs text-on-surface-variant">Establish a new isolated environment for projects.</p>
+          <h3 class="text-lg font-bold text-on-surface mb-1">{{ editingWorkspaceId ? 'Edit Workspace' : 'Create New Workspace' }}</h3>
+          <p class="text-xs text-on-surface-variant">{{ editingWorkspaceId ? 'Update the workspace details.' : 'Establish a new isolated environment for projects.' }}</p>
         </div>
 
         <div class="flex flex-col gap-4">
@@ -119,7 +145,7 @@
             @if (loading) {
               <span class="material-symbols-outlined text-sm animate-spin">refresh</span>
             }
-            Create Workspace
+            {{ editingWorkspaceId ? 'Save Workspace' : 'Create Workspace' }}
           </button>
         </div>
       </div>

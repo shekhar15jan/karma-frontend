@@ -1,6 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import { take } from 'rxjs';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
+import { ApiService } from '../../shared/services/api.service';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
 
 @Component({
@@ -62,7 +65,7 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
               <div class="mt-4 mb-3">
                 <h4 class="text-xs font-bold text-on-surface truncate mb-1" [title]="artifact.name">{{ artifact.name }}</h4>
                 <p class="text-[9px] text-on-surface-variant mb-0 font-mono">
-                  {{ formatDate(artifact.createdAt) }}
+                  {{ formatDate(artifact.createdAt) }} · {{ contentTypeLabel(artifact.contentType) }}
                 </p>
               </div>
 
@@ -90,10 +93,23 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
                 <span class="text-[9px] font-mono text-on-surface-variant uppercase">{{ selected.artifactType }} · {{ selected.reviewStatus }} · v{{ selected.currentVersion || 1 }}</span>
               </div>
             </div>
-            <button (click)="closePreview()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer">close</button>
+            <div class="flex items-center gap-2">
+              <button (click)="download(selected)" class="flex items-center gap-1 px-3 py-1 bg-primary/10 border border-primary/30 text-[10px] font-bold text-primary rounded hover:bg-primary/20 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-xs">download</span> Download
+              </button>
+              <button (click)="closePreview()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer">close</button>
+            </div>
           </div>
-          <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
-            <pre class="text-[12px] font-mono text-on-surface whitespace-pre-wrap break-words leading-relaxed">{{ selected.contentText || 'No content available.' }}</pre>
+          <div class="p-6 overflow-y-auto custom-scrollbar flex-grow flex items-center justify-center">
+            @if (isVideo(selected)) {
+              <video controls autoplay class="max-w-full max-h-[50vh] rounded-lg" [src]="previewUrl(selected)"></video>
+            } @else if (isAudio(selected)) {
+              <audio controls class="w-full" [src]="previewUrl(selected)"></audio>
+            } @else if (isImage(selected)) {
+              <img [src]="previewUrl(selected)" class="max-w-full max-h-[50vh] rounded-lg" alt="{{ selected.name }}" />
+            } @else {
+              <pre class="text-[12px] font-mono text-on-surface whitespace-pre-wrap break-words leading-relaxed w-full">{{ selected.contentText || 'No content available.' }}</pre>
+            }
           </div>
         </div>
       </div>
@@ -103,13 +119,18 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
     .no-scrollbar::-webkit-scrollbar { display: none; }
   `],
 })
-export class ArtifactExplorerComponent implements OnInit {
+export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   artifacts: ArtifactResponse[] = [];
   selected: ArtifactResponse | null = null;
   filter: string = 'ALL';
   loading = false;
+  private objectUrl: string | null = null;
 
-  constructor(private readonly artifactsService: ArtifactsService) {}
+  constructor(
+    private readonly artifactsService: ArtifactsService,
+    private readonly api: ApiService,
+    private readonly sanitizer: DomSanitizer,
+  ) {}
 
   get filteredArtifacts(): ArtifactResponse[] {
     if (this.filter === 'ALL') return this.artifacts;
@@ -149,22 +170,109 @@ export class ArtifactExplorerComponent implements OnInit {
     return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  contentTypeLabel(contentType?: string): string {
+    if (!contentType) return 'N/A';
+    return contentType.split('/').pop()?.toUpperCase() || 'N/A';
+  }
+
+  isVideo(a: ArtifactResponse): boolean {
+    return a.artifactType?.toUpperCase() === 'VIDEO' || (a.contentType || '').toLowerCase().startsWith('video/');
+  }
+
+  isAudio(a: ArtifactResponse): boolean {
+    return a.artifactType?.toUpperCase() === 'AUDIO' || (a.contentType || '').toLowerCase().startsWith('audio/');
+  }
+
+  isImage(a: ArtifactResponse): boolean {
+    return ['IMAGE', 'THUMBNAIL', 'MEDIA_ASSET'].includes(a.artifactType?.toUpperCase()) ||
+      (a.contentType || '').toLowerCase().startsWith('image/');
+  }
+
+  isMedia(a: ArtifactResponse): boolean {
+    return this.isVideo(a) || this.isAudio(a) || this.isImage(a);
+  }
+
+  fileUrl(artifact: ArtifactResponse): string {
+    return `${this.apiBase}/v1/artifacts/${artifact.id}/file`;
+  }
+
+  previewUrl(artifact: ArtifactResponse): SafeUrl {
+    if (this.objectUrl) {
+      return this.sanitizer.bypassSecurityTrustUrl(this.objectUrl);
+    }
+    return this.sanitizer.bypassSecurityTrustUrl(this.fileUrl(artifact));
+  }
+
   openPreview(artifact: ArtifactResponse): void {
     this.selected = artifact;
+    this.loadObjectUrl(artifact);
   }
 
   closePreview(): void {
     this.selected = null;
+    this.revokeObjectUrl();
+  }
+
+  ngOnDestroy(): void {
+    this.revokeObjectUrl();
+  }
+
+  private loadObjectUrl(artifact: ArtifactResponse): void {
+    this.revokeObjectUrl();
+    this.api.getBlob(`/v1/artifacts/${artifact.id}/file`)
+      .pipe(take(1))
+      .subscribe({
+        next: (blob) => {
+          if (!this.selected || this.selected.id !== artifact.id) return;
+          this.objectUrl = URL.createObjectURL(blob);
+        },
+        error: () => {}
+      });
+  }
+
+  private revokeObjectUrl(): void {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
   }
 
   download(artifact: ArtifactResponse): void {
-    const content = artifact.contentText || '';
-    const blob = new Blob([content], { type: artifact.contentType || 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${artifact.name || 'artifact'}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    this.api.getBlob(`/v1/artifacts/${artifact.id}/file`)
+      .pipe(take(1))
+      .subscribe({
+        next: (blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = this.filenameFor(artifact);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        },
+        error: () => {}
+      });
+  }
+
+  private filenameFor(artifact: ArtifactResponse): string {
+    const ext = this.extensionFor(artifact.contentType);
+    const name = (artifact.name || 'artifact').trim().replace(/[^\w.-]+/g, '-');
+    return name.toLowerCase().endsWith('.' + ext) ? name : `${name}.${ext}`;
+  }
+
+  private extensionFor(contentType?: string): string {
+    const ct = (contentType || '').toLowerCase();
+    if (ct.includes('video')) return 'mp4';
+    if (ct.includes('audio')) return ct.includes('wav') ? 'wav' : 'mp3';
+    if (ct.includes('image')) return ct.includes('jpeg') ? 'jpg' : ct.includes('webp') ? 'webp' : 'png';
+    if (ct.includes('json')) return 'json';
+    if (ct.includes('html')) return 'html';
+    if (ct.includes('csv')) return 'csv';
+    return 'md';
+  }
+
+  private get apiBase(): string {
+    return (window as any).__KARMA_API_BASE__ || 'http://127.0.0.1:8080/api';
   }
 }

@@ -44,7 +44,7 @@
           <div class="flex gap-4 text-[10px] text-on-surface-variant font-mono">
             <span>Duration: {{ formatDuration(exec.durationMs) }}</span>
             <span>Model: {{ exec.modelUsed || 'N/A' }}</span>
-            <span>Cost: ${{ exec.totalCost.toFixed(4) }}</span>
+            <span>Cost: ${{ formatCost(exec.totalCost) }}</span>
           </div>
           @if (selectedExecution?.id === exec.id && steps.length > 0) {
             <div class="border-t border-outline-variant/20 pt-3 space-y-2">

@@ -42,6 +42,8 @@ export class WorkflowDesignerComponent implements OnInit {
   saving = false;
   running = false;
   runResult: { executionId: string, missionId: string } | null = null;
+  savedDefinitions: any[] = [];
+  selectedDefinitionId = '';
 
   // Drag and Connect State
   isConnecting = false;
@@ -70,6 +72,47 @@ export class WorkflowDesignerComponent implements OnInit {
         error: () => {
           this.loading = false;
           this.error = 'Failed to load agents.';
+        }
+      });
+    this.loadDefinitions();
+  }
+
+  loadDefinitions(): void {
+    this.workflowsService.getDefinitions()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (defs) => {
+          this.savedDefinitions = defs;
+        },
+        error: () => {
+          this.error = 'Failed to load saved workflows.';
+        }
+      });
+  }
+
+  onSelectDefinition(id: string): void {
+    const def = this.savedDefinitions.find(d => d.id === id);
+    if (!def) return;
+    this.workflowName = def.name;
+    const nodes = typeof def.nodes === 'string' ? JSON.parse(def.nodes || '[]') : (def.nodes || []);
+    const edges = typeof def.edges === 'string' ? JSON.parse(def.edges || '[]') : (def.edges || []);
+    this.nodes = [...nodes];
+    this.edges = [...edges];
+    this.selectedNode = null;
+  }
+
+  deleteSelectedDefinition(): void {
+    if (!this.selectedDefinitionId) return;
+    if (!window.confirm('Delete this saved workflow? This cannot be undone.')) return;
+    this.workflowsService.deleteDefinition(this.selectedDefinitionId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.selectedDefinitionId = '';
+          this.loadDefinitions();
+        },
+        error: () => {
+          this.error = 'Failed to delete workflow.';
         }
       });
   }
@@ -151,6 +194,7 @@ export class WorkflowDesignerComponent implements OnInit {
       .subscribe({
         next: () => {
           this.saving = false;
+          this.loadDefinitions();
         },
         error: () => {
           this.error = 'Failed to save workflow.';

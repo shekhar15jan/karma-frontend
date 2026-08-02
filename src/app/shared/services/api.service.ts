@@ -32,6 +32,15 @@ export class ApiService {
       .pipe(map(res => res.data));
   }
 
+  getBlob(path: string): Observable<Blob> {
+    const token = this.auth.getToken();
+    let h = new HttpHeaders();
+    if (token) {
+      h = h.set('Authorization', `Bearer ${token}`);
+    }
+    return this.http.get(`${this.baseUrl}${path}`, { headers: h, responseType: 'blob' });
+  }
+
   post<T>(path: string, body: unknown) {
     return this.http.post<ApiResponse<T>>(`${this.baseUrl}${path}`, body, { headers: this.headers() });
   }

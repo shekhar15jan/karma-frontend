@@ -15,6 +15,7 @@ import { AgentResponse } from '../../shared/models/agent.model';
 export class AgentsComponent implements OnInit {
   agents: AgentResponse[] = [];
   selectedAgent: AgentResponse | null = null;
+  isNewAgent = false;
   loading = false;
   error: string | null = null;
 
@@ -53,6 +54,23 @@ export class AgentsComponent implements OnInit {
 
   selectAgent(agent: AgentResponse): void {
     this.selectedAgent = { ...agent };
+    this.isNewAgent = false;
+  }
+
+  newAgent(): void {
+    this.selectedAgent = {
+      id: '',
+      name: '',
+      description: '',
+      category: 'CONTENT',
+      icon: 'smart_toy',
+      status: 'ACTIVE',
+      defaultPromptId: '',
+      defaultProviderId: '',
+      createdAt: '',
+      updatedAt: '',
+    };
+    this.isNewAgent = true;
   }
 
   deleteAgent(agent: AgentResponse): void {
@@ -69,9 +87,22 @@ export class AgentsComponent implements OnInit {
 
   saveAgentSettings(): void {
     if (!this.selectedAgent) return;
-    this.agentsService.update(this.selectedAgent.id, this.selectedAgent).subscribe({
-      next: () => {
-        this.agents = this.agents.map(a => a.id === this.selectedAgent!.id ? this.selectedAgent! : a);
+    const payload = {
+      name: this.selectedAgent.name,
+      description: this.selectedAgent.description,
+      category: this.selectedAgent.category,
+      status: this.selectedAgent.status,
+    };
+    const op = this.isNewAgent
+      ? this.agentsService.create(payload)
+      : this.agentsService.update(this.selectedAgent.id, payload);
+    op.subscribe({
+      next: (saved) => {
+        if (this.isNewAgent) {
+          this.agents = [...this.agents, saved];
+        } else {
+          this.agents = this.agents.map(a => a.id === saved.id ? saved : a);
+        }
         this.selectedAgent = null;
       },
       error: (err) => {

@@ -7,6 +7,7 @@ export interface ArtifactResponse {
   status: string;
   contentText: string;
   contentType: string;
+  storageLocation?: string;
   reviewStatus: string;
   publicationStatus: string;
   tags: string[];

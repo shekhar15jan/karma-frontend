@@ -770,7 +770,7 @@
               <div class="grid grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
                   <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Mission Type</label>
-                  <select [(ngModel)]="newMission.missionType"
+                  <select [(ngModel)]="newMission.missionType" (ngModelChange)="onMissionTypeChange()"
                           class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
                     @for (type of ['VIDEO', 'BLOG', 'SCRIPT', 'VOICE', 'THUMBNAIL', 'WORKFLOW']; track type) {
                       <option [value]="type">{{ type }}</option>
@@ -786,6 +786,39 @@
                     }
                   </select>
                 </div>
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
+                    Flows to Execute
+                    <span class="normal-case text-on-surface-variant/60">({{ selectedFlowIds.length }} selected)</span>
+                  </label>
+                  <button (click)="toggleAllFlows()"
+                          class="text-[10px] font-mono uppercase tracking-wider text-primary hover:text-primary-container transition-colors cursor-pointer">
+                    {{ allFlowsSelected() ? 'Clear all' : 'Select all' }}
+                  </button>
+                </div>
+                @if (flowsList.length === 0) {
+                  <div class="text-[11px] text-on-surface-variant">No flows available yet.</div>
+                } @else {
+                  <div class="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    @for (flow of flowsList; track flow.id) {
+                      <label [ngClass]="{ 'border-primary/60 bg-primary/10': isFlowSelected(flow.id), 'opacity-40': flow.enabled === false }"
+                             class="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-outline-variant/30 cursor-pointer transition-colors hover:border-primary/40">
+                        <input type="checkbox" [checked]="isFlowSelected(flow.id)"
+                               [disabled]="flow.enabled === false"
+                               (change)="toggleFlow(flow.id)"
+                               class="accent-primary cursor-pointer" />
+                        <span class="material-symbols-outlined text-[14px] text-primary">{{ flow.icon || 'account_tree' }}</span>
+                        <span class="flex flex-col leading-tight">
+                          <span class="text-[11px] text-on-surface">{{ flow.name }}</span>
+                          <span class="text-[9px] text-on-surface-variant font-mono uppercase">{{ flow.category }}</span>
+                        </span>
+                      </label>
+                    }
+                  </div>
+                }
               </div>
 
               <div class="flex flex-col gap-1.5">

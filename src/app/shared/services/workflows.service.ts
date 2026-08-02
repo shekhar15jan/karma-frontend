@@ -11,6 +11,14 @@ export class WorkflowsService {
     return this.api.get<WorkflowRunResponse[]>('/v1/workflow-executions/runs').pipe(map(r => r.data));
   }
 
+  getDefinitions(): Observable<unknown[]> {
+    return this.api.get<unknown[]>('/v1/workflow-executions/definitions').pipe(map(r => r.data));
+  }
+
+  deleteDefinition(id: string): Observable<void> {
+    return this.api.delete<void>(`/v1/workflow-executions/definitions/${id}`).pipe(map(r => r.data));
+  }
+
   getProjectRuns(projectId: string): Observable<WorkflowRunResponse[]> {
     return this.api.get<WorkflowRunResponse[]>(`/v1/workflow-executions/projects/${projectId}/runs`).pipe(map(r => r.data));
   }
