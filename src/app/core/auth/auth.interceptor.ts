@@ -25,7 +25,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         }
 
         if (req.headers.has(RETRY_FLAG) || !auth.getRefreshToken()) {
-          auth.logout();
+          auth.logout(true);
           return throwError(() => error);
         }
 
@@ -40,7 +40,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             return next(retry);
           }),
           catchError((refreshError) => {
-            auth.logout();
+            auth.logout(true);
             return throwError(() => refreshError);
           }),
         );

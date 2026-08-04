@@ -67,9 +67,19 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
                 <p class="text-[9px] text-on-surface-variant mb-0 font-mono">
                   {{ formatDate(artifact.createdAt) }} · {{ contentTypeLabel(artifact.contentType) }}
                 </p>
+                @if (artifact.storageLocation) {
+                  <p class="text-[8px] font-mono text-on-surface-variant/70 mt-1 mb-0 truncate" [title]="hostPath(artifact)">
+                    {{ hostPath(artifact) }}
+                  </p>
+                }
               </div>
 
               <div class="flex gap-2 border-t border-outline-variant/20 pt-2.5">
+                @if (artifact.storageLocation) {
+                  <button (click)="copyPath(artifact)" class="px-2 py-1 bg-white/5 border border-outline-variant/30 text-[9px] rounded hover:bg-white/10 transition-colors flex items-center justify-center" title="Copy path">
+                    <span class="material-symbols-outlined text-xs text-on-surface-variant">content_copy</span>
+                  </button>
+                }
                 <button (click)="openPreview(artifact)" class="flex-grow py-1 bg-white/5 border border-outline-variant/30 text-[9px] rounded font-bold hover:bg-white/10 transition-colors">Preview</button>
                 <button (click)="download(artifact)" class="px-2 py-1 bg-primary/10 border border-primary/30 text-[9px] rounded hover:bg-primary/20 transition-colors flex items-center justify-center">
                   <span class="material-symbols-outlined text-xs text-primary">download</span>
@@ -124,6 +134,8 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   selected: ArtifactResponse | null = null;
   filter: string = 'ALL';
   loading = false;
+  hostRoot = '';
+  containerRoot = '/data/artifacts';
   private objectUrl: string | null = null;
 
   constructor(
@@ -139,7 +151,41 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.loadStorageRoot();
     this.loadArtifacts();
+  }
+
+  private loadStorageRoot(): void {
+    this.api.get<{ hostRoot: string; containerRoot: string }>('/v1/artifacts/storage-root')
+      .pipe(take(1))
+      .subscribe({
+        next: (res) => {
+          this.hostRoot = res?.data?.hostRoot || '';
+          this.containerRoot = res?.data?.containerRoot || '/data/artifacts';
+        },
+        error: () => {}
+      });
+  }
+
+  hostPath(artifact: ArtifactResponse): string {
+    const loc = artifact.storageLocation || '';
+    const path = loc.replace(/^file:\/\//, '');
+    if (this.hostRoot && path.startsWith(this.containerRoot)) {
+      const relative = path.slice(this.containerRoot.length).replace(/^\//, '');
+      return this.hostRoot.replace(/\//g, '\\') + '\\' + relative.replace(/\//g, '\\');
+    }
+    return path;
+  }
+
+  copyPath(artifact: ArtifactResponse): void {
+    const p = this.hostPath(artifact);
+    navigator.clipboard?.writeText(p).then(() => {
+      const btn = document.querySelector('.path-copy-active');
+      if (btn) {
+        btn.classList.remove('path-copy-active');
+        setTimeout(() => btn.classList.add('path-copy-active'), 0);
+      }
+    }).catch(() => {});
   }
 
   loadArtifacts(): void {

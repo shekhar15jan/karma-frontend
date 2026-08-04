@@ -13,6 +13,7 @@ export interface CreateMissionRequest {
   providerId?: string;
   sourceDocumentIds?: string[];
   selectedFlowIds?: string[];
+  outputDirectory?: string;
 }
 
 @Injectable({ providedIn: 'root' })

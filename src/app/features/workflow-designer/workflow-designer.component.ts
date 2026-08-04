@@ -1,10 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AgentsService } from '../../shared/services/agents.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
 import { AgentResponse } from '../../shared/models/agent.model';
+import { FlowResponse } from '../../shared/models/flow.model';
 
 export interface WorkflowNode {
   id: string;
@@ -12,6 +14,7 @@ export interface WorkflowNode {
   agentId: string;
   agentName: string;
   status: 'pending' | 'configured' | 'ready';
+  stepKind: 'AGENT' | 'VIDEO' | 'PUBLISH';
   config: Record<string, string>;
   model?: string;
   x: number;
@@ -22,6 +25,7 @@ export interface WorkflowEdge {
   id: string;
   source: string;
   target: string;
+  handoff?: boolean;
 }
 
 @Component({
@@ -37,13 +41,16 @@ export class WorkflowDesignerComponent implements OnInit {
   edges: WorkflowEdge[] = [];
   selectedNode: WorkflowNode | null = null;
   workflowName = 'Untitled Workflow';
+  workflowDescription = '';
   loading = true;
   error: string | null = null;
   saving = false;
   running = false;
   runResult: { executionId: string, missionId: string } | null = null;
-  savedDefinitions: any[] = [];
-  selectedDefinitionId = '';
+  saveResult: { flowId: string } | null = null;
+  savedFlows: any[] = [];
+  selectedFlowId = '';
+  selectedFlowDeleteId = '';
 
   // Drag and Connect State
   isConnecting = false;
@@ -59,9 +66,11 @@ export class WorkflowDesignerComponent implements OnInit {
   constructor(
     private readonly agentsService: AgentsService,
     private readonly workflowsService: WorkflowsService,
+    private readonly route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
+    const flowParam = this.route.snapshot.queryParamMap.get('flow');
     this.agentsService.getAll()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -74,15 +83,18 @@ export class WorkflowDesignerComponent implements OnInit {
           this.error = 'Failed to load agents.';
         }
       });
-    this.loadDefinitions();
+    this.loadFlows(flowParam);
   }
 
-  loadDefinitions(): void {
-    this.workflowsService.getDefinitions()
+  loadFlows(openId?: string | null): void {
+    this.workflowsService.getFlows()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (defs) => {
-          this.savedDefinitions = defs;
+        next: (flows) => {
+          this.savedFlows = flows;
+          if (openId) {
+            this.onSelectFlow(openId);
+          }
         },
         error: () => {
           this.error = 'Failed to load saved workflows.';
@@ -90,29 +102,67 @@ export class WorkflowDesignerComponent implements OnInit {
       });
   }
 
-  onSelectDefinition(id: string): void {
-    const def = this.savedDefinitions.find(d => d.id === id);
-    if (!def) return;
-    this.workflowName = def.name;
-    const nodes = typeof def.nodes === 'string' ? JSON.parse(def.nodes || '[]') : (def.nodes || []);
-    const edges = typeof def.edges === 'string' ? JSON.parse(def.edges || '[]') : (def.edges || []);
-    this.nodes = [...nodes];
-    this.edges = [...edges];
+  onSelectFlow(id: string): void {
+    const flow = this.savedFlows.find(f => f.id === id);
+    if (!flow) return;
+    this.workflowName = flow.name || 'Untitled Workflow';
+    this.workflowDescription = flow.description || '';
+    this.applyDesign(flow.design);
+    this.selectedFlowId = id;
+    this.selectedFlowDeleteId = id;
+  }
+
+  clearSelection(): void {
+    this.selectedFlowId = '';
+    this.selectedFlowDeleteId = '';
+  }
+
+  private applyDesign(design: any): void {
+    if (!design) return;
+    const rawNodes = Array.isArray(design.nodes) ? design.nodes : [];
+    const rawEdges = Array.isArray(design.edges) ? design.edges : [];
+    this.nodes = rawNodes.map(this.normalizeNode);
+    this.edges = rawEdges.map(this.normalizeEdge);
     this.selectedNode = null;
   }
 
-  deleteSelectedDefinition(): void {
-    if (!this.selectedDefinitionId) return;
-    if (!window.confirm('Delete this saved workflow? This cannot be undone.')) return;
-    this.workflowsService.deleteDefinition(this.selectedDefinitionId)
+  private normalizeNode(n: any): WorkflowNode {
+    return {
+      id: n.id,
+      label: n.label || '',
+      agentId: n.agentId || '',
+      agentName: n.agentName || '',
+      status: (n.status === 'ready' || n.status === 'configured' || n.status === 'pending') ? n.status : 'pending',
+      stepKind: n.stepKind === 'VIDEO' || n.stepKind === 'PUBLISH' ? n.stepKind : 'AGENT',
+      config: n.config || {},
+      model: n.model,
+      x: Number(n.x) || 80,
+      y: Number(n.y) || 80,
+    };
+  }
+
+  private normalizeEdge(e: any): WorkflowEdge {
+    return {
+      id: e.id,
+      source: e.source ?? e.from,
+      target: e.target ?? e.to,
+      handoff: e.handoff === undefined ? true : !!e.handoff,
+    };
+  }
+
+  deleteSelectedFlow(): void {
+    if (!this.selectedFlowDeleteId) return;
+    if (!window.confirm('Delete this flow? This cannot be undone.')) return;
+    this.workflowsService.deleteFlow(this.selectedFlowDeleteId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
-          this.selectedDefinitionId = '';
-          this.loadDefinitions();
+          this.selectedFlowDeleteId = '';
+          this.selectedFlowId = '';
+          this.loadFlows();
         },
         error: () => {
-          this.error = 'Failed to delete workflow.';
+          this.error = 'Failed to delete flow.';
         }
       });
   }
@@ -125,11 +175,12 @@ export class WorkflowDesignerComponent implements OnInit {
       agentId: agent.id,
       agentName: agent.name,
       status: 'pending',
+      stepKind: 'AGENT',
       config: {
         tempLimit: '75',
         concurrency: '3'
       },
-      model: 'gpt-4o',
+      model: 'gemini-3.5-flash',
       x: 80 + this.nodes.length * 40,
       y: 80 + this.nodes.length * 30,
     };
@@ -184,20 +235,23 @@ export class WorkflowDesignerComponent implements OnInit {
   saveWorkflow(): void {
     this.saving = true;
     this.error = null;
+    this.saveResult = null;
     const payload = {
       name: this.workflowName,
+      description: this.workflowDescription,
       nodes: this.nodes,
       edges: this.edges,
     };
     this.workflowsService.saveWorkflow(payload)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: () => {
+        next: (flow) => {
           this.saving = false;
-          this.loadDefinitions();
+          this.saveResult = { flowId: flow?.id };
+          this.loadFlows(flow?.id);
         },
-        error: () => {
-          this.error = 'Failed to save workflow.';
+        error: (err: any) => {
+          this.error = this.extractError(err) || 'Failed to save workflow.';
           this.saving = false;
         }
       });
@@ -207,8 +261,10 @@ export class WorkflowDesignerComponent implements OnInit {
     this.running = true;
     this.error = null;
     this.runResult = null;
+    this.saveResult = null;
     const payload = {
       name: this.workflowName,
+      description: this.workflowDescription,
       nodes: this.nodes,
       edges: this.edges,
     };
@@ -220,11 +276,51 @@ export class WorkflowDesignerComponent implements OnInit {
           this.runResult = { executionId: result.executionId, missionId: result.missionId };
           this.error = null;
         },
-        error: (err) => {
-          this.error = 'Failed to run workflow.';
+        error: (err: any) => {
+          this.error = this.extractError(err) || 'Failed to run workflow.';
           this.running = false;
         }
       });
+  }
+
+  private extractError(err: any): string | null {
+    const msg = err?.error?.message || err?.message;
+    return typeof msg === 'string' && msg.trim() ? msg : null;
+  }
+
+  updateNodeStepKind(kind: 'AGENT' | 'VIDEO' | 'PUBLISH'): void {
+    if (!this.selectedNode) return;
+    this.selectedNode = {
+      ...this.selectedNode,
+      stepKind: kind,
+      status: 'configured',
+    };
+    this.nodes = this.nodes.map(n =>
+      n.id === this.selectedNode!.id ? this.selectedNode! : n
+    );
+  }
+
+  toggleEdgeHandoff(edge: WorkflowEdge): void {
+    const updated = { ...edge, handoff: edge.handoff === false };
+    this.edges = this.edges.map(e => e.id === edge.id ? updated : e);
+  }
+
+  private wouldCreateCycle(sourceId: string, targetId: string): boolean {
+    const adjacency = new Map<string, string[]>();
+    for (const edge of this.edges) {
+      if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+      adjacency.get(edge.source)!.push(edge.target);
+    }
+    const stack = [targetId];
+    const visited = new Set<string>();
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (current === sourceId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      for (const next of adjacency.get(current) || []) stack.push(next);
+    }
+    return false;
   }
 
   getMappedIcon(icon: string): string {
@@ -241,6 +337,10 @@ export class WorkflowDesignerComponent implements OnInit {
   getAgentIcon(agentId: string): string {
     const agent = this.agents.find(a => a.id === agentId);
     return this.getMappedIcon(agent?.icon || '');
+  }
+
+  get activeAgents(): AgentResponse[] {
+    return this.agents.filter(a => a.status === 'ACTIVE');
   }
 
   getNodeX(nodeId: string): number {
@@ -318,10 +418,15 @@ export class WorkflowDesignerComponent implements OnInit {
     event.stopPropagation();
     if (this.isConnecting && this.sourceNodeId) {
       if (this.sourceNodeId !== node.id) {
-        const exists = this.edges.some(e => e.source === this.sourceNodeId && e.target === node.id);
-        if (!exists) {
-          const edgeId = `edge-${Date.now()}`;
-          this.edges = [...this.edges, { id: edgeId, source: this.sourceNodeId, target: node.id }];
+        if (this.wouldCreateCycle(this.sourceNodeId, node.id)) {
+          this.error = 'Cannot connect: this would create a circular flow.';
+        } else {
+          this.error = null;
+          const exists = this.edges.some(e => e.source === this.sourceNodeId && e.target === node.id);
+          if (!exists) {
+            const edgeId = `edge-${Date.now()}`;
+            this.edges = [...this.edges, { id: edgeId, source: this.sourceNodeId, target: node.id, handoff: true }];
+          }
         }
       }
       this.isConnecting = false;

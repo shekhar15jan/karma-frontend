@@ -104,8 +104,11 @@
                 </div>
                 @if (expandedProviders.has(provider.id) && provider.models?.length) {
                   <div class="px-2 pb-1.5 flex flex-wrap gap-1">
-                    @for (m of provider.models; track m) {
+                    @for (m of provider.models.slice(0, 8); track m) {
                       <span class="text-[7px] px-1.5 py-0.5 bg-white/5 border border-outline-variant/20 rounded font-mono text-on-surface-variant">{{ m }}</span>
+                    }
+                    @if (provider.models.length > 8) {
+                      <span class="text-[7px] px-1.5 py-0.5 bg-white/5 border border-outline-variant/20 rounded font-mono text-on-surface-variant">+{{ provider.models.length - 8 }} more</span>
                     }
                   </div>
                 }
@@ -174,41 +177,41 @@
           <!-- Research (Top - 270deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]">
-                <span class="material-symbols-outlined text-green-400">search</span>
+              <div [class]="hudCircleCls('research')">
+                <span class="material-symbols-outlined" [class]="hudState('research').cls">search</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">RESEARCH</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <span class="text-[8px] font-bold" [class]="hudState('research').cls">{{ hudState('research').text }} {{ hubPct('research') }}</span>
             </div>
           </div>
           <!-- Script (45deg - Top Right) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">description</span>
+              <div [class]="hudCircleCls('script')">
+                <span class="material-symbols-outlined" [class]="hudState('script').cls">description</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SCRIPT</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">SCRIPT</p>
+              <span class="text-[8px] font-bold" [class]="hudState('script').cls">{{ hudState('script').text }} {{ hubPct('script') }}</span>
             </div>
           </div>
           <!-- Blog (Right - 0deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">feed</span>
+              <div [class]="hudCircleCls('blog')">
+                <span class="material-symbols-outlined" [class]="hudState('blog').cls">feed</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">BLOG</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">BLOG</p>
+              <span class="text-[8px] font-bold" [class]="hudState('blog').cls">{{ hudState('blog').text }} {{ hubPct('blog') }}</span>
             </div>
           </div>
           <!-- SEO (135deg - Bottom Right) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">bar_chart</span>
+              <div [class]="hudCircleCls('seo')">
+                <span class="material-symbols-outlined" [class]="hudState('seo').cls">bar_chart</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SEO</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">SEO</p>
+              <span class="text-[8px] font-bold" [class]="hudState('seo').cls">{{ hudState('seo').text }} {{ hubPct('seo') }}</span>
             </div>
           </div>
           <!-- Karma Core (Center) -->
@@ -237,41 +240,41 @@
           <!-- Voice (Bottom - 90deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-secondary shadow-[0_0_15px_rgba(209,188,255,0.3)]">
-                <span class="material-symbols-outlined text-secondary">mic</span>
+              <div [class]="hudCircleCls('voice')">
+                <span class="material-symbols-outlined" [class]="hudState('voice').cls">mic</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VOICE</p>
-              <span class="text-[8px] text-secondary font-bold">Generating</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">VOICE</p>
+              <span class="text-[8px] font-bold" [class]="hudState('voice').cls">{{ hudState('voice').text }} {{ hubPct('voice') }}</span>
             </div>
           </div>
           <!-- Video (225deg - Bottom Left) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-primary-container shadow-[0_0_15_rgba(0,229,255,0.3)]">
-                <span class="material-symbols-outlined text-primary-container">videocam</span>
+              <div [class]="hudCircleCls('video')">
+                <span class="material-symbols-outlined" [class]="hudState('video').cls">videocam</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VIDEO</p>
-              <span class="text-[8px] text-primary-container font-bold">Rendering 45%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">VIDEO</p>
+              <span class="text-[8px] font-bold" [class]="hudState('video').cls">{{ hudState('video').text }} {{ hubPct('video') }}</span>
             </div>
           </div>
           <!-- Thumbnail (Left - 180deg) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-outline-variant/50">
-                <span class="material-symbols-outlined text-on-surface-variant">grid_view</span>
+              <div [class]="hudCircleCls('thumbnail')">
+                <span class="material-symbols-outlined" [class]="hudState('thumbnail').cls">grid_view</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">THUMBNAIL</p>
-              <span class="text-[8px] text-on-surface-variant font-bold">Pending</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">THUMBNAIL</p>
+              <span class="text-[8px] font-bold" [class]="hudState('thumbnail').cls">{{ hudState('thumbnail').text }} {{ hubPct('thumbnail') }}</span>
             </div>
           </div>
           <!-- Image (315deg - Top Left) -->
           <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.3)]">
-                <span class="material-symbols-outlined text-orange-400">image</span>
+              <div [class]="hudCircleCls('image')">
+                <span class="material-symbols-outlined" [class]="hudState('image').cls">image</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">IMAGE</p>
-              <span class="text-[8px] text-orange-400 font-bold">Generating 8/12</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">IMAGE</p>
+              <span class="text-[8px] font-bold" [class]="hudState('image').cls">{{ hudState('image').text }} {{ hubPct('image') }}</span>
             </div>
           </div>
         </div>
@@ -592,8 +595,11 @@
                   <div class="mt-3 pt-3 border-t border-outline-variant/20">
                     <p class="text-[9px] text-on-surface-variant font-mono uppercase tracking-wider mb-1.5">Models ({{ provider.models.length }})</p>
                     <div class="flex flex-wrap gap-1.5">
-                      @for (m of provider.models; track m) {
+                      @for (m of provider.models.slice(0, 10); track m) {
                         <span class="px-2 py-0.5 bg-white/5 border border-outline-variant/20 text-[9px] text-on-surface rounded font-mono">{{ m }}</span>
+                      }
+                      @if (provider.models.length > 10) {
+                        <span class="px-2 py-0.5 bg-white/5 border border-outline-variant/20 text-[9px] text-on-surface-variant rounded font-mono">+{{ provider.models.length - 10 }} more</span>
                       }
                     </div>
                   </div>
@@ -619,8 +625,17 @@
                     <span class="material-symbols-outlined" [ngClass]="{'text-green-400': flow.status === 'COMPLETED', 'text-[#00e5ff]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flow.icon || 'account_tree' }}</span>
                     {{ flow.name }}
                   </h4>
+                  <div class="flex items-center gap-2">
                   <span class="px-2 py-1 text-[9px] rounded font-bold uppercase"
                         [ngClass]="{'bg-green-400/20 text-green-400': flow.status === 'COMPLETED', 'bg-[#00e5ff]/20 text-[#00e5ff] animate-pulse': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'bg-white/10 text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flowBadge(flow).text }}</span>
+                  <button class="px-2 py-1.5 border text-xs font-bold rounded-lg transition-all flex items-center justify-center"
+                          [ngClass]="(flow.isSystem || !canDeleteFlows) ? 'bg-white/5 border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 cursor-pointer'"
+                          [disabled]="flow.isSystem || !canDeleteFlows"
+                          [title]="flow.isSystem ? 'System flow cannot be deleted' : 'Delete flow'"
+                          (click)="deleteFlow(flow)">
+                    <span class="material-symbols-outlined text-sm">{{ flow.isSystem ? 'lock' : 'delete' }}</span>
+                  </button>
+                </div>
                 </div>
                 <p class="text-[11px] text-on-surface-variant leading-relaxed">{{ flow.description || 'No description available.' }}</p>
                 <p class="text-[9px] uppercase font-mono text-on-surface-variant/70 mt-2">{{ flow.category || 'GENERAL' }}</p>
@@ -770,7 +785,7 @@
               <div class="grid grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
                   <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Mission Type</label>
-                  <select [(ngModel)]="newMission.missionType" (ngModelChange)="onMissionTypeChange()"
+                  <select [(ngModel)]="newMission.missionType"
                           class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
                     @for (type of ['VIDEO', 'BLOG', 'SCRIPT', 'VOICE', 'THUMBNAIL', 'WORKFLOW']; track type) {
                       <option [value]="type">{{ type }}</option>
@@ -832,6 +847,14 @@
                 </select>
               </div>
 
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Output Folder <span class="normal-case text-on-surface-variant/60">(optional)</span></label>
+                <input type="text" [(ngModel)]="newMission.outputDirectory"
+                       placeholder="e.g. clientA/video or a full Windows path under the output root"
+                       class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
+                <span class="text-[9px] text-on-surface-variant/70">Blank inherits the workspace default folder.</span>
+              </div>
+
               <div class="flex gap-3 pt-2">
                 <button (click)="createMission(false)" [disabled]="isCreatingMission"
                         class="flex-grow py-2.5 bg-white/5 border border-outline-variant/40 text-[11px] font-bold text-on-surface rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer">
@@ -860,7 +883,15 @@
           <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-1">{{ selectedFlowForDiagram.name }}</h2>
           <span class="text-[10px] text-on-surface-variant font-mono">{{ selectedFlowForDiagram.description || 'System execution workflow' }}</span>
         </div>
-        <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer transition-colors" (click)="closeModal()">&times;</button>
+        <div class="flex items-center gap-2">
+          <a routerLink="/workflows" [queryParams]="{ flow: selectedFlowForDiagram.id }"
+             class="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 text-xs font-bold rounded-lg hover:bg-cyan-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+             title="Open this flow in the Workflow Designer">
+            <span class="material-symbols-outlined text-sm">hub</span>
+            Open in Designer
+          </a>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer transition-colors" (click)="closeModal()">&times;</button>
+        </div>
       </div>
       <div class="p-8 overflow-y-auto no-scrollbar flex-grow bg-[#111111] flex flex-col items-center justify-center min-h-[300px]">
         
@@ -929,8 +960,60 @@
             <span class="text-[12px] font-bold text-white uppercase tracking-wider text-center drop-shadow-md">Output</span>
           </div>
 
-        </div>
+</div>
       </div>
+
+      @if (flowDetailLoading) {
+        <div class="px-8 pb-8 -mt-6 flex items-center justify-center gap-2 text-on-surface-variant text-xs">
+          <span class="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+          Loading run history...
+        </div>
+      } @else if (selectedFlowDetail) {
+        <div class="px-8 pb-8 -mt-4 grid grid-cols-2 gap-4 border-t border-outline-variant/10 pt-4">
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-primary">history</span>
+              <h3 class="text-[11px] font-bold text-on-surface uppercase tracking-widest m-0">Run History</h3>
+              <span class="text-[10px] font-mono text-primary-container ml-auto">{{ selectedFlowDetail.runCount }} run{{ selectedFlowDetail.runCount === 1 ? '' : 's' }}</span>
+            </div>
+            @if (selectedFlowDetail.recentRuns.length === 0) {
+              <p class="text-[11px] text-on-surface-variant m-0">No runs yet.</p>
+            } @else {
+              <div class="flex flex-col gap-1.5 overflow-y-auto no-scrollbar max-h-[180px]">
+                @for (run of selectedFlowDetail.recentRuns; track run.id) {
+                  <div class="flex items-center gap-2 bg-white/5 border border-outline-variant/20 rounded-lg px-2.5 py-1.5">
+                    <span class="w-2 h-2 rounded-full shrink-0" [ngClass]="run.status === 'COMPLETED' ? 'bg-green-400' : run.status === 'FAILED' ? 'bg-red-400' : run.status === 'RUNNING' ? 'bg-cyan-400 animate-pulse' : 'bg-gray-500'"></span>
+                    <span class="text-[11px] font-mono uppercase truncate shrink-0" [class]="flowDetailRunStatusCls(run.status)">{{ run.status }}</span>
+                    <span class="text-[10px] text-on-surface-variant ml-auto truncate">{{ fmtDateTime(run.startedAt) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-primary">inventory_2</span>
+              <h3 class="text-[11px] font-bold text-on-surface uppercase tracking-widest m-0">Artifacts Generated</h3>
+              <span class="text-[10px] font-mono text-on-surface-variant ml-auto">{{ selectedFlowDetail.artifacts.length }}</span>
+            </div>
+            @if (selectedFlowDetail.artifacts.length === 0) {
+              <p class="text-[11px] text-on-surface-variant m-0">No artifacts generated yet.</p>
+            } @else {
+              <div class="flex flex-col gap-1.5 overflow-y-auto no-scrollbar max-h-[180px]">
+                @for (art of selectedFlowDetail.artifacts; track art.id) {
+                  <div class="flex items-center gap-2 bg-white/5 border border-outline-variant/20 rounded-lg px-2.5 py-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-cyan-400 shrink-0">{{ artifactTypeIcon(art.artifactType) }}</span>
+                    <span class="text-[11px] text-on-surface truncate">{{ art.name }}</span>
+                    <span class="text-[10px] font-mono text-on-surface-variant truncate shrink-0">{{ art.artifactType || art.contentType }}</span>
+                  </div>
+                  <span class="sr-only">{{ art.id }}</span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   </div>
 }

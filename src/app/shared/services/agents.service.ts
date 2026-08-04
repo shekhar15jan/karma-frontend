@@ -31,4 +31,12 @@ export class AgentsService {
   delete(id: string): Observable<void> {
     return this.api.delete<void>(`/v1/agents/${id}`).pipe(map(r => r.data));
   }
+
+  activate(id: string): Observable<void> {
+    return this.api.post<void>(`/v1/agents/${id}/activate`, {}).pipe(map(r => r.data));
+  }
+
+  deactivate(id: string): Observable<void> {
+    return this.api.post<void>(`/v1/agents/${id}/deactivate`, {}).pipe(map(r => r.data));
+  }
 }

@@ -109,6 +109,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'skills',
+        loadComponent: () =>
+          import('./features/skill-library/skill-library.component').then(
+            (m) => m.SkillLibraryComponent,
+          ),
+      },
+      {
         path: 'providers',
         loadComponent: () =>
           import('./features/provider-center/provider-center.component').then(

@@ -12,13 +12,14 @@ import { ProjectsService } from '../../shared/services/projects.service';
 import { MissionResponse } from '../../shared/models/mission.model';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { ProjectResponse } from '../../shared/models/project.model';
-import { FlowResponse } from '../../shared/models/flow.model';
+import { FlowResponse, FlowDetail } from '../../shared/models/flow.model';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
 import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
 import { AgentsService } from '../../shared/services/agents.service';
 import { ProvidersService } from '../../shared/services/providers.service';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { KarmaActionService } from '../../shared/services/karma-action.service';
+import { WorkflowsService } from '../../shared/services/workflows.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../shared/services/api.service';
 
@@ -33,6 +34,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   activeMission: (MissionResponse & { formattedDate?: string }) | null = null;
   flowsList: (FlowResponse & { icon?: string; status?: string })[] = [];
   selectedFlowForDiagram: (FlowResponse & { icon?: string; status?: string }) | null = null;
+  selectedFlowDetail: FlowDetail | null = null;
+  flowDetailLoading = false;
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
   missionProgress = 0;
 
@@ -56,6 +59,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private flowStatusInterval: any;
   private flowStepMap = new Map<string, string>();
+  hubStatus: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
 
   loading = false;
   error: string | null = null;
@@ -130,37 +134,16 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     description: '' as string,
     missionType: 'VIDEO' as string,
     priority: 'MEDIUM' as string,
-    providerId: '' as string
+    providerId: '' as string,
+    outputDirectory: '' as string
   };
   selectedFlowIds: string[] = [];
-  flowsPresetDirty = false;
-  private missionTypePresets: Record<string, string[]> = {
-    VIDEO: ['Research', 'Script', 'Video', 'Publishing'],
-    BLOG: ['Research', 'Blog', 'Publishing'],
-    SCRIPT: ['Research', 'Script'],
-    VOICE: ['Voice'],
-    THUMBNAIL: ['Thumbnail'],
-    WORKFLOW: ['Research', 'Script', 'Video', 'Publishing'],
-  };
-
-  private flowByName(name: string): (FlowResponse & { icon?: string; status?: string }) | undefined {
-    return this.flowsList.find(f => (f.name || '').toLowerCase().includes(name.toLowerCase()));
-  }
-
-  applyFlowPreset(): void {
-    if (this.flowsPresetDirty) return;
-    const preset = this.missionTypePresets[this.newMission.missionType] || [];
-    this.selectedFlowIds = preset
-      .map(name => this.flowByName(name)?.id)
-      .filter((id): id is string => !!id);
-  }
 
   isFlowSelected(flowId: string): boolean {
     return this.selectedFlowIds.includes(flowId);
   }
 
   toggleFlow(flowId: string): void {
-    this.flowsPresetDirty = true;
     const idx = this.selectedFlowIds.indexOf(flowId);
     if (idx >= 0) {
       this.selectedFlowIds.splice(idx, 1);
@@ -170,7 +153,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleAllFlows(): void {
-    this.flowsPresetDirty = true;
     this.selectedFlowIds = this.allFlowsSelected()
       ? []
       : this.flowsList.filter(f => f.enabled !== false).map(f => f.id);
@@ -181,15 +163,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return enabled.length > 0 && this.selectedFlowIds.length === enabled.length;
   }
 
-  onMissionTypeChange(): void {
-    this.flowsPresetDirty = false;
-    this.applyFlowPreset();
-  }
-
   onWorkspaceChange(): void {
     this.projects = [];
     this.newMission.projectId = '';
     if (this.newMission.workspaceId) {
+      const ws = this.workspaces.find(w => w.id === this.newMission.workspaceId);
+      if (ws?.defaultOutputDirectory && !this.newMission.outputDirectory) {
+        this.newMission.outputDirectory = ws.defaultOutputDirectory;
+      }
       this.loadProjects(this.newMission.workspaceId);
     }
   }
@@ -253,7 +234,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       missionType: this.newMission.missionType,
       priority: this.newMission.priority,
       providerId: this.newMission.providerId || undefined,
-      selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined
+      selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined,
+      outputDirectory: this.newMission.outputDirectory?.trim() || undefined
     };
     this.missionsService.create(payload).subscribe({
       next: (created) => {
@@ -262,8 +244,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.activeModal = null;
         this.newMission.name = '';
         this.newMission.description = '';
-        this.flowsPresetDirty = false;
-        this.applyFlowPreset();
         this.loadMissions(this.newMission.projectId);
         if (runAfterCreate) {
           this.executionsService.trigger(created.id, this.runMode).subscribe({
@@ -284,19 +264,28 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   hudState(key: string): { text: string; cls: string; border: string; pulse: boolean } {
-    const flow = this.flowsList.find(f =>
-      key === 'seo'
-        ? f.category === 'PLANNING'
-        : (f.name || '').toLowerCase().includes(key) || f.category.toLowerCase().includes(key)
-    );
-    if (!flow) return { text: 'Idle', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
-    switch (flow.status) {
-      case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
-      case 'IN_PROGRESS':
-      case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
-      case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
-      default: return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
-    }
+    const s = this.hubStatus[key];
+    if (s) return { text: s.text, cls: s.cls, border: s.border, pulse: s.pulse };
+    return { text: 'Idle', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+  }
+
+  hudCircleCls(key: string): string {
+    const base = 'w-14 h-14 rounded-full glass-panel flex items-center justify-center';
+    const s = this.hubStatus[key];
+    if (!s) return `${base} border-outline-variant/50 opacity-60`;
+    const glow = s.pulse
+      ? ' animate-pulse shadow-[0_0_18px_rgba(0,229,255,0.45)]'
+      : s.text === 'Completed'
+        ? ' shadow-[0_0_18px_rgba(74,222,128,0.35)]'
+        : s.text === 'Failed'
+          ? ' shadow-[0_0_18px_rgba(239,68,68,0.35)]'
+          : '';
+    return `${base} ${s.border}${glow}`;
+  }
+
+  hubPct(key: string): string {
+    const s = this.hubStatus[key];
+    return s ? s.pct + '%' : '0%';
   }
 
   flowBadge(flow: any): { text: string; cls: string; border: string; pulse: boolean } {
@@ -323,20 +312,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     let svg: string;
     if (t.includes('google') || t.includes('gemini'))
       svg = '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>';
-    else if (t.includes('openai'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#10a37f"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">O</text></svg>';
-    else if (t.includes('anthropic') || t.includes('claude'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#d97706"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">C</text></svg>';
     else if (t.includes('groq'))
       svg = '<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#f97316"/></svg>';
     else if (t.includes('opencode') || t.includes('zen'))
       svg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#00e5ff" opacity="0.2"/><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="13" font-weight="bold" font-family="sans-serif">Z</text></svg>';
     else if (t.includes('edge') || t.includes('tts'))
       svg = '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="#0078d4"/><path d="M12 7v10M8 10l4-3 4 3" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>';
-    else if (t.includes('elevenlabs'))
-      svg = '<svg viewBox="0 0 24 24"><path d="M3 12h2v4H3zm4-6h2v16H7zm4-4h2v24h-2zm4 6h2v12h-2zm4-2h2v10h-2z" fill="#8b5cf6"/></svg>';
-    else if (t.includes('stability'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#a855f7"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">S</text></svg>';
     else if (t.includes('ffmpeg'))
       svg = '<svg viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="11" font-weight="bold" font-family="sans-serif">Ff</text></svg>';
     else if (t.includes('openrouter'))
@@ -423,13 +404,29 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   openFlowDiagram(flow: (FlowResponse & { icon?: string; status?: string })) {
     this.selectedFlowForDiagram = flow;
+    this.selectedFlowDetail = null;
+    this.flowDetailLoading = true;
     this.activeModal = 'flow-diagram';
     this.cdr.detectChanges();
+    this.workflowsService.getFlowDetails(flow.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (detail) => {
+          this.selectedFlowDetail = detail;
+          this.flowDetailLoading = false;
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.flowDetailLoading = false;
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   closeModal() {
     this.activeModal = null;
     this.selectedFlowForDiagram = null;
+    this.selectedFlowDetail = null;
     this.cdr.detectChanges();
   }
 
@@ -476,6 +473,31 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     
     return matchedAgents;
+  }
+
+  flowDetailRunStatusCls(status: string): string {
+    switch (status) {
+      case 'COMPLETED': return 'text-green-400 border-green-500/40 bg-green-500/10';
+      case 'FAILED': return 'text-red-400 border-red-500/40 bg-red-500/10';
+      case 'RUNNING': return 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10';
+      default: return 'text-on-surface-variant border-outline-variant/30 bg-white/5';
+    }
+  }
+
+  artifactTypeIcon(type: string): string {
+    const t = (type || '').toLowerCase();
+    if (t.includes('video')) return 'movie';
+    if (t.includes('image') || t.includes('thumb')) return 'image';
+    if (t.includes('audio') || t.includes('voice')) return 'music_note';
+    if (t.includes('pdf')) return 'picture_as_pdf';
+    return 'description';
+  }
+
+  fmtDateTime(ts: string | undefined | null): string {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
   }
 
   private wakeUpListener = (e: any) => {
@@ -534,6 +556,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly agentsService: AgentsService,
     private readonly providersService: ProvidersService,
     private readonly artifactsService: ArtifactsService,
+    private readonly workflowsService: WorkflowsService,
     private readonly karmaActions: KarmaActionService,
     private readonly auth: AuthService,
     private readonly api: ApiService,
@@ -841,7 +864,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
             status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
           }));
           this.applyFlowStatusesToFlows();
-          this.applyFlowPreset();
         },
         error: (err) => {
           console.error('Failed to fetch flows', err);
@@ -1003,6 +1025,58 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       else this.flowStepMap.set(flowId, 'PENDING');
     });
     this.applyFlowStatusesToFlows();
+    this.buildHubStatus(steps);
+  }
+
+  private buildHubStatus(steps: ExecutionStepResponse[]): void {
+    const counts = new Map<string, { total: number; completed: number; running: number; failed: number }>();
+    for (const step of steps) {
+      const key = this.hubKeyForStep(step);
+      if (!key) continue;
+      const c = counts.get(key) || { total: 0, completed: 0, running: 0, failed: 0 };
+      c.total++;
+      if (step.status === 'COMPLETED') c.completed++;
+      else if (step.status === 'RUNNING') c.running++;
+      else if (step.status === 'FAILED') c.failed++;
+      counts.set(key, c);
+    }
+    const next: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
+    counts.forEach((c, key) => {
+      const pct = c.total > 0 ? Math.round((c.completed / c.total) * 100) : 0;
+      if (c.running > 0) {
+        next[key] = { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true, pct };
+      } else if (c.failed > 0) {
+        next[key] = { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false, pct };
+      } else if (c.completed === c.total) {
+        next[key] = { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false, pct };
+      } else {
+        next[key] = { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false, pct };
+      }
+    });
+    this.hubStatus = next;
+  }
+
+  private hubKeyForStep(step: ExecutionStepResponse): string | null {
+    const agent = this.agentStatusList.find(a => a.id === step.agentId);
+    if (agent) {
+      const name = (agent.name || '').toLowerCase();
+      if (name.includes('research')) return 'research';
+      if (name.includes('script')) return 'script';
+      if (name.includes('blog')) return 'blog';
+      if (name.includes('seo')) return 'seo';
+      if (name.includes('voice') || name.includes('audio')) return 'voice';
+      if (name.includes('thumbnail')) return 'thumbnail';
+      if (name.includes('image')) return 'image';
+      if (name.includes('video')) return 'video';
+    }
+    switch (step.stepType) {
+      case 'TTS': return 'voice';
+      case 'VIDEO_GENERATION': return 'video';
+      case 'IMAGE_GENERATION': return 'image';
+      case 'MUSIC_GENERATION': return null;
+      case 'PUBLISH': return null;
+      default: return null;
+    }
   }
 
   private updateOperationalMetrics(steps: ExecutionStepResponse[], executions: ExecutionResponse[], executionId: string): void {
@@ -1093,5 +1167,51 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       `[SYS] ${stamp} - Mounting Agent Runtime Engine`,
       `[SYS] ${stamp} - Awaiting active mission dispatch...`
     ];
+  }
+
+  get canDeleteFlows(): boolean {
+    return (this.auth.user()?.role || 'OPERATOR').toUpperCase() === 'ADMIN';
+  }
+
+  deleteFlow(flow: any): void {
+    if (flow?.isSystem) {
+      this.showToast('System flow cannot be deleted', 'lock');
+      return;
+    }
+    if (!this.canDeleteFlows) {
+      this.showToast('Your role does not allow deleting flows', 'lock');
+      return;
+    }
+    if (!window.confirm(`Delete flow "${flow?.name}"?`)) return;
+    this.dashboardService.deleteFlow(flow.id).subscribe({
+      next: () => {
+        this.flowsList = this.flowsList.filter(f => f.id !== flow.id);
+        this.showToast('Flow deleted', 'check_circle');
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || err?.message || 'Failed to delete flow';
+        this.showToast(String(msg), 'error');
+        this.loadFlows();
+      }
+    });
+  }
+
+  private loadFlows(): void {
+    this.dashboardService.getFlows().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (flows) => {
+        this.flowsList = flows.map(f => ({
+          ...f,
+          icon: f.category === 'RESEARCH' ? 'manage_search'
+              : f.category === 'CONTENT' ? 'edit_note'
+              : f.category === 'MEDIA' ? 'movie'
+              : f.category === 'REVIEW' ? 'rate_review'
+              : f.category === 'PUBLISHING' ? 'publish'
+              : 'account_tree',
+          status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
+        }));
+        this.applyFlowStatusesToFlows();
+      },
+      error: () => {}
+    });
   }
 }

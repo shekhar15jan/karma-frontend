@@ -27,7 +27,15 @@ export class ProvidersService {
     return this.api.delete<void>(`/v1/providers/${id}`).pipe(map(r => r.data));
   }
 
-  testConnection(id: string): Observable<{ success: boolean; message: string }> {
-    return this.api.post<{ success: boolean; message: string }>(`/v1/providers/${id}/test`, {}).pipe(map(r => r.data));
+  activate(id: string): Observable<void> {
+    return this.api.post<void>(`/v1/providers/${id}/activate`, {}).pipe(map(r => r.data));
+  }
+
+  deactivate(id: string): Observable<void> {
+    return this.api.post<void>(`/v1/providers/${id}/deactivate`, {}).pipe(map(r => r.data));
+  }
+
+  testConnection(id: string, body?: { apiKey?: string; apiEndpoint?: string }): Observable<{ success: boolean; message: string; status?: string; modelCount?: number }> {
+    return this.api.post<{ success: boolean; message: string; status?: string; modelCount?: number }>(`/v1/providers/${id}/test`, body || {}).pipe(map(r => r.data));
   }
 }

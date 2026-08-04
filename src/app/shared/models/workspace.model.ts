@@ -4,6 +4,7 @@ export interface WorkspaceResponse {
   description: string;
   ownerId: string;
   status: string;
+  defaultOutputDirectory?: string;
   projectCount: number;
   missionCount: number;
   artifactCount: number;
