@@ -106,20 +106,21 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Type</label>
-            <select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
-              <option value="google">Google Gemini / Imagen</option>
-              <option value="google-music">Google Music (Lyria 3)</option>
-              <option value="openrouter">OpenRouter (Free Models)</option>
-              <option value="opencode">OpenCode Zen</option>
-              <option value="groq">Groq Cloud (Fast LLMs)</option>
-              <option value="edge-tts">Edge TTS (Voice)</option>
-              <option value="ffmpeg">FFmpeg Local (Video)</option>
-            </select>
+<select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
+               <option value="google">Google Gemini / Imagen</option>
+               <option value="google-music">Google Music (Lyria 3)</option>
+               <option value="openrouter">OpenRouter (Free Models)</option>
+               <option value="opencode">OpenCode Zen</option>
+               <option value="groq">Groq Cloud (Fast LLMs)</option>
+               <option value="edge-tts">Edge TTS (Voice)</option>
+               <option value="ffmpeg">FFmpeg Local (Video)</option>
+               <option value="cloudflare">Cloudflare Workers AI (Images)</option>
+             </select>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / FFmpeg)</span></label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
-            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenCode/Groq: paste your key from their dashboard · Google: AI Studio key · Edge TTS: leave blank</span>
+            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenCode/Groq: paste your key from their dashboard · Google: AI Studio key · Edge TTS: leave blank · Cloudflare: API Token from Cloudflare dashboard</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>

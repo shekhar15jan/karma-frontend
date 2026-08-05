@@ -9,6 +9,7 @@ export interface MissionResponse {
   providerId: string;
   progress: number;
   outputDirectory?: string;
+  targetDurationSeconds?: number;
   startedAt: string;
   completedAt: string;
   createdAt: string;

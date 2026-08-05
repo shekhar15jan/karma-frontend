@@ -67,6 +67,49 @@ export class AdministrationComponent implements OnInit {
   voiceSaving = false;
   voiceSaved = false;
 
+  settingMeta: Record<string, { description: string; category: string }> = {
+    'llm.max_tokens.default': {
+      description: 'Default max output tokens for regular LLM agent calls.',
+      category: 'LLM',
+    },
+    'llm.max_tokens.reasoning': {
+      description: 'Max output tokens for planning/content/review agents.',
+      category: 'LLM',
+    },
+    'llm.max_tokens.script': {
+      description: 'Max output tokens for the story/script writer. Raise this to allow longer scripts (a 15-min video needs a full-length script).',
+      category: 'LLM',
+    },
+    'llm.google_search_grounding': {
+      description: 'Enables Google Search grounding for the LLM.',
+      category: 'LLM',
+    },
+    'music.max_duration_seconds': {
+      description: 'Length of the generated background music clip in seconds.',
+      category: 'Media',
+    },
+    'video.target_duration_seconds': {
+      description: 'Default target length of generated videos in seconds. 900 = 15 minutes. Per-mission override available in the Create Mission form.',
+      category: 'Video',
+    },
+    'video.min_scenes': {
+      description: 'Minimum number of scenes the script writer must produce.',
+      category: 'Video',
+    },
+    'video.max_scenes': {
+      description: 'Maximum number of scenes the script writer may produce.',
+      category: 'Video',
+    },
+    'video.words_per_scene': {
+      description: 'Spoken narration words per scene (~2.3 words/sec). Drives real video length.',
+      category: 'Video',
+    },
+    'video.ffmpeg_timeout_seconds': {
+      description: 'Max seconds a single FFmpeg encode may run before aborting. Raise for long (10-15 min) videos.',
+      category: 'Video',
+    },
+  };
+
   constructor(private readonly adminService: AdminService,
               private readonly voicePrefs: VoicePreferencesService) {}
 
@@ -149,12 +192,15 @@ export class AdministrationComponent implements OnInit {
             } else if (settingsData && typeof settingsData === 'object') {
               raw = settingsData;
             }
-            this.settings = Object.entries(raw).map(([key, value]) => ({
-              key,
-              value: String(value),
-              description: '',
-              category: 'General'
-            }));
+            this.settings = Object.entries(raw).map(([key, value]) => {
+              const meta = this.settingMeta[key] || { description: '', category: 'General' };
+              return {
+                key,
+                value: String(value),
+                description: meta.description,
+                category: meta.category
+              };
+            });
             this.loading = false;
           },
           error: (err) => {

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -19,12 +19,16 @@ export interface WorkflowNode {
   model?: string;
   x: number;
   y: number;
+  inputs?: string[];
+  outputs?: string[];
 }
 
 export interface WorkflowEdge {
   id: string;
   source: string;
   target: string;
+  sourcePort?: string;
+  targetPort?: string;
   handoff?: boolean;
 }
 
@@ -55,6 +59,7 @@ export class WorkflowDesignerComponent implements OnInit {
   // Drag and Connect State
   isConnecting = false;
   sourceNodeId: string | null = null;
+  sourcePort: string | null = null;
   mouseX = 0;
   mouseY = 0;
   activeDraggingNode: WorkflowNode | null = null;
@@ -146,6 +151,8 @@ export class WorkflowDesignerComponent implements OnInit {
       id: e.id,
       source: e.source ?? e.from,
       target: e.target ?? e.to,
+      sourcePort: e.sourcePort || 'right',
+      targetPort: e.targetPort || 'left',
       handoff: e.handoff === undefined ? true : !!e.handoff,
     };
   }
@@ -169,13 +176,18 @@ export class WorkflowDesignerComponent implements OnInit {
 
   addNode(agent: AgentResponse): void {
     const id = `node-${this.nodes.length + 1}-${Date.now()}`;
+    const isVideo = agent.name.toLowerCase().includes('video');
+    const stepKind = isVideo ? 'VIDEO' : 'AGENT';
+    
     const node: WorkflowNode = {
       id,
       label: agent.name,
       agentId: agent.id,
       agentName: agent.name,
       status: 'pending',
-      stepKind: 'AGENT',
+      stepKind,
+      inputs: isVideo ? ['audio', 'image', 'script'] : ['in'],
+      outputs: ['out'],
       config: {
         tempLimit: '75',
         concurrency: '3'
@@ -208,6 +220,18 @@ export class WorkflowDesignerComponent implements OnInit {
     }
   }
 
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      const activeTag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      const isInput = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+      
+      if (!isInput && this.selectedNode) {
+        this.removeNode(this.selectedNode);
+      }
+    }
+  }
+
   updateNodeModel(model: string): void {
     if (!this.selectedNode) return;
     this.selectedNode = {
@@ -227,6 +251,37 @@ export class WorkflowDesignerComponent implements OnInit {
       config: { ...this.selectedNode.config, [key]: value },
       status: 'configured',
     };
+    this.updateSelectedNode();
+  }
+
+  addNodeConfig(): void {
+    if (!this.selectedNode) return;
+    const newKey = window.prompt('Enter new configuration key (e.g., condition):');
+    if (newKey && newKey.trim() && !this.selectedNode.config[newKey.trim()]) {
+      this.selectedNode = {
+        ...this.selectedNode,
+        config: { ...this.selectedNode.config, [newKey.trim()]: '' },
+        status: 'configured',
+      };
+      this.updateSelectedNode();
+    }
+  }
+
+  removeNodeConfig(key: string): void {
+    if (!this.selectedNode) return;
+    const newConfig = { ...this.selectedNode.config };
+    delete newConfig[key];
+    this.selectedNode = {
+      ...this.selectedNode,
+      config: newConfig,
+      status: 'configured',
+    };
+    this.updateSelectedNode();
+  }
+
+
+
+  private updateSelectedNode(): void {
     this.nodes = this.nodes.map(n =>
       n.id === this.selectedNode!.id ? this.selectedNode! : n
     );
@@ -343,26 +398,43 @@ export class WorkflowDesignerComponent implements OnInit {
     return this.agents.filter(a => a.status === 'ACTIVE');
   }
 
-  getNodeX(nodeId: string): number {
+  getOutputX(nodeId: string, port?: string): number {
     const node = this.nodes.find(n => n.id === nodeId);
-    return node ? node.x + 72 : 0; // centered horizontally (width is 144px, half is 72px)
+    if (!node) return 0;
+    if (port === 'bottom') return node.x + 88;
+    return node.x + 176;
   }
 
-  getNodeY(nodeId: string): number {
-    const n = this.nodes.find(x => x.id === nodeId);
-    // Return center Y of the node (approx 40px down)
-    return n ? n.y + 40 : 0;
+  getOutputY(nodeId: string, port?: string): number {
+    const node = this.nodes.find(x => x.id === nodeId);
+    if (!node) return 0;
+    if (port === 'bottom') return node.y + 84;
+    return node.y + 42;
   }
 
-  getEdgeMidX(sourceId: string, targetId: string): number {
-    const x1 = this.getNodeX(sourceId);
-    const x2 = this.getNodeX(targetId);
+  getInputX(nodeId: string, port?: string): number {
+    const node = this.nodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.x + 88;
+    return node.x;
+  }
+
+  getInputY(nodeId: string, port?: string): number {
+    const node = this.nodes.find(x => x.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.y;
+    return node.y + 42;
+  }
+
+  getEdgeMidX(edge: WorkflowEdge): number {
+    const x1 = this.getOutputX(edge.source, edge.sourcePort);
+    const x2 = this.getInputX(edge.target, edge.targetPort);
     return (x1 + x2) / 2;
   }
 
-  getEdgeMidY(sourceId: string, targetId: string): number {
-    const y1 = this.getNodeY(sourceId);
-    const y2 = this.getNodeY(targetId);
+  getEdgeMidY(edge: WorkflowEdge): number {
+    const y1 = this.getOutputY(edge.source, edge.sourcePort);
+    const y2 = this.getInputY(edge.target, edge.targetPort);
     return (y1 + y2) / 2;
   }
 
@@ -392,8 +464,8 @@ export class WorkflowDesignerComponent implements OnInit {
       let newY = event.clientY - this.dragStartY;
 
       // Bound constraints
-      newX = Math.max(10, Math.min(rect.width - 150, newX));
-      newY = Math.max(10, Math.min(rect.height - 110, newY));
+      newX = Math.max(10, Math.min(rect.width - 180, newX));
+      newY = Math.max(10, Math.min(rect.height - 90, newY));
 
       this.activeDraggingNode.x = newX;
       this.activeDraggingNode.y = newY;
@@ -401,37 +473,48 @@ export class WorkflowDesignerComponent implements OnInit {
     }
   }
 
-  onCanvasMouseUp(): void {
+  @HostListener('window:mouseup')
+  onWindowMouseUp(): void {
     this.activeDraggingNode = null;
+    if (this.isConnecting) {
+      this.cancelConnection();
+    }
   }
 
   // Node Connect Handlers
-  startConnection(node: WorkflowNode, event: MouseEvent): void {
+  startConnection(node: WorkflowNode, port: string, event: MouseEvent): void {
     event.stopPropagation();
     this.isConnecting = true;
     this.sourceNodeId = node.id;
-    this.mouseX = node.x + 72;
-    this.mouseY = node.y + 40;
+    this.sourcePort = port;
+    this.mouseX = this.getOutputX(node.id, port);
+    this.mouseY = this.getOutputY(node.id, port);
   }
 
-  onNodeClick(node: WorkflowNode, event: MouseEvent): void {
-    event.stopPropagation();
-    if (this.isConnecting && this.sourceNodeId) {
+  finishConnection(node: WorkflowNode, port: string, event: MouseEvent): void {
+    if (this.isConnecting && this.sourceNodeId && this.sourcePort) {
+      event.stopPropagation();
       if (this.sourceNodeId !== node.id) {
         if (this.wouldCreateCycle(this.sourceNodeId, node.id)) {
           this.error = 'Cannot connect: this would create a circular flow.';
         } else {
           this.error = null;
-          const exists = this.edges.some(e => e.source === this.sourceNodeId && e.target === node.id);
+          const exists = this.edges.some(e => e.source === this.sourceNodeId && e.target === node.id && e.sourcePort === this.sourcePort && e.targetPort === port);
           if (!exists) {
             const edgeId = `edge-${Date.now()}`;
-            this.edges = [...this.edges, { id: edgeId, source: this.sourceNodeId, target: node.id, handoff: true }];
+            this.edges = [...this.edges, { id: edgeId, source: this.sourceNodeId, target: node.id, sourcePort: this.sourcePort, targetPort: port, handoff: true }];
           }
         }
       }
       this.isConnecting = false;
       this.sourceNodeId = null;
-    } else {
+      this.sourcePort = null;
+    }
+  }
+
+  onNodeClick(node: WorkflowNode, event: MouseEvent): void {
+    event.stopPropagation();
+    if (!this.isConnecting) {
       this.selectNode(node);
     }
   }
@@ -439,6 +522,7 @@ export class WorkflowDesignerComponent implements OnInit {
   cancelConnection(): void {
     this.isConnecting = false;
     this.sourceNodeId = null;
+    this.sourcePort = null;
   }
 
   getNodeLabel(nodeId: string): string {
@@ -450,30 +534,53 @@ export class WorkflowDesignerComponent implements OnInit {
     this.edges = this.edges.filter(e => e.id !== edgeId);
   }
 
-  // Generate strict L-shaped stepped paths between nodes (orthogonal routing)
-  getNodePath(sourceId: string, targetId: string): string {
-    const x1 = this.getNodeX(sourceId);
-    const y1 = this.getNodeY(sourceId);
-    const x2 = this.getNodeX(targetId);
-    const y2 = this.getNodeY(targetId);
+  // Generate smooth bezier curve between nodes
+  getNodePath(edge: WorkflowEdge): string {
+    const x1 = this.getOutputX(edge.source, edge.sourcePort);
+    const y1 = this.getOutputY(edge.source, edge.sourcePort);
+    const x2 = this.getInputX(edge.target, edge.targetPort);
+    const y2 = this.getInputY(edge.target, edge.targetPort);
 
-    const x_mid = (x1 + x2) / 2;
+    let cp1x = x1 + Math.max(Math.abs(x2 - x1) * 0.5, 40);
+    let cp1y = y1;
+    let cp2x = x2 - Math.max(Math.abs(x2 - x1) * 0.5, 40);
+    let cp2y = y2;
+    let endX = x2;
+    let endY = y2;
+
+    if (edge.sourcePort === 'bottom') {
+      cp1x = x1;
+      cp1y = y1 + Math.max(Math.abs(y2 - y1) * 0.5, 40);
+    }
     
-    // Offset final X coordinate so arrowhead stops exactly at the target card edge (72px half-width)
-    const directionOffset = x2 > x1 ? -74 : 74;
-    const finalX = x2 + directionOffset;
+    if (edge.targetPort === 'top') {
+      cp2x = x2;
+      cp2y = y2 - Math.max(Math.abs(y2 - y1) * 0.5, 40);
+      endY = y2 - 4; // slight offset for the arrowhead
+    } else {
+      endX = x2 - 4;
+    }
 
-    return `M ${x1} ${y1} H ${x_mid} V ${y2} H ${finalX}`;
+    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
   }
 
   getTempPath(): string {
-    if (!this.sourceNodeId) return '';
-    const x1 = this.getNodeX(this.sourceNodeId);
-    const y1 = this.getNodeY(this.sourceNodeId);
+    if (!this.sourceNodeId || !this.sourcePort) return '';
+    const x1 = this.getOutputX(this.sourceNodeId, this.sourcePort);
+    const y1 = this.getOutputY(this.sourceNodeId, this.sourcePort);
     const x2 = this.mouseX;
     const y2 = this.mouseY;
 
-    const x_mid = (x1 + x2) / 2;
-    return `M ${x1} ${y1} H ${x_mid} V ${y2} H ${x2}`;
+    let cp1x = x1 + Math.max(Math.abs(x2 - x1) * 0.5, 40);
+    let cp1y = y1;
+    let cp2x = x2 - Math.max(Math.abs(x2 - x1) * 0.5, 40);
+    let cp2y = y2;
+
+    if (this.sourcePort === 'bottom') {
+      cp1x = x1;
+      cp1y = y1 + Math.max(Math.abs(y2 - y1) * 0.5, 40);
+    }
+
+    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
   }
 }

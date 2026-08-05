@@ -12,6 +12,13 @@
           <div class="space-y-1 min-w-0">
             <p class="text-[13px] font-bold text-on-surface mb-0 truncate" [title]="activeMission.name">{{ activeMission.name }}</p>
             <p class="text-[10px] text-on-surface-variant font-label-mono uppercase mb-0">{{ activeMission.missionType || 'Standard Mission' }}</p>
+            @if (activeMissionMode) {
+              <span class="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
+                    [ngClass]="activeMissionMode === 'REVIEW' ? 'text-[#00e5ff] border-[#00e5ff]/40 bg-[#00e5ff]/10' : 'text-green-400 border-green-500/40 bg-green-500/10'">
+                <span class="material-symbols-outlined text-[11px]">rate_review</span>
+                {{ activeMissionMode }}
+              </span>
+            }
             <p class="text-[9px] text-on-surface-variant mb-0">Created: {{ activeMission.formattedDate || 'Just now' }}</p>
           </div>
         </div>
@@ -721,9 +728,19 @@
 
         @if (activeModal === 'create-mission') {
           <div class="space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-3">
               <p class="text-[11px] text-on-surface-variant mb-0">Create a new mission to kick off an automated workflow.</p>
-              <span class="text-[9px] font-mono uppercase text-on-surface-variant/60">Mode: {{ runMode }}</span>
+              <div class="flex items-center gap-1 bg-white/5 border border-outline-variant/30 rounded-lg p-0.5 shrink-0">
+                <span class="text-[9px] font-mono uppercase text-on-surface-variant/60 px-1.5">Mode</span>
+                <button (click)="setRunMode('REVIEW')" [class]="runMode === 'REVIEW' ? 'bg-primary/20 text-[#00e5ff] border border-primary/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]' : 'text-on-surface-variant border border-transparent hover:text-on-surface'"
+                        class="px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer">
+                  REVIEW
+                </button>
+                <button (click)="setRunMode('AUTO')" [class]="runMode === 'AUTO' ? 'bg-primary/20 text-[#00e5ff] border border-primary/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]' : 'text-on-surface-variant border border-transparent hover:text-on-surface'"
+                        class="px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer">
+                  AUTO
+                </button>
+              </div>
             </div>
 
             @if (workspaces.length === 0) {
@@ -855,6 +872,14 @@
                 <span class="text-[9px] text-on-surface-variant/70">Blank inherits the workspace default folder.</span>
               </div>
 
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Target Duration <span class="normal-case text-on-surface-variant/60">(seconds, optional)</span></label>
+                <input type="number" min="30" step="30" [(ngModel)]="newMission.targetDurationSeconds"
+                       placeholder="e.g. 900 = 15 min video"
+                       class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
+                <span class="text-[9px] text-on-surface-variant/70">Blank uses the global default (900s / 15 min). The story &amp; narration are written to hit this length.</span>
+              </div>
+
               <div class="flex gap-3 pt-2">
                 <button (click)="createMission(false)" [disabled]="isCreatingMission"
                         class="flex-grow py-2.5 bg-white/5 border border-outline-variant/40 text-[11px] font-bold text-on-surface rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer">
@@ -930,6 +955,14 @@
                       {{ selectedFlowForDiagram.status === 'IN_PROGRESS' || selectedFlowForDiagram.status === 'ACTIVE' ? 'Executing Tasks...' : (selectedFlowForDiagram.status === 'COMPLETED' ? 'Standby' : 'Waiting') }}
                     </span>
                   </div>
+                  @if (pendingReviewForAgent(agent.id); as review) {
+                    <button (click)="openReviewModal(review)"
+                            class="mt-2 px-2.5 py-1 bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[10px] font-bold rounded-lg hover:bg-orange-500/30 transition-all flex items-center gap-1.5 cursor-pointer animate-pulse">
+                      <span class="material-symbols-outlined text-[13px]">rate_review</span>
+                      Review Output
+                      <span class="px-1.5 py-0.5 bg-orange-500/30 rounded text-[8px] font-mono">{{ review.stepOrder + 1 }} · {{ review.retryCount }}×</span>
+                    </button>
+                  }
                 </div>
               </div>
             }
@@ -1014,6 +1047,132 @@
           </div>
         </div>
       }
+    </div>
+  </div>
+}
+
+@if (activeModal === 'review' && selectedReviewStep) {
+  <div class="fixed inset-0 bg-background/90 backdrop-blur-sm z-[120] flex flex-col" (click)="closeModal()">
+    <div class="flex flex-col flex-grow overflow-hidden" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="px-5 py-3 border-b border-outline-variant/30 flex items-center justify-between bg-white/5 shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="material-symbols-outlined text-[#00e5ff] text-xl">rate_review</span>
+          <div class="min-w-0">
+            <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-tight truncate">Review: {{ selectedReviewStep.agentName || 'Agent' }}</h2>
+            <span class="text-[9px] font-mono text-on-surface-variant uppercase">
+              {{ selectedReviewStep.flowName || 'Flow' }} · {{ stepTypeLabel(selectedReviewStep.stepType) }} · step {{ selectedReviewStep.stepOrder + 1 }}
+              @if (selectedReviewStep.missionName) { · {{ selectedReviewStep.missionName }} }
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          @if (selectedReviewStep.retryCount > 0) {
+            <span class="text-[9px] font-mono text-amber-400 uppercase">Rewritten {{ selectedReviewStep.retryCount }}× of {{ selectedReviewStep.maxRetries || 3 }}</span>
+          }
+          <button class="w-9 h-9 rounded-full bg-white/5 border border-outline-variant/30 text-on-surface-variant hover:text-red-400 hover:border-red-500/40 text-xl font-light cursor-pointer transition-colors flex items-center justify-center" (click)="closeModal()">&times;</button>
+        </div>
+      </div>
+
+      <!-- Split body -->
+      <div class="flex flex-grow min-h-0 overflow-hidden">
+        <!-- Left: flow design -->
+        <div class="w-[320px] shrink-0 border-r border-outline-variant/30 flex flex-col bg-[#0d0f12] overflow-y-auto no-scrollbar p-4">
+          <span class="text-[9px] font-mono text-on-surface-variant uppercase mb-2">Flow Design</span>
+          <div class="flex flex-col gap-2">
+            @for (agent of selectedFlowAgents; track agent.name) {
+              <div class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border"
+                   [class]="pendingReviewForAgent(agent.id) ? 'border-orange-500/40 bg-orange-500/10' : 'border-outline-variant/20 bg-white/5'">
+                <span class="material-symbols-outlined text-[16px]" [ngClass]="agent.colorClass">{{ agent.icon }}</span>
+                <span class="text-[11px] font-semibold text-on-surface truncate flex-grow">{{ agent.name }}</span>
+                @if (pendingReviewForAgent(agent.id); as rev) {
+                  <button (click)="selectedReviewStep = rev; reviewFeedback = '';"
+                          [class]="selectedReviewStep.stepId === rev.stepId ? 'bg-orange-500/40 text-white' : 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30'"
+                          class="px-2 py-0.5 rounded text-[8px] font-bold uppercase transition-colors cursor-pointer shrink-0">
+                    review
+                  </button>
+                } @else {
+                  <span class="w-2 h-2 rounded-full bg-green-400/60 shrink-0"></span>
+                }
+              </div>
+            }
+            @if (selectedFlowAgents.length === 0) {
+              <p class="text-[10px] text-on-surface-variant">No flow loaded.</p>
+            }
+          </div>
+          <div class="mt-4 pt-3 border-t border-outline-variant/20">
+            <span class="text-[9px] font-mono text-on-surface-variant uppercase block mb-1.5">Other pending reviews</span>
+            @for (step of pendingStepReviews; track step.stepId) {
+              @if (step.stepId !== selectedReviewStep.stepId) {
+                <button (click)="selectedReviewStep = step; reviewFeedback = '';"
+                        class="w-full text-left px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-outline-variant/20 text-[10px] text-on-surface transition-colors cursor-pointer mb-1 flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-[12px] text-orange-400">rate_review</span>
+                  <span class="truncate flex-grow">{{ step.agentName }}</span>
+                  <span class="text-[8px] font-mono text-on-surface-variant">{{ step.flowName }}</span>
+                </button>
+              }
+            }
+            @if (pendingStepReviews.length <= 1) {
+              <p class="text-[9px] text-on-surface-variant/70 m-0">No other pending reviews.</p>
+            }
+          </div>
+        </div>
+
+        <!-- Right: live output + actions -->
+        <div class="flex flex-col flex-grow min-w-0 bg-[#111214] overflow-hidden">
+          <div class="flex-grow min-h-0 overflow-y-auto no-scrollbar p-5">
+            @if (selectedReviewStep.inputData) {
+              <div class="mb-4">
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase mb-1 block">Agent Input / Context</span>
+                <pre class="p-3 bg-white/5 border border-outline-variant/20 rounded-xl text-[10px] text-on-surface leading-relaxed select-text font-mono whitespace-pre-wrap break-words mb-0">{{ selectedReviewStep.inputData }}</pre>
+              </div>
+            }
+
+            <div class="mb-4">
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase mb-1 block">Agent Output</span>
+
+              @if (selectedReviewStep.stepType === 'IMAGE_GENERATION' && reviewOutputUrls(selectedReviewStep).length > 0) {
+                <div class="grid grid-cols-2 gap-3">
+                  @for (url of reviewOutputUrls(selectedReviewStep); track url) {
+                    <img [src]="url" class="w-full h-44 object-cover rounded-xl border border-outline-variant/30 bg-white/5" />
+                  }
+                </div>
+              } @else if ((selectedReviewStep.stepType === 'TTS' || selectedReviewStep.stepType === 'MUSIC_GENERATION') && reviewOutputUrls(selectedReviewStep).length > 0) {
+                <audio [src]="reviewOutputUrls(selectedReviewStep)[0]" controls class="w-full" preload="metadata"></audio>
+              } @else if (selectedReviewStep.stepType === 'VIDEO_GENERATION' && reviewOutputUrls(selectedReviewStep).length > 0) {
+                <video [src]="reviewOutputUrls(selectedReviewStep)[0]" controls class="w-full rounded-xl border border-outline-variant/30 bg-black" preload="metadata"></video>
+              } @else {
+                <pre class="p-3 bg-white/5 border border-primary/30 rounded-xl text-xs text-on-surface leading-relaxed select-text font-mono whitespace-pre-wrap break-words mb-0">{{ selectedReviewStep.outputData || 'No output captured.' }}</pre>
+              }
+            </div>
+
+            @if (reviewRetriesExhausted(selectedReviewStep)) {
+              <div class="flex items-center gap-2 px-3 py-2 bg-red-600/10 border border-red-500/30 rounded-xl text-[10px] font-mono text-red-400 mb-4">
+                <span class="material-symbols-outlined text-sm">error</span>
+                Rewrite limit reached ({{ selectedReviewStep.retryCount }} of {{ selectedReviewStep.maxRetries || 3 }}). Rejecting will fail the execution.
+              </div>
+            }
+          </div>
+
+          <!-- Actions bar -->
+          <div class="px-5 py-3 border-t border-outline-variant/30 bg-white/5 shrink-0 flex flex-col gap-2">
+            <textarea [(ngModel)]="reviewFeedback" rows="2"
+                      placeholder="Feedback sent to the agent if you reject (e.g. make it more conversational, expand the intro...)"
+                      class="w-full p-2.5 bg-white/5 border border-outline-variant/25 rounded-lg text-xs text-on-surface placeholder-on-surface-variant/50 resize-none focus:outline-none focus:border-primary/50"></textarea>
+            <div class="flex gap-3">
+              <button (click)="approveReviewStep()" [disabled]="reviewSubmitting"
+                      class="flex-grow px-4 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                <span class="material-symbols-outlined text-sm">check_circle</span> Approve & Continue
+              </button>
+              <button (click)="rejectReviewStep()" [disabled]="reviewSubmitting || reviewRetriesExhausted(selectedReviewStep)"
+                      class="px-4 py-2.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      [title]="reviewRetriesExhausted(selectedReviewStep) ? 'Rewrite limit reached' : ''">
+                <span class="material-symbols-outlined text-sm">refresh</span> Reject & Rewrite
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 }

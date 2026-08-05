@@ -20,6 +20,8 @@ import { ProvidersService } from '../../shared/services/providers.service';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { KarmaActionService } from '../../shared/services/karma-action.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
+import { ReviewsService } from '../../shared/services/reviews.service';
+import { PendingStepReviewResponse } from '../../shared/models/pending-step-review.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../shared/services/api.service';
 
@@ -60,6 +62,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private flowStatusInterval: any;
   private flowStepMap = new Map<string, string>();
   hubStatus: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
+  activeMissionMode: 'AUTO' | 'REVIEW' | null = null;
 
   loading = false;
   error: string | null = null;
@@ -87,6 +90,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     voice: 'Healthy' as string
   };
   agentStatusList: any[] = [];
+  pendingStepReviews: PendingStepReviewResponse[] = [];
+  selectedReviewStep: PendingStepReviewResponse | null = null;
+  reviewFeedback = '';
+  reviewSubmitting = false;
   defaultAgents = [
     { name: 'Research Agent', icon: 'search', colorClass: 'text-green-400', status: 'Standby' },
     { name: 'Planner Agent', icon: 'assignment', colorClass: 'text-blue-400', status: 'Standby' },
@@ -135,7 +142,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     missionType: 'VIDEO' as string,
     priority: 'MEDIUM' as string,
     providerId: '' as string,
-    outputDirectory: '' as string
+    outputDirectory: '' as string,
+    targetDurationSeconds: '' as string
   };
   selectedFlowIds: string[] = [];
 
@@ -235,7 +243,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       priority: this.newMission.priority,
       providerId: this.newMission.providerId || undefined,
       selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined,
-      outputDirectory: this.newMission.outputDirectory?.trim() || undefined
+      outputDirectory: this.newMission.outputDirectory?.trim() || undefined,
+      targetDurationSeconds: this.newMission.targetDurationSeconds
+        ? Math.max(30, Number(this.newMission.targetDurationSeconds))
+        : undefined
     };
     this.missionsService.create(payload).subscribe({
       next: (created) => {
@@ -244,6 +255,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.activeModal = null;
         this.newMission.name = '';
         this.newMission.description = '';
+        this.newMission.targetDurationSeconds = '';
         this.loadMissions(this.newMission.projectId);
         if (runAfterCreate) {
           this.executionsService.trigger(created.id, this.runMode).subscribe({
@@ -327,6 +339,11 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sanitizer.bypassSecurityTrustHtml(svg);
   }
 
+  setRunMode(mode: 'AUTO' | 'REVIEW'): void {
+    this.runMode = mode;
+    this.showToast(`Run mode set to ${mode}`, 'toggle_on');
+  }
+
   triggerMission(missionId: string): void {
     this.executionsService.trigger(missionId, this.runMode).subscribe({
       next: () => {
@@ -396,7 +413,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | null = null;
+  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | null = null;
 
   openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission') {
     this.activeModal = modalType;
@@ -427,7 +444,102 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.activeModal = null;
     this.selectedFlowForDiagram = null;
     this.selectedFlowDetail = null;
+    this.selectedReviewStep = null;
     this.cdr.detectChanges();
+  }
+
+  loadPendingReviews(): void {
+    this.reviewsService.getPendingStepReviews()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (steps) => {
+          this.pendingStepReviews = steps;
+          if (this.selectedReviewStep) {
+            const match = steps.find(s => s.stepId === this.selectedReviewStep!.stepId);
+            this.selectedReviewStep = match ?? null;
+          }
+        },
+        error: () => {}
+      });
+  }
+
+  pendingReviewForAgent(agentId: string): PendingStepReviewResponse | null {
+    return this.pendingStepReviews.find(s => s.agentId === agentId) || null;
+  }
+
+  openReviewModal(step: PendingStepReviewResponse): void {
+    this.selectedReviewStep = step;
+    this.reviewFeedback = '';
+    this.activeModal = 'review';
+    this.cdr.detectChanges();
+  }
+
+  approveReviewStep(): void {
+    const step = this.selectedReviewStep;
+    if (!step || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({ stepId: step.stepId, decision: 'APPROVED' }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.afterReviewAction(step);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+      }
+    });
+  }
+
+  rejectReviewStep(): void {
+    const step = this.selectedReviewStep;
+    if (!step || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({
+      stepId: step.stepId,
+      decision: 'REJECTED',
+      comments: this.reviewFeedback
+    }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.afterReviewAction(step);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+      }
+    });
+  }
+
+  private afterReviewAction(step: PendingStepReviewResponse): void {
+    this.reviewFeedback = '';
+    this.loadPendingReviews();
+    if (this.activeMission?.id) {
+      this.loadFlowStatuses(this.activeMission.id);
+    }
+  }
+
+  stepTypeLabel(type: string): string {
+    switch (type) {
+      case 'LLM_CALL': return 'LLM Call';
+      case 'IMAGE_GENERATION': return 'Image Generation';
+      case 'TTS': return 'Voiceover';
+      case 'VIDEO_GENERATION': return 'Video Assembly';
+      case 'MUSIC_GENERATION': return 'Music Generation';
+      case 'PUBLISH': return 'Publish';
+      default: return type || 'Unknown';
+    }
+  }
+
+  reviewRetriesExhausted(step: PendingStepReviewResponse | null): boolean {
+    return !!step && (step.retryCount ?? 0) >= (step.maxRetries || 3);
+  }
+
+  reviewOutputUrls(step: PendingStepReviewResponse | null): string[] {
+    if (!step || !step.outputData) return [];
+    const trimmed = step.outputData.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('http') || trimmed.startsWith('/')) {
+      return trimmed.split(/\r?\n/).map(u => u.trim()).filter(u => u.length > 0);
+    }
+    return [];
   }
 
   get selectedFlowAgents(): any[] {
@@ -557,6 +669,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly providersService: ProvidersService,
     private readonly artifactsService: ArtifactsService,
     private readonly workflowsService: WorkflowsService,
+    private readonly reviewsService: ReviewsService,
     private readonly karmaActions: KarmaActionService,
     private readonly auth: AuthService,
     private readonly api: ApiService,
@@ -582,6 +695,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       if (this.activeMission?.id) {
         this.loadFlowStatuses(this.activeMission.id);
       }
+      this.loadPendingReviews();
     }, 10000);
   }
 
@@ -848,6 +962,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loading = true;
 
     this.loadWorkspacesAndMissions();
+    this.loadPendingReviews();
 
     this.dashboardService.getFlows()
       .pipe(takeUntil(this.destroy$))
@@ -996,6 +1111,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         next: (executions) => {
           if (executions.length === 0) return;
           const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING') || executions[0];
+          this.activeMissionMode = (active.mode === 'AUTO' || active.mode === 'REVIEW') ? active.mode : null;
           this.executionsService.getSteps(active.id)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
