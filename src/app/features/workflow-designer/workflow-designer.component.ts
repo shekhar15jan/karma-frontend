@@ -14,7 +14,7 @@ export interface WorkflowNode {
   agentId: string;
   agentName: string;
   status: 'pending' | 'configured' | 'ready';
-  stepKind: 'AGENT' | 'VIDEO' | 'PUBLISH';
+  stepKind: 'AGENT' | 'VIDEO' | 'PUBLISH' | 'UTILITY';
   config: Record<string, string>;
   model?: string;
   x: number;
@@ -138,7 +138,7 @@ export class WorkflowDesignerComponent implements OnInit {
       agentId: n.agentId || '',
       agentName: n.agentName || '',
       status: (n.status === 'ready' || n.status === 'configured' || n.status === 'pending') ? n.status : 'pending',
-      stepKind: n.stepKind === 'VIDEO' || n.stepKind === 'PUBLISH' ? n.stepKind : 'AGENT',
+      stepKind: n.stepKind === 'VIDEO' || n.stepKind === 'PUBLISH' || n.stepKind === 'UTILITY' ? n.stepKind : 'AGENT',
       config: n.config || {},
       model: n.model,
       x: Number(n.x) || 80,
@@ -343,14 +343,14 @@ export class WorkflowDesignerComponent implements OnInit {
     return typeof msg === 'string' && msg.trim() ? msg : null;
   }
 
-  updateNodeStepKind(kind: 'AGENT' | 'VIDEO' | 'PUBLISH'): void {
+  updateNodeStepKind(kind: 'AGENT' | 'VIDEO' | 'PUBLISH' | 'UTILITY'): void {
     if (!this.selectedNode) return;
     this.selectedNode = {
       ...this.selectedNode,
       stepKind: kind,
       status: 'configured',
     };
-    this.nodes = this.nodes.map(n =>
+    this.nodes = this.nodes.map(n => 
       n.id === this.selectedNode!.id ? this.selectedNode! : n
     );
   }
@@ -457,15 +457,15 @@ export class WorkflowDesignerComponent implements OnInit {
     const rect = canvas.getBoundingClientRect();
 
     if (this.isConnecting && this.sourceNodeId) {
-      this.mouseX = event.clientX - rect.left;
-      this.mouseY = event.clientY - rect.top;
+      this.mouseX = event.clientX - rect.left + canvas.scrollLeft;
+      this.mouseY = event.clientY - rect.top + canvas.scrollTop;
     } else if (this.activeDraggingNode) {
       let newX = event.clientX - this.dragStartX;
       let newY = event.clientY - this.dragStartY;
 
-      // Bound constraints
-      newX = Math.max(10, Math.min(rect.width - 180, newX));
-      newY = Math.max(10, Math.min(rect.height - 90, newY));
+      // Bound constraints (allow infinite scrolling right/down)
+      newX = Math.max(10, newX);
+      newY = Math.max(10, newY);
 
       this.activeDraggingNode.x = newX;
       this.activeDraggingNode.y = newY;
@@ -534,34 +534,36 @@ export class WorkflowDesignerComponent implements OnInit {
     this.edges = this.edges.filter(e => e.id !== edgeId);
   }
 
-  // Generate smooth bezier curve between nodes
+  // Generate multi-angle orthogonal (stepped) lines
   getNodePath(edge: WorkflowEdge): string {
     const x1 = this.getOutputX(edge.source, edge.sourcePort);
     const y1 = this.getOutputY(edge.source, edge.sourcePort);
     const x2 = this.getInputX(edge.target, edge.targetPort);
     const y2 = this.getInputY(edge.target, edge.targetPort);
 
-    let cp1x = x1 + Math.max(Math.abs(x2 - x1) * 0.5, 40);
-    let cp1y = y1;
-    let cp2x = x2 - Math.max(Math.abs(x2 - x1) * 0.5, 40);
-    let cp2y = y2;
     let endX = x2;
     let endY = y2;
-
-    if (edge.sourcePort === 'bottom') {
-      cp1x = x1;
-      cp1y = y1 + Math.max(Math.abs(y2 - y1) * 0.5, 40);
-    }
-    
     if (edge.targetPort === 'top') {
-      cp2x = x2;
-      cp2y = y2 - Math.max(Math.abs(y2 - y1) * 0.5, 40);
       endY = y2 - 4; // slight offset for the arrowhead
     } else {
       endX = x2 - 4;
     }
 
-    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
+    if (edge.sourcePort === 'right' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'right' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x2} ${y1} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${x1} ${y2} L ${endX} ${endY}`;
+    }
+
+    // Fallback for any unknown ports
+    return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
   }
 
   getTempPath(): string {
@@ -571,16 +573,13 @@ export class WorkflowDesignerComponent implements OnInit {
     const x2 = this.mouseX;
     const y2 = this.mouseY;
 
-    let cp1x = x1 + Math.max(Math.abs(x2 - x1) * 0.5, 40);
-    let cp1y = y1;
-    let cp2x = x2 - Math.max(Math.abs(x2 - x1) * 0.5, 40);
-    let cp2y = y2;
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
 
     if (this.sourcePort === 'bottom') {
-      cp1x = x1;
-      cp1y = y1 + Math.max(Math.abs(y2 - y1) * 0.5, 40);
+      return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
     }
 
-    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+    return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
   }
 }

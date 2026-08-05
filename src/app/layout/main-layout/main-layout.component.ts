@@ -33,7 +33,7 @@ interface ChatMessage {
       }
 
       <!-- TOP APP BAR -->
-      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/95 backdrop-blur-xl border-b border-[#00e5ff] shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
+      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/95 backdrop-blur-xl border-b border-primary-container shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
         <div class="flex items-center gap-6">
           <button (click)="toggleSidebar()" class="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all cursor-pointer">
             {{ showSidebar ? 'menu_open' : 'menu' }}
@@ -107,6 +107,7 @@ interface ChatMessage {
             </div>
           </div>
           <div class="flex items-center gap-1">
+            <button (click)="toggleTheme()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" [title]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</button>
             <button (click)="showToast('Global Search coming soon', 'search')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Search">search</button>
             <button (click)="toggleChat()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Karma Chat Panel">chat_bubble</button>
             <div class="relative">
@@ -121,13 +122,13 @@ interface ChatMessage {
       </header>
 
       <!-- SIDE NAV BAR -->
-      <aside class="fixed left-0 top-0 h-full flex flex-col py-24 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-[#00e5ff] shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
+      <aside class="fixed left-0 top-0 h-full flex flex-col py-24 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-primary-container shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
              [ngClass]="showSidebar ? 'w-56' : 'w-20 items-center'">
         <div class="flex flex-col gap-0.5 flex-grow overflow-y-auto no-scrollbar px-3">
           @for (item of navItems; track item.path) {
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-primary/10 text-primary-container border-l-4 border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.1)]"
+              routerLinkActive="bg-primary/10 text-primary-container border-l-4 border-l-primary-container shadow-[0_0_15px_rgba(0,229,255,0.1)]"
               [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
               class="flex items-center gap-4 py-2.5 text-on-surface-variant hover:text-primary hover:bg-white/5 transition-all rounded-lg text-decoration-none"
               [ngClass]="showSidebar ? 'px-4' : 'justify-center w-12 px-0'"
@@ -233,7 +234,7 @@ interface ChatMessage {
         </div>
       }
 
-      <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-[#00e5ff] shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
+      <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-primary-container shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
         
         <!-- EXTREME LEFT: Wake up Karma -->
         <div class="absolute left-6 flex items-center">
@@ -281,6 +282,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   // Karma AI speech configuration
   karmaVoiceSpeechEnabled = false;
+
+  // Theme State
+  isDarkMode = true;
 
   // Speech Recognition States (Operator Mic)
   isListening = false;
@@ -358,6 +362,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     // Load persisted voice & language preferences
     this.voicePrefs.loadCatalog().catch(() => {});
     this.voicePrefs.loadPreferences().catch(() => {});
+
+    // Load Theme Preference
+    const savedTheme = localStorage.getItem('karma-theme');
+    if (savedTheme === 'light') {
+      this.isDarkMode = false;
+      document.documentElement.classList.remove('dark');
+    } else {
+      this.isDarkMode = true;
+      document.documentElement.classList.add('dark');
+    }
 
     this.loadWorkspaces();
 
@@ -538,6 +552,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   toggleSidebar() {
     this.showSidebar = !this.showSidebar;
+  }
+
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
+    if (this.isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('karma-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('karma-theme', 'light');
+    }
   }
 
   initSpeech() {

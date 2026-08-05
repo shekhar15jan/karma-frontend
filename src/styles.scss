@@ -3,15 +3,51 @@
 :root {
   --app-header-height: 64px;
   --app-sidebar-width: 224px;
+
+  /* Light Theme (Default) */
+  --color-primary: #006875;
+  --color-on-secondary-container: #1e192b;
+  --color-background: #fdfcff;
+  --color-secondary: #625b71;
+  --color-surface-container: #f3edf7;
+  --color-on-surface: #1a1c1e;
+  --color-primary-container: #97f0ff;
+  --color-surface-variant: #e1e2ec;
+  --color-outline-variant: #c4c6d0;
+  --color-surface-dim: #ded8e1;
+  --color-on-background: #1a1c1e;
+  --color-tertiary: #7d5260;
+  --color-inverse-primary: #4fd8eb;
+  
+  --pattern-bg: rgba(0, 104, 117, 0.05);
+}
+
+html.dark {
+  /* Dark Theme */
+  --color-primary: #c3f5ff;
+  --color-on-secondary-container: #ddcdff;
+  --color-background: #0d1320;
+  --color-secondary: #d1bcff;
+  --color-surface-container: #19202c;
+  --color-on-surface: #dce2f4;
+  --color-primary-container: #00e5ff;
+  --color-surface-variant: #2e3542;
+  --color-outline-variant: #3b494c;
+  --color-surface-dim: #0d1320;
+  --color-on-background: #dce2f4;
+  --color-tertiary: #ffe9db;
+  --color-inverse-primary: #006875;
+  
+  --pattern-bg: rgba(0, 218, 243, 0.1);
 }
 
 html, body {
   height: 100vh;
   margin: 0;
   overflow: hidden;
-  background-color: #0d1320;
+  background-color: var(--color-background);
   background-image: 
-      radial-gradient(circle at 50% 50%, rgba(0, 218, 243, 0.1) 0%, transparent 70%),
+      radial-gradient(circle at 50% 50%, var(--pattern-bg) 0%, transparent 70%),
       url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
 }
 
@@ -28,9 +64,16 @@ html, body {
 
 .glass-panel {
   backdrop-filter: blur(20px);
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+html.dark .glass-panel {
   background: rgba(13, 19, 32, 0.7);
-  border: 1px solid #00e5ff;
+  border: 1px solid var(--color-primary-container);
   animation: lightning-energy 4s infinite ease-in-out;
+  box-shadow: none;
 }
 
 .karma-node {

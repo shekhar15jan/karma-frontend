@@ -34,10 +34,14 @@ import { ApiService } from '../../shared/services/api.service';
 })
 export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   activeMission: (MissionResponse & { formattedDate?: string }) | null = null;
+  activeStepsByAgent = new Map<string, string>(); // agentId -> status (e.g. RUNNING, COMPLETED, PENDING, FAILED)
   flowsList: (FlowResponse & { icon?: string; status?: string })[] = [];
   selectedFlowForDiagram: (FlowResponse & { icon?: string; status?: string }) | null = null;
   selectedFlowDetail: FlowDetail | null = null;
   flowDetailLoading = false;
+  designNodes: any[] = [];
+  designEdges: any[] = [];
+  designBounds = { minX: 0, minY: 0, width: 800, height: 600 };
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
   missionProgress = 0;
 
@@ -431,6 +435,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         next: (detail) => {
           this.selectedFlowDetail = detail;
           this.flowDetailLoading = false;
+          this.buildDesignView(detail);
           this.cdr.detectChanges();
         },
         error: () => {
@@ -445,6 +450,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.selectedFlowForDiagram = null;
     this.selectedFlowDetail = null;
     this.selectedReviewStep = null;
+    this.designNodes = [];
+    this.designEdges = [];
     this.cdr.detectChanges();
   }
 
@@ -467,10 +474,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.pendingStepReviews.find(s => s.agentId === agentId) || null;
   }
 
-  openReviewModal(step: PendingStepReviewResponse): void {
+  selectReviewForDiagram(step: PendingStepReviewResponse): void {
     this.selectedReviewStep = step;
     this.reviewFeedback = '';
-    this.activeModal = 'review';
     this.cdr.detectChanges();
   }
 
@@ -540,6 +546,170 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       return trimmed.split(/\r?\n/).map(u => u.trim()).filter(u => u.length > 0);
     }
     return [];
+  }
+
+  private buildDesignView(detail: FlowDetail): void {
+    const rawNodes = Array.isArray(detail.design?.nodes) ? detail.design.nodes : [];
+    const rawEdges = Array.isArray(detail.design?.edges) ? detail.design.edges : [];
+
+    const nodes = rawNodes.map((n: any) => ({
+      id: String(n.id),
+      label: n.label || n.agentName || 'Agent',
+      agentId: n.agentId || '',
+      agentName: n.agentName || '',
+      status: (n.status === 'ready' || n.status === 'configured' || n.status === 'pending') ? n.status : 'pending',
+      stepKind: n.stepKind === 'VIDEO' || n.stepKind === 'PUBLISH' ? n.stepKind : 'AGENT',
+      x: Number(n.x) || 80,
+      y: Number(n.y) || 80,
+    }));
+
+    const edges = rawEdges.map((e: any) => ({
+      id: String(e.id || `edge-${Math.random()}`),
+      source: String(e.source ?? e.from),
+      target: String(e.target ?? e.to),
+      sourcePort: e.sourcePort || 'right',
+      targetPort: e.targetPort || 'left',
+      handoff: e.handoff === undefined ? true : !!e.handoff,
+    }));
+
+    const incoming = new Set(edges.map(e => e.target));
+    const outgoing = new Set(edges.map(e => e.source));
+    const starts = nodes.filter(n => !incoming.has(n.id));
+    const sinks = nodes.filter(n => !outgoing.has(n.id));
+
+    const startSource = starts[0] || nodes[0];
+    const endSink = sinks[sinks.length - 1] || nodes[nodes.length - 1];
+
+    const startX = startSource ? (startSource.x as number) - 280 : 80;
+    const startY = startSource ? (startSource.y as number) : 80;
+    const endX = endSink ? (endSink.x as number) + 176 + 280 : 900;
+    const endY = endSink ? (endSink.y as number) : 80;
+
+    const allNodes: any[] = [
+      { id: 'start', label: 'Start', agentId: '', agentName: 'Flow Start', status: 'ready', stepKind: 'START', x: startX, y: startY },
+      ...nodes,
+      { id: 'end', label: 'Finish', agentId: '', agentName: 'Flow End', status: 'ready', stepKind: 'END', x: endX, y: endY },
+    ];
+
+    const allEdges: any[] = [...edges];
+    if (startSource) allEdges.push({ id: 'edge-start', source: 'start', target: startSource.id, sourcePort: 'right', targetPort: 'left', handoff: true });
+    if (endSink) allEdges.push({ id: 'edge-end', source: endSink.id, target: 'end', sourcePort: 'right', targetPort: 'left', handoff: true });
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of allNodes) {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + 176);
+      maxY = Math.max(maxY, n.y + 84);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
+
+    this.designNodes = allNodes;
+    this.designEdges = allEdges;
+    this.designBounds = { minX, minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  designNodeIcon(node: any): string {
+    if (node.stepKind === 'START') return 'play_arrow';
+    if (node.stepKind === 'END') return 'flag';
+    const agent = this.agentStatusList.find(a => a.id === node.agentId);
+    if (agent?.icon) return agent.icon;
+    const def = this.defaultAgents.find(d => d.name === node.agentName);
+    return def?.icon || 'smart_toy';
+  }
+
+  designNodeIconClass(node: any): string {
+    if (node.stepKind === 'START') return 'text-cyan-400';
+    if (node.stepKind === 'END') return 'text-green-400';
+    if (node.stepKind === 'VIDEO') return 'text-purple-400';
+    if (node.stepKind === 'PUBLISH') return 'text-green-400';
+    return 'text-[#00e5ff]';
+  }
+
+  designNodeBorderClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'border border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)] animate-pulse';
+    if (activeStatus === 'COMPLETED') return 'border-l-4 border-green-500';
+    if (activeStatus === 'FAILED') return 'border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]';
+    
+    if (node.stepKind === 'START' || node.stepKind === 'END') return 'border-l-4 border-cyan-400';
+    if (node.stepKind === 'VIDEO') return 'border-l-4 border-purple-500';
+    if (node.stepKind === 'PUBLISH') return 'border-l-4 border-green-500';
+    return 'border-l-4 border-primary-container';
+  }
+
+  designNodeBgClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'bg-primary/10';
+    if (activeStatus === 'COMPLETED') return 'bg-green-500/10';
+    if (activeStatus === 'FAILED') return 'bg-red-500/10';
+
+    if (node.stepKind === 'START') return 'bg-surface-container';
+    if (node.stepKind === 'END') return 'bg-surface-container';
+    return 'bg-surface-container';
+  }
+  
+  designNodeStatus(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus) return activeStatus;
+    return node.status;
+  }
+
+  designOutputX(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'bottom') return node.x + 88;
+    return node.x + 176;
+  }
+
+  designOutputY(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'bottom') return node.y + 84;
+    return node.y + 42;
+  }
+
+  designInputX(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.x + 88;
+    return node.x;
+  }
+
+  designInputY(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.y;
+    return node.y + 42;
+  }
+
+  designNodePath(edge: any): string {
+    const x1 = this.designOutputX(edge.source, edge.sourcePort);
+    const y1 = this.designOutputY(edge.source, edge.sourcePort);
+    const x2 = this.designInputX(edge.target, edge.targetPort);
+    const y2 = this.designInputY(edge.target, edge.targetPort);
+
+    let endX = x2;
+    let endY = y2;
+    if (edge.targetPort === 'top') {
+      endY = y2 - 4;
+    } else {
+      endX = x2 - 4;
+    }
+
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
+    if (edge.sourcePort === 'right' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'right' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x2} ${y1} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${x1} ${y2} L ${endX} ${endY}`;
+    }
+    return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
   }
 
   get selectedFlowAgents(): any[] {
@@ -1128,11 +1298,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private applyFlowStatuses(steps: ExecutionStepResponse[]): void {
     const byFlow = new Map<string, ExecutionStepResponse[]>();
+    this.activeStepsByAgent.clear();
+
     for (const step of steps) {
       const arr = byFlow.get(step.flowId) || [];
       arr.push(step);
       byFlow.set(step.flowId, arr);
+      
+      // Keep track of the most recent status for each agent in this active execution
+      this.activeStepsByAgent.set(step.agentId, step.status);
     }
+    
     this.flowStepMap.clear();
     byFlow.forEach((flowSteps, flowId) => {
       if (flowSteps.some(s => s.status === 'RUNNING')) this.flowStepMap.set(flowId, 'IN_PROGRESS');
@@ -1142,6 +1318,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
     this.applyFlowStatusesToFlows();
     this.buildHubStatus(steps);
+    this.cdr.detectChanges();
   }
 
   private buildHubStatus(steps: ExecutionStepResponse[]): void {
