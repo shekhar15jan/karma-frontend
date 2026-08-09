@@ -820,6 +820,22 @@
                 </div>
               </div>
 
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Source Document (Required)</label>
+                  <input type="file" (change)="onFileSelected($event)" accept=".md,.txt"
+                         class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer" />
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Run Mode</label>
+                  <select [(ngModel)]="runMode"
+                          class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
+                    <option value="REVIEW">REVIEW (Require Human Approval)</option>
+                    <option value="AUTO">AUTO (Fully Autonomous)</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="flex flex-col gap-2">
                 <div class="flex items-center justify-between">
                   <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">

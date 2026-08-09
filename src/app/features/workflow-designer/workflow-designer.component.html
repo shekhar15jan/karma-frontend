@@ -123,7 +123,9 @@
       (mousemove)="onCanvasMouseMove($event)"
     >
       <!-- Infinite Canvas Inner Container -->
-      <div class="relative min-w-[3000px] min-h-[3000px]">
+      <div class="relative transition-all duration-300"
+           [style.min-width.px]="getCanvasWidth()"
+           [style.min-height.px]="getCanvasHeight()">
         <!-- Canvas dot-grid background -->
         <div class="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(rgba(0,229,255,0.15)_1.5px,transparent_1.5px)] [background-size:20px_20px]"></div>
 
@@ -188,17 +190,13 @@
 
       <!-- Drag & Drop Nodes -->
       @for (node of nodes; track node.id) {
-        <div class="absolute w-44 rounded-lg bg-surface-container border border-outline-variant/30 cursor-grab active:cursor-grabbing hover:border-primary transition-all shadow-lg select-none z-20 flex flex-col group overflow-visible"
+        <div [class]="'absolute w-44 rounded-lg cursor-grab active:cursor-grabbing transition-all shadow-lg select-none z-20 flex flex-col group overflow-visible ' + designNodeBgClass(node)"
              [style.left.px]="node.x" [style.top.px]="node.y"
              [class.ring-2]="selectedNode?.id === node.id"
              [class.ring-primary]="selectedNode?.id === node.id"
              (mousedown)="onNodeMouseDown(node, $event)"
              (click)="onNodeClick(node, $event)"
-             [ngClass]="{
-                'border-l-4 border-l-primary-container': !node.stepKind || node.stepKind === 'AGENT',
-                'border-l-4 border-l-purple-500': node.stepKind === 'VIDEO',
-                'border-l-4 border-l-green-500': node.stepKind === 'UTILITY'
-             }">
+             [ngClass]="designNodeBorderClass(node)">
           
           <!-- FIXED 4-SIDED PORTS -->
           <!-- Left Port (Input) -->
@@ -243,9 +241,26 @@
           </div>
           
           <div class="px-3 pb-2 flex items-center justify-between border-t border-white/5 pt-2">
-            <span class="text-[9px] font-mono uppercase"
-                  [ngClass]="node.status === 'ready' ? 'text-green-400' : 'text-on-surface-variant/70'"
-            >{{ node.status }}</span>
+            <div class="flex items-center gap-1">
+              @if (designNodeStatus(node) === 'RUNNING') {
+                <span class="material-symbols-outlined text-[10px] animate-spin text-[#00e5ff]">sync</span>
+              }
+              @if (designNodeStatus(node) === 'COMPLETED') {
+                <span class="material-symbols-outlined text-[10px] text-green-400">check_circle</span>
+              }
+              @if (designNodeStatus(node) === 'FAILED') {
+                <span class="material-symbols-outlined text-[10px] text-red-500">error</span>
+              }
+              <span class="text-[9px] font-mono uppercase"
+                    [ngClass]="{
+                      'text-green-400': designNodeStatus(node) === 'COMPLETED' || node.status === 'ready',
+                      'text-[#00e5ff]': designNodeStatus(node) === 'RUNNING',
+                      'text-red-500': designNodeStatus(node) === 'FAILED',
+                      'text-on-surface-variant/70': designNodeStatus(node) !== 'COMPLETED' && designNodeStatus(node) !== 'RUNNING' && designNodeStatus(node) !== 'FAILED' && node.status !== 'ready'
+                    }">
+                {{ designNodeStatus(node) }}
+              </span>
+            </div>
             @if (node.stepKind && node.stepKind !== 'AGENT') {
               <span class="text-[8px] font-mono font-bold uppercase"
                 [ngClass]="node.stepKind === 'VIDEO' ? 'text-purple-400' : 'text-green-400'"
@@ -307,10 +322,10 @@
               (change)="updateNodeStepKind($any($event.target).value)"
             >
               <option value="AGENT" class="bg-background text-on-surface">Agent (auto)</option>
-              <option value="VIDEO" class="bg-background text-on-surface">Video (ffmpeg combine)</option>
+              <option value="VIDEO" class="bg-background text-on-surface">Video (Remotion / ffmpeg)</option>
               <option value="PUBLISH" class="bg-background text-on-surface">Publish (social post)</option>
             </select>
-            <p class="text-[9px] text-on-surface-variant italic mb-0 leading-snug">VIDEO runs the final ffmpeg assembly; PUBLISH posts the result. Use on the terminal step.</p>
+            <p class="text-[9px] text-on-surface-variant italic mb-0 leading-snug">VIDEO runs the final assembly (Remotion renderer, ffmpeg fallback); PUBLISH posts the result. Use on the terminal step.</p>
           </div>
 
           <div class="space-y-2 mt-1">

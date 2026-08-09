@@ -6,9 +6,11 @@ import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DashboardService } from '../../shared/services/dashboard.service';
 import { ExecutionsService } from '../../shared/services/executions.service';
+import { Router } from '@angular/router';
 import { MissionsService } from '../../shared/services/missions.service';
 import { WorkspacesService } from '../../shared/services/workspaces.service';
 import { ProjectsService } from '../../shared/services/projects.service';
+import { SourceDocumentsService } from '../../shared/services/source-documents.service';
 import { MissionResponse } from '../../shared/models/mission.model';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { ProjectResponse } from '../../shared/models/project.model';
@@ -138,6 +140,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   showProjectModal = false;
   isCreatingProject = false;
   newProjectName = '';
+  selectedSourceFile: File | null = null;
   newMission = {
     workspaceId: '' as string,
     projectId: '' as string,
@@ -150,6 +153,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     targetDurationSeconds: '' as string
   };
   selectedFlowIds: string[] = [];
+  selectedFlowId: string = '';
 
   isFlowSelected(flowId: string): boolean {
     return this.selectedFlowIds.includes(flowId);
@@ -202,6 +206,31 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.showProjectModal = false;
   }
 
+  openMissionModal(): void {
+    if (this.workspaces.length === 0) {
+      this.showToast('Please create a workspace first', 'error');
+      return;
+    }
+    this.newMission = {
+      workspaceId: this.workspaces[0].id,
+      projectId: '',
+      name: '',
+      description: '',
+      missionType: 'VIDEO',
+      priority: 'HIGH',
+      providerId: '',
+      outputDirectory: this.workspaces[0].defaultOutputDirectory || '',
+      targetDurationSeconds: ''
+    };
+    if (this.projects.length > 0) {
+      this.newMission.projectId = this.projects[0].id;
+    }
+    this.selectedSourceFile = null;
+    this.selectedFlowId = this.flowsList.length > 0 ? this.flowsList[0].id : '';
+    this.selectedFlowIds = this.selectedFlowId ? [this.selectedFlowId] : [];
+    this.activeModal = 'create-mission';
+  }
+
   getWorkspaceName(): string {
     return this.workspaces.find(w => w.id === this.newMission.workspaceId)?.name || 'Select a workspace first';
   }
@@ -246,7 +275,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       missionType: this.newMission.missionType,
       priority: this.newMission.priority,
       providerId: this.newMission.providerId || undefined,
-      selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined,
+      selectedFlowIds: this.selectedFlowId ? [this.selectedFlowId] : (this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined),
       outputDirectory: this.newMission.outputDirectory?.trim() || undefined,
       targetDurationSeconds: this.newMission.targetDurationSeconds
         ? Math.max(30, Number(this.newMission.targetDurationSeconds))
@@ -261,11 +290,42 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.newMission.description = '';
         this.newMission.targetDurationSeconds = '';
         this.loadMissions(this.newMission.projectId);
-        if (runAfterCreate) {
-          this.executionsService.trigger(created.id, this.runMode).subscribe({
-            next: () => this.showToast('Mission execution started', 'play_arrow'),
-            error: () => this.showToast('Failed to start execution', 'error')
-          });
+        
+        const triggerExecution = () => {
+          if (runAfterCreate) {
+            this.executionsService.trigger(created.id, this.runMode).subscribe({
+              next: () => {
+                this.showToast('Mission execution started', 'play_arrow');
+                this.router.navigate(['/executions']);
+              },
+              error: (err) => this.showToast('Failed to start execution: ' + (err?.error?.message || err?.message || 'missing flows or configuration'), 'error')
+            });
+          }
+        };
+
+        if (this.selectedSourceFile) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            this.sourceDocsService.upload({
+              missionId: created.id,
+              filename: this.selectedSourceFile!.name,
+              format: this.selectedSourceFile!.name.split('.').pop() || 'txt',
+              content: content
+            }).subscribe({
+              next: () => {
+                this.showToast('Source document uploaded', 'check_circle');
+                triggerExecution();
+              },
+              error: (err) => {
+                this.showToast('Failed to upload source document', 'error');
+                triggerExecution(); // Trigger anyway or fail? Let's trigger anyway.
+              }
+            });
+          };
+          reader.readAsText(this.selectedSourceFile);
+        } else {
+          triggerExecution();
         }
       },
       error: (err) => {
@@ -273,6 +333,13 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.showToast('Failed to create mission: ' + (err?.error?.message || 'unknown error'), 'error');
       }
     });
+  }
+
+  onFileSelected(event: any): void {
+    const file = event.target.files[0];
+    if (file) {
+      this.selectedSourceFile = file;
+    }
   }
 
   isAgentReady(status: string): boolean {
@@ -308,6 +375,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!flow) return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
     switch (flow.status) {
       case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
+      case 'RUNNING':
       case 'IN_PROGRESS':
       case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
       case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
@@ -336,6 +404,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       svg = '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="#0078d4"/><path d="M12 7v10M8 10l4-3 4 3" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>';
     else if (t.includes('ffmpeg'))
       svg = '<svg viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="11" font-weight="bold" font-family="sans-serif">Ff</text></svg>';
+    else if (t.includes('remotion'))
+      svg = '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="#00e5ff" stroke-width="1.5"/><path d="M20 10l-3 2 3 2" stroke="#00e5ff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     else if (t.includes('openrouter'))
       svg = '<svg viewBox="0 0 24 24"><polygon points="12,4 20,20 4,20" fill="#8b5cf6" opacity="0.3"/><polygon points="12,8 17,18 7,18" fill="#8b5cf6"/></svg>';
     else
@@ -353,8 +423,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       next: () => {
         this.showToast(`Mission execution triggered (${this.runMode})`, 'play_arrow');
       },
-      error: () => {
-        this.showToast('Failed to trigger mission', 'error');
+      error: (err) => {
+        this.showToast('Failed to trigger mission: ' + (err?.error?.message || err?.message || 'missing configuration'), 'error');
       }
     });
   }
@@ -832,6 +902,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly executionsService: ExecutionsService,
+    private readonly router: Router,
     private readonly missionsService: MissionsService,
     private readonly workspacesService: WorkspacesService,
     private readonly projectsService: ProjectsService,
@@ -844,7 +915,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly auth: AuthService,
     private readonly api: ApiService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
+    private readonly sourceDocsService: SourceDocumentsService
   ) {}
 
   ngOnInit(): void {
@@ -989,18 +1061,34 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.reportActionOutcome(action, false, 'project/name missing');
         return;
       }
+      const validFlows = this.flowsList.filter(f => f.enabled !== false).map(f => f.id);
+      const selectedFlowIds = Array.isArray(params.selectedFlowIds)
+        ? (params.selectedFlowIds as string[]).filter(id => validFlows.includes(id))
+        : [];
+      const targetDurationSeconds = params.targetDurationSeconds
+        ? Math.max(30, Number(params.targetDurationSeconds))
+        : undefined;
       this.missionsService.create({
         projectId,
         name: String(params.name),
         description: params.description,
         missionType: params.missionType,
         priority: params.priority,
-        providerId: params.providerId
+        providerId: params.providerId,
+        selectedFlowIds: selectedFlowIds.length > 0 ? selectedFlowIds : undefined,
+        targetDurationSeconds
       }).subscribe({
         next: (mission) => {
           this.showToast(`KARMA created mission "${mission.name}"`, 'check_circle');
           this.loadDashboard();
-          this.reportActionOutcome(action, true, `mission "${mission.name}" created`);
+          const mode = (params.runMode === 'AUTO' || params.runMode === 'REVIEW') ? params.runMode : undefined;
+          if (mode) {
+            this.executionsService.trigger(mission.id, mode).subscribe({
+              next: () => this.showToast(`KARMA started mission execution (${mode})`, 'play_arrow'),
+              error: () => this.showToast('KARMA created mission but failed to start execution', 'error')
+            });
+          }
+          this.reportActionOutcome(action, true, `mission "${mission.name}" created${mode ? ` and running (${mode})` : ''}`);
         },
         error: (err) => {
           this.showToast('KARMA failed to create mission: ' + (err?.error?.message || 'error'), 'error');

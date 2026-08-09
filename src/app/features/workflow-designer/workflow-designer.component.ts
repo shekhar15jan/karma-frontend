@@ -1,10 +1,11 @@
-import { Component, OnInit, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AgentsService } from '../../shared/services/agents.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
+import { ExecutionsService } from '../../shared/services/executions.service';
 import { AgentResponse } from '../../shared/models/agent.model';
 import { FlowResponse } from '../../shared/models/flow.model';
 
@@ -39,7 +40,7 @@ export interface WorkflowEdge {
   templateUrl: './workflow-designer.component.html',
   styleUrl: './workflow-designer.component.scss',
 })
-export class WorkflowDesignerComponent implements OnInit {
+export class WorkflowDesignerComponent implements OnInit, OnDestroy {
   agents: AgentResponse[] = [];
   nodes: WorkflowNode[] = [];
   edges: WorkflowEdge[] = [];
@@ -67,12 +68,24 @@ export class WorkflowDesignerComponent implements OnInit {
   private dragStartY = 0;
 
   private destroy$ = new Subject<void>();
+  activeStepsByAgent = new Map<string, string>(); // agentId -> status
+  private statusPollingInterval: any;
 
   constructor(
     private readonly agentsService: AgentsService,
     private readonly workflowsService: WorkflowsService,
+    private readonly executionsService: ExecutionsService,
     private readonly route: ActivatedRoute,
+    private readonly cdr: ChangeDetectorRef
   ) {}
+
+  ngOnDestroy(): void {
+    if (this.statusPollingInterval) {
+      clearInterval(this.statusPollingInterval);
+    }
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   ngOnInit(): void {
     const flowParam = this.route.snapshot.queryParamMap.get('flow');
@@ -89,6 +102,18 @@ export class WorkflowDesignerComponent implements OnInit {
         }
       });
     this.loadFlows(flowParam);
+  }
+
+  getCanvasWidth(): number {
+    if (this.nodes.length === 0) return 3000;
+    const maxX = Math.max(...this.nodes.map(n => n.x));
+    return Math.max(3000, maxX + 800);
+  }
+
+  getCanvasHeight(): number {
+    if (this.nodes.length === 0) return 3000;
+    const maxY = Math.max(...this.nodes.map(n => n.y));
+    return Math.max(3000, maxY + 800);
   }
 
   loadFlows(openId?: string | null): void {
@@ -330,12 +355,72 @@ export class WorkflowDesignerComponent implements OnInit {
           this.running = false;
           this.runResult = { executionId: result.executionId, missionId: result.missionId };
           this.error = null;
+          this.startExecutionPolling(result.executionId);
         },
         error: (err: any) => {
           this.error = this.extractError(err) || 'Failed to run workflow.';
           this.running = false;
         }
       });
+  }
+
+  private startExecutionPolling(executionId: string): void {
+    if (this.statusPollingInterval) {
+      clearInterval(this.statusPollingInterval);
+    }
+    this.activeStepsByAgent.clear();
+    this.pollExecutionSteps(executionId);
+    
+    this.statusPollingInterval = setInterval(() => {
+      this.pollExecutionSteps(executionId);
+    }, 5000);
+  }
+
+  private pollExecutionSteps(executionId: string): void {
+    this.executionsService.getSteps(executionId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (steps) => {
+          this.activeStepsByAgent.clear();
+          for (const step of steps) {
+            this.activeStepsByAgent.set(step.agentId, step.status);
+          }
+          this.cdr.detectChanges();
+          
+          if (steps.length > 0 && steps.every(s => s.status === 'COMPLETED' || s.status === 'FAILED' || s.status === 'SKIPPED')) {
+            if (this.statusPollingInterval) clearInterval(this.statusPollingInterval);
+          }
+        },
+        error: () => {}
+      });
+  }
+
+  designNodeStatus(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus) return activeStatus;
+    return node.status;
+  }
+
+  designNodeBorderClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'border border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)] animate-pulse';
+    if (activeStatus === 'COMPLETED') return 'border-l-4 border-green-500';
+    if (activeStatus === 'FAILED') return 'border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]';
+    
+    if (!node.stepKind || node.stepKind === 'AGENT') return 'border-l-4 border-l-primary-container';
+    if (node.stepKind === 'VIDEO') return 'border-l-4 border-l-purple-500';
+    if (node.stepKind === 'PUBLISH') return 'border-l-4 border-l-green-500';
+    if (node.stepKind === 'UTILITY') return 'border-l-4 border-l-orange-400';
+    return 'border-l-4 border-l-primary-container';
+  }
+
+  designNodeBgClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'bg-primary/10';
+    if (activeStatus === 'COMPLETED') return 'bg-green-500/10';
+    if (activeStatus === 'FAILED') return 'bg-red-500/10';
+
+    return 'bg-surface-container';
   }
 
   private extractError(err: any): string | null {
