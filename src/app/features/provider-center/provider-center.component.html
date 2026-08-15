@@ -113,15 +113,14 @@
                <option value="opencode">OpenCode Zen</option>
                <option value="groq">Groq Cloud (Fast LLMs)</option>
                <option value="edge-tts">Edge TTS (Voice)</option>
-               <option value="ffmpeg">FFmpeg Local (Video)</option>
                <option value="remotion">Remotion Local (Video)</option>
                <option value="cloudflare">Cloudflare Workers AI (Images)</option>
              </select>
           </div>
           <div class="space-y-1">
-            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / FFmpeg / Remotion)</span></label>
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / Remotion)</span></label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
-            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenCode/Groq: paste your key from their dashboard · Google: AI Studio key · Edge TTS: leave blank · FFmpeg/Remotion: local renderer, leave blank · Cloudflare: API Token from Cloudflare dashboard</span>
+            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenCode/Groq: paste your key from their dashboard · Google: AI Studio key · Edge TTS: leave blank · Remotion: local renderer, leave blank · Cloudflare: API Token from Cloudflare dashboard</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>

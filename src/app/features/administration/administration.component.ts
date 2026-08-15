@@ -104,10 +104,6 @@ export class AdministrationComponent implements OnInit {
       description: 'Spoken narration words per scene (~2.3 words/sec). Drives real video length.',
       category: 'Video',
     },
-    'video.ffmpeg_timeout_seconds': {
-      description: 'Max seconds a single FFmpeg encode may run before aborting. Raise for long (10-15 min) videos.',
-      category: 'Video',
-    },
   };
 
   constructor(private readonly adminService: AdminService,
