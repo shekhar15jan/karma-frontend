@@ -122,7 +122,7 @@ interface ChatMessage {
       </header>
 
       <!-- SIDE NAV BAR -->
-      <aside class="fixed left-0 top-0 h-full flex flex-col py-24 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-primary-container shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
+      <aside class="fixed left-0 top-0 h-full flex flex-col pt-24 pb-6 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-primary-container shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
              [ngClass]="showSidebar ? 'w-56' : 'w-20 items-center'">
         <div class="flex flex-col gap-0.5 flex-grow overflow-y-auto no-scrollbar px-3">
           @for (item of navItems; track item.path) {
@@ -141,7 +141,7 @@ interface ChatMessage {
           }
         </div>
         <!-- User Profile (AI Chat triggers on click) -->
-        <div class="mt-auto px-4 pb-8 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
+        <div class="mt-auto px-4 pb-2 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
           <div class="relative flex items-center justify-center">
             <div class="rounded-full border border-primary/40 flex items-center justify-center p-1 group-hover:border-primary transition-all" 
                  [ngClass]="{'w-24 h-24': showSidebar, 'w-12 h-12': !showSidebar, 'animate-pulse border-white shadow-[0_0_20px_rgba(255,255,255,1)]': isKarmaSpeaking}">

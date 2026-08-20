@@ -5,6 +5,7 @@ import { take } from 'rxjs';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { ApiService } from '../../shared/services/api.service';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-artifact-explorer',
@@ -319,6 +320,6 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   }
 
   private get apiBase(): string {
-    return (window as any).__KARMA_API_BASE__ || 'http://127.0.0.1:8080/api';
+    return environment.apiUrl;
   }
 }

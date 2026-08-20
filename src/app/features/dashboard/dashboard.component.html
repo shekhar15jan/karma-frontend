@@ -3,7 +3,12 @@
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-y-auto no-scrollbar">
     <!-- Active Mission -->
     <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
-      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+        <button (click)="openModal('create-mission')" class="text-[9px] font-label-mono uppercase tracking-widest text-primary hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer flex items-center gap-1">
+          <span class="material-symbols-outlined text-[12px]">add_circle</span> New
+        </button>
+      </div>
       @if (activeMission) {
         <div class="flex gap-3 items-start mt-1">
           <div class="w-12 h-12 bg-primary/10 rounded border border-[#00e5ff]/30 flex items-center justify-center shrink-0">
@@ -23,27 +28,21 @@
           </div>
         </div>
         <div class="space-y-2 mt-2">
-          <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-            <!-- Simulated progress based on status -->
-            <div class="bg-[#00e5ff] h-full shadow-[0_0_10px_#00e5ff]" [style.width]="activeMission.status === 'COMPLETED' ? '100%' : '72%'"></div>
+          <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30">
+            <div class="bg-[#00e5ff] h-full shadow-[0_0_10px_#00e5ff] transition-all duration-500" [style.width.%]="missionProgress"></div>
           </div>
           <div class="flex justify-between text-[10px] text-on-surface-variant font-label-mono">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400' : 'bg-[#00e5ff]'"></span>
               <span>Status: {{ activeMission.status }}</span>
             </div>
-            <span>{{ activeMission.status === 'COMPLETED' ? '100%' : '72%' }}</span>
+            <span>{{ missionProgress }}%</span>
           </div>
-          <button (click)="triggerMission(activeMission!.id)" class="w-full mt-1 px-3 py-1.5 bg-green-600/20 border border-green-500/50 text-green-500 text-xs font-bold rounded-lg hover:bg-green-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-            <span class="material-symbols-outlined text-sm">play_arrow</span>
-            <span>Run Mission</span>
-          </button>
         </div>
       } @else {
         <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
           <span class="material-symbols-outlined text-[32px] opacity-50">flight_takeoff</span>
           <p class="text-[11px] mb-0">No active missions found</p>
-          <button (click)="openModal('create-mission')" class="mt-2 text-[10px] px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded cursor-pointer hover:bg-primary/30 transition-colors">Start Mission</button>
         </div>
       }
     </div>
@@ -132,46 +131,9 @@
 
   <!-- CENTER AREA -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-hidden">
-    <!-- Flows Pipeline -->
-    <div class="glass-panel rounded-xl p-4 flex flex-col gap-4 shrink-0">
-      <div class="flex justify-between items-center">
-        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Flows</h3>
-        <div class="flex items-center gap-2">
-          <button (click)="toggleDiagnosticsSidebar()" class="text-[9px] flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors bg-green-400/10 border border-green-400/30 px-2 py-0.5 rounded cursor-pointer">
-            <span class="material-symbols-outlined text-[12px] animate-pulse">sensors</span> Diagnostics
-          </button>
-          <button (click)="openModal('flows')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
-        </div>
-      </div>
-      <div #flowsContainer class="flex flex-nowrap gap-3 px-6 w-full overflow-x-auto no-scrollbar pb-2 scroll-smooth">
-        @if (flowsList && flowsList.length > 0) {
-          @for (flow of flowsList; track flow.id) {
-            <div class="flex flex-col gap-2 shrink-0 w-36 bg-white/5 border border-outline-variant/30 rounded-lg p-3 transition-all cursor-pointer hover:bg-white/10 hover:border-primary/50"
-                 (click)="openFlowDiagram(flow); $event.stopPropagation()"
-                 [ngClass]="{'border-green-400 bg-green-400/5': flow.status === 'COMPLETED', 'border-[#00e5ff] bg-[#00e5ff]/5': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE'}">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full border flex items-center justify-center transition-colors shrink-0"
-                     [ngClass]="{'border-green-400 bg-green-400/10 text-green-400 shadow-[0_0_10px_rgba(74,222,128,0.2)]': flow.status === 'COMPLETED', 'border-[#00e5ff] bg-[#00e5ff]/10 text-[#00e5ff] animate-pulse shadow-[0_0_10px_rgba(0,229,255,0.4)]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'border-outline-variant bg-white/5 opacity-50 text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">
-                  <span class="material-symbols-outlined text-[16px]">{{ flow.icon || 'account_tree' }}</span>
-                </div>
-                <div class="flex flex-col overflow-hidden">
-                  <span class="text-[10px] font-bold text-on-surface truncate" [title]="flow.name">{{ flow.name }}</span>
-                  <span class="text-[8px] uppercase font-mono truncate" [ngClass]="{'text-green-400': flow.status === 'COMPLETED', 'text-[#00e5ff]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flow.status || 'PENDING' }}</span>
-                </div>
-              </div>
-            </div>
-          }
-        } @else {
-          <div class="w-full text-center py-6 text-on-surface-variant flex flex-col items-center justify-center gap-2">
-            <span class="material-symbols-outlined text-[24px] opacity-50">account_tree</span>
-            <span class="text-[11px]">No workflows running</span>
-          </div>
-        }
-      </div>
-    </div>
 
     <!-- Central Hub (Karma Core) -->
-    <div class="flex-grow relative flex items-center justify-center overflow-visible py-4">
+    <div class="flex-grow relative flex flex-col items-center justify-center overflow-visible py-4">
       <div class="absolute inset-0 pointer-events-none" id="connection-lines-container"></div>
       <div class="relative w-[520px] h-[520px] flex items-center justify-center">
         <!-- Concentric HUD Rings (SVG for precision) -->
@@ -182,7 +144,7 @@
         <!-- Orbital Nodes Container -->
         <div class="absolute inset-0" id="nodes-container">
           <!-- Research (Top - 270deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('research')" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('research')">
                 <span class="material-symbols-outlined" [class]="hudState('research').cls">search</span>
@@ -192,7 +154,7 @@
             </div>
           </div>
           <!-- Script (45deg - Top Right) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('script')" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('script')">
                 <span class="material-symbols-outlined" [class]="hudState('script').cls">description</span>
@@ -202,7 +164,7 @@
             </div>
           </div>
           <!-- Blog (Right - 0deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('blog')" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('blog')">
                 <span class="material-symbols-outlined" [class]="hudState('blog').cls">feed</span>
@@ -212,7 +174,7 @@
             </div>
           </div>
           <!-- SEO (135deg - Bottom Right) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('seo')" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('seo')">
                 <span class="material-symbols-outlined" [class]="hudState('seo').cls">bar_chart</span>
@@ -245,7 +207,7 @@
             </div>
           </div>
           <!-- Voice (Bottom - 90deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('voice')" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('voice')">
                 <span class="material-symbols-outlined" [class]="hudState('voice').cls">mic</span>
@@ -255,7 +217,7 @@
             </div>
           </div>
           <!-- Video (225deg - Bottom Left) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('video')" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('video')">
                 <span class="material-symbols-outlined" [class]="hudState('video').cls">videocam</span>
@@ -265,7 +227,7 @@
             </div>
           </div>
           <!-- Thumbnail (Left - 180deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('thumbnail')" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('thumbnail')">
                 <span class="material-symbols-outlined" [class]="hudState('thumbnail').cls">grid_view</span>
@@ -275,7 +237,7 @@
             </div>
           </div>
           <!-- Image (315deg - Top Left) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('image')" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
             <div class="flex flex-col items-center">
               <div [class]="hudCircleCls('image')">
                 <span class="material-symbols-outlined" [class]="hudState('image').cls">image</span>
@@ -295,9 +257,23 @@
           <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 rounded-full"></div>
           
           <div class="w-36 h-36 rounded-full glass-panel flex items-center justify-center relative z-10">
-            <div class="text-center relative z-10">
+            <div class="text-center relative z-10 flex flex-col items-center">
               <h2 class="text-headline-md font-bold tracking-[0.2em] text-on-surface mb-0 leading-none">KARMA</h2>
               <h3 class="text-[12px] font-bold tracking-[0.5em] text-[#00e5ff] mb-0 mt-1">CORE</h3>
+              <div class="mt-2 w-full px-2">
+                @if (activeMission) {
+                  <button (click)="triggerMission(activeMission!.id)" class="w-full mt-1 px-3 py-1.5 bg-green-600/20 border border-green-500/50 text-green-500 text-[10px] font-bold rounded-lg hover:bg-green-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span class="material-symbols-outlined text-sm">play_arrow</span>
+                    <span>Run Mission</span>
+                  </button>
+                  <button (click)="openModal('create-mission')" class="w-full mt-1 px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded cursor-pointer hover:bg-primary/30 transition-colors text-[10px] font-bold flex items-center justify-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm">add_circle</span>
+                    <span>New Mission</span>
+                  </button>
+                } @else {
+                  <button (click)="openModal('create-mission')" class="mt-2 text-[10px] px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded cursor-pointer hover:bg-primary/30 transition-colors w-full">Start Mission</button>
+                }
+              </div>
             </div>
           </div>
         </div>
@@ -404,40 +380,7 @@
       </div>
     </div>
 
-    <!-- Pending Approvals -->
-    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
-      <div class="flex justify-between items-center shrink-0">
-        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Pending Approvals</h3>
-        <button (click)="openModal('approvals')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
-      </div>
-      <div class="space-y-2 overflow-y-auto flex-grow h-full pr-2 no-scrollbar">
-        @if (pendingApprovals && pendingApprovals.length > 0) {
-          @for (approval of pendingApprovals; track approval.id) {
-            <div class="flex items-start gap-3 p-2 bg-white/5 rounded-lg border border-primary/10 transition-colors hover:bg-white/10">
-              <div class="w-10 h-10 rounded flex items-center justify-center shrink-0 border"
-                   [ngClass]="{'bg-red-600/20 border-red-500/30 text-red-500': approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT', 'bg-blue-600/20 border-blue-500/30 text-blue-400': approval.type === 'BLOG_POST' || approval.type === 'ARTICLE', 'bg-[#00e5ff]/20 border-[#00e5ff]/30 text-[#00e5ff]': approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN', 'bg-primary/20 border-primary/30 text-primary': (approval.type ? !['VIDEO_SCRIPT','SCRIPT','BLOG_POST','ARTICLE','SOCIAL_POST','LINKEDIN'].includes(approval.type) : true)}">
-                @if (approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT') { <span class="material-symbols-outlined text-[20px]">play_circle</span> }
-                @else if (approval.type === 'BLOG_POST' || approval.type === 'ARTICLE') { <span class="material-symbols-outlined text-[20px]">article</span> }
-                @else if (approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN') { <span class="text-[18px] font-bold flex items-center justify-center">in</span> }
-                @else { <span class="material-symbols-outlined text-[20px]">inventory_2</span> }
-              </div>
-              <div class="flex-grow min-w-0">
-                <div class="flex justify-between items-center"><p class="text-[10px] font-bold truncate mb-0" [title]="approval.title || approval.name">{{ approval.title || approval.name || 'Artifact Review' }}</p><span class="text-[8px] text-on-surface-variant">{{ approval.formattedDate || 'Just now' }}</span></div>
-                <div class="flex gap-1.5 mt-1.5">
-                  <button (click)="showToast('Reviewing ' + (approval.title || 'Artifact'), 'preview')" class="flex-grow py-1 bg-white/5 border border-primary/30 text-[9px] rounded hover:bg-primary/10 text-on-surface transition-colors cursor-pointer">Review</button>
-                  <button (click)="showToast('Approved ' + (approval.title || 'Artifact'), 'check_circle')" class="flex-grow py-1 bg-green-600/60 border border-green-500/40 text-[9px] rounded font-bold text-white transition-colors cursor-pointer hover:bg-green-500/80">Approve</button>
-                </div>
-              </div>
-            </div>
-          }
-        } @else {
-          <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
-            <span class="material-symbols-outlined text-[32px] opacity-50">fact_check</span>
-            <p class="text-[11px] mb-0 text-center px-4">No artifacts currently waiting for human approval.</p>
-          </div>
-        }
-      </div>
-    </div>
+
 
     <!-- Voice Commands -->
     <div class="glass-panel rounded-xl p-4 flex flex-col shrink-0">
@@ -527,7 +470,7 @@
 </div>
 
 <!-- Dynamic Overlay Modal -->
-@if (activeModal && activeModal !== 'flow-diagram' && activeModal !== 'review') {
+@if (activeModal && activeModal !== 'flow-diagram' && activeModal !== 'review' && activeModal !== 'direct-review') {
   <div class="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
     <!-- Click outside to close (invisible backdrop) -->
     <div class="absolute inset-0 cursor-pointer" (click)="closeModal()"></div>
@@ -880,12 +823,24 @@
                 </select>
               </div>
 
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Output Folder <span class="normal-case text-on-surface-variant/60">(optional)</span></label>
-                <input type="text" [(ngModel)]="newMission.outputDirectory"
-                       placeholder="e.g. clientA/video or a full Windows path under the output root"
-                       class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
-                <span class="text-[9px] text-on-surface-variant/70">Blank inherits the workspace default folder.</span>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Video Theme</label>
+                  <select [(ngModel)]="newMission.theme"
+                          class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
+                    @for (t of ['whiteboard', 'corporate', 'minimal', 'dark', 'glass', 'technical', 'codeatcloud', 'auto']; track t) {
+                      <option [value]="t">{{ t === 'auto' ? 'Auto (vary per run)' : (t | titlecase) }}</option>
+                    }
+                  </select>
+                  <span class="text-[9px] text-on-surface-variant/70">Default whiteboard. Auto rotates the style (theme, transitions) on every run.</span>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Output Folder <span class="normal-case text-on-surface-variant/60">(optional)</span></label>
+                  <input type="text" [(ngModel)]="newMission.outputDirectory"
+                         placeholder="e.g. clientA/video or a full Windows path under the output root"
+                         class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
+                  <span class="text-[9px] text-on-surface-variant/70">Blank inherits the workspace default folder.</span>
+                </div>
               </div>
 
               <div class="flex flex-col gap-1.5">
@@ -1175,6 +1130,66 @@
           }
         </div>
       </div>
+    </div>
+  </div>
+}
+
+<!-- Direct Content Review Modal -->
+@if (activeModal === 'direct-review' && directReviewStep) {
+  <div class="fixed inset-0 bg-background/90 backdrop-blur-sm z-[120] flex items-center justify-center p-8" (click)="closeModal()">
+    <div class="flex flex-col bg-[#111214] border border-outline-variant/30 rounded-2xl w-[800px] max-h-[85vh] overflow-hidden shadow-2xl" (click)="$event.stopPropagation()">
+       <!-- Header -->
+       <div class="px-5 py-4 border-b border-outline-variant/30 bg-white/5 shrink-0 flex items-center justify-between">
+         <h3 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0">Review: {{ stepTypeLabel(directReviewStep.stepType) }}</h3>
+         <button class="w-8 h-8 rounded-full hover:bg-white/10 text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer" (click)="closeModal()">
+           <span class="material-symbols-outlined text-lg">close</span>
+         </button>
+       </div>
+       
+       <!-- Content -->
+       <div class="flex-grow min-h-0 overflow-y-auto p-5">
+         <div class="h-full">
+            <span class="text-[10px] font-mono text-on-surface-variant uppercase mb-2 block">Content Output</span>
+            @if (directReviewStep.stepType === 'TTS' || directReviewStep.stepType === 'MUSIC_GENERATION') {
+              <div class="space-y-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <div class="p-3 bg-white/5 border border-outline-variant/30 rounded-xl">
+                    <audio controls class="w-full h-10" [src]="url"></audio>
+                  </div>
+                }
+              </div>
+            } @else if (directReviewStep.stepType === 'VIDEO_GENERATION') {
+              <div class="space-y-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <video controls class="w-full rounded-xl border border-outline-variant/30" [src]="url"></video>
+                }
+              </div>
+            } @else if (directReviewStep.stepType === 'IMAGE_GENERATION' && reviewOutputUrls(directReviewStep).length > 0) {
+              <div class="grid grid-cols-2 gap-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <img [src]="url" class="w-full aspect-video object-cover rounded-xl border border-outline-variant/30">
+                }
+              </div>
+            } @else {
+              <pre class="p-4 bg-white/5 border border-outline-variant/20 rounded-xl text-xs text-on-surface leading-relaxed whitespace-pre-wrap break-words min-h-[200px]">{{ directReviewStep.outputData || 'No output captured.' }}</pre>
+            }
+         </div>
+       </div>
+
+       <!-- Actions (Only if pending approval) -->
+       @if (directReviewStep.reviewStatus === 'PENDING_REVIEW' || directReviewStep.reviewStatus === 'PENDING' || directReviewStep.status === 'PENDING_APPROVAL') {
+         <div class="px-5 py-4 border-t border-outline-variant/30 bg-white/5 shrink-0 flex flex-col gap-3">
+           <textarea [(ngModel)]="reviewFeedback" rows="2" placeholder="Feedback for rewrite (if rejecting)..." class="w-full p-2.5 bg-white/5 border border-outline-variant/25 rounded-lg text-xs text-on-surface resize-none focus:outline-none focus:border-primary/50"></textarea>
+           <div class="flex gap-3">
+             <button (click)="approveDirectReview()" [disabled]="reviewSubmitting" class="flex-grow py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+               <span class="material-symbols-outlined text-sm">check_circle</span> Approve & Continue
+             </button>
+             <button (click)="rejectDirectReview()" [disabled]="reviewSubmitting" class="flex-grow py-2.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+               <span class="material-symbols-outlined text-sm">refresh</span> Reject & Rewrite
+             </button>
+           </div>
+         </div>
+       }
     </div>
   </div>
 }

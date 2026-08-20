@@ -23,9 +23,11 @@ import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { KarmaActionService } from '../../shared/services/karma-action.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
 import { ReviewsService } from '../../shared/services/reviews.service';
+import { SseService } from '../../shared/services/sse.service';
 import { PendingStepReviewResponse } from '../../shared/models/pending-step-review.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../shared/services/api.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-dashboard',
@@ -46,6 +48,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   designBounds = { minX: 0, minY: 0, width: 800, height: 600 };
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
   missionProgress = 0;
+  missionSteps: ExecutionStepResponse[] = [];
+  directReviewStep: ExecutionStepResponse | null = null;
 
   hudNodes = [
     { key: 'research', label: 'RESEARCH', icon: 'search', left: 260, top: 50 },
@@ -65,14 +69,13 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   workers: { id: number; name: string; task: string; status: string; progress: number }[] = [];
   logs: string[] = [];
 
-  private flowStatusInterval: any;
-  private flowStepMap = new Map<string, string>();
+  flowStepMap: Map<string, string> = new Map();
   hubStatus: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
   activeMissionMode: 'AUTO' | 'REVIEW' | null = null;
 
   loading = false;
   error: string | null = null;
-  runMode: 'AUTO' | 'REVIEW' = 'REVIEW';
+  runMode: 'AUTO' | 'REVIEW' = 'AUTO';
   heardCommand = 'Say "Wake up Karma" to begin';
 
   @ViewChild('flowsContainer') flowsContainer!: ElementRef;
@@ -150,7 +153,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     priority: 'MEDIUM' as string,
     providerId: '' as string,
     outputDirectory: '' as string,
-    targetDurationSeconds: '' as string
+    targetDurationSeconds: '' as string,
+    theme: 'whiteboard' as string
   };
   selectedFlowIds: string[] = [];
   selectedFlowId: string = '';
@@ -220,7 +224,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       priority: 'HIGH',
       providerId: '',
       outputDirectory: this.workspaces[0].defaultOutputDirectory || '',
-      targetDurationSeconds: ''
+      targetDurationSeconds: '',
+      theme: 'whiteboard'
     };
     if (this.projects.length > 0) {
       this.newMission.projectId = this.projects[0].id;
@@ -279,7 +284,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       outputDirectory: this.newMission.outputDirectory?.trim() || undefined,
       targetDurationSeconds: this.newMission.targetDurationSeconds
         ? Math.max(30, Number(this.newMission.targetDurationSeconds))
-        : undefined
+        : undefined,
+      theme: this.newMission.theme
     };
     this.missionsService.create(payload).subscribe({
       next: (created) => {
@@ -357,7 +363,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     const s = this.hubStatus[key];
     if (!s) return `${base} border-outline-variant/50 opacity-60`;
     const glow = s.pulse
-      ? ' animate-pulse shadow-[0_0_18px_rgba(0,229,255,0.45)]'
+      ? ' rotating-green-light'
       : s.text === 'Completed'
         ? ' shadow-[0_0_18px_rgba(74,222,128,0.35)]'
         : s.text === 'Failed'
@@ -485,9 +491,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | null = null;
+  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | 'direct-review' | null = null;
 
-  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission') {
+  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | 'direct-review') {
     this.activeModal = modalType;
   }
 
@@ -518,6 +524,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.selectedFlowForDiagram = null;
     this.selectedFlowDetail = null;
     this.selectedReviewStep = null;
+    this.directReviewStep = null;
     this.designNodes = [];
     this.designEdges = [];
     this.cdr.detectChanges();
@@ -606,12 +613,20 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return !!step && (step.retryCount ?? 0) >= (step.maxRetries || 3);
   }
 
-  reviewOutputUrls(step: PendingStepReviewResponse | null): string[] {
+  reviewOutputUrls(step: any): string[] {
     if (!step || !step.outputData) return [];
     const trimmed = step.outputData.trim();
     if (!trimmed) return [];
-    if (trimmed.startsWith('http') || trimmed.startsWith('/')) {
-      return trimmed.split(/\r?\n/).map(u => u.trim()).filter(u => u.length > 0);
+    if (trimmed.startsWith('http') || trimmed.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
+      const apiBase = environment.apiUrl;
+      const token = localStorage.getItem('karma_token') || '';
+      return trimmed.split(/\r?\n/).map((u: string) => {
+        let url = u.trim();
+        if (/^[a-zA-Z]:[\\/]/.test(url)) {
+          return `${apiBase}/v1/artifacts/stream?path=${encodeURIComponent(url)}&token=${token}`;
+        }
+        return url;
+      }).filter((u: string) => u.length > 0);
     }
     return [];
   }
@@ -914,7 +929,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private readonly api: ApiService,
     private readonly cdr: ChangeDetectorRef,
     private readonly sanitizer: DomSanitizer,
-    private readonly sourceDocsService: SourceDocumentsService
+    private readonly sourceDocsService: SourceDocumentsService,
+    private readonly sseService: SseService
   ) {}
 
   ngOnInit(): void {
@@ -931,12 +947,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.addEventListener('operator-speaking', this.operatorSpeakingHandler);
     window.addEventListener('karma-speech-pulse', this.speechPulseHandler);
 
-    this.flowStatusInterval = setInterval(() => {
-      if (this.activeMission?.id) {
-        this.loadFlowStatuses(this.activeMission.id);
-      }
-      this.loadPendingReviews();
-    }, 10000);
+    this.sseService.connect();
+    this.sseService.onMessage()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((msg) => {
+        if (msg.event.startsWith('execution.') || msg.event.startsWith('mission.') || msg.event.startsWith('step.')) {
+          if (this.activeMission?.id) {
+            this.loadFlowStatuses(this.activeMission.id);
+          }
+          this.loadPendingReviews();
+        }
+      });
   }
 
   private reportActionOutcome(action: any, success: boolean, note?: string): void {
@@ -1074,7 +1095,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         priority: params.priority,
         providerId: params.providerId,
         selectedFlowIds: selectedFlowIds.length > 0 ? selectedFlowIds : undefined,
-        targetDurationSeconds
+        targetDurationSeconds,
+        theme: params.theme
       }).subscribe({
         next: (mission) => {
           this.showToast(`KARMA created mission "${mission.name}"`, 'check_circle');
@@ -1199,9 +1221,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.drawInterval) {
       clearInterval(this.drawInterval);
     }
-    if (this.flowStatusInterval) {
-      clearInterval(this.flowStatusInterval);
-    }
     window.removeEventListener('resize', this.resizeListener);
     window.removeEventListener('heard-voice-command', this.heardVoiceListener);
     window.removeEventListener('system-diagnostic-start', this.systemDiagnosticStartListener);
@@ -1295,6 +1314,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
               pulseClass: ''
             };
           });
+          if (this.missionSteps && this.missionSteps.length > 0) {
+            this.applyFlowStatuses(this.missionSteps);
+          }
         },
         error: (err) => {
           console.error('Failed to fetch agents', err);
@@ -1343,7 +1365,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (missions) => {
-          this.activeMission = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING') || null;
+          const running = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING');
+          this.activeMission = running || (missions.length > 0 ? missions[0] : null);
           if (this.activeMission?.createdAt) {
             this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           }
@@ -1361,6 +1384,15 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private loadFlowStatuses(missionId: string): void {
+    // Reset state for new mission
+    this.missionProgress = 0;
+    this.queueSize = 0;
+    this.cpuLoad = 0;
+    this.gpuLoad = 0;
+    this.hubStatus = {};
+    this.workers = [];
+    this.activeStepsByAgent.clear();
+    
     this.executionsService.getAll(missionId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -1372,6 +1404,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
             .pipe(takeUntil(this.destroy$))
             .subscribe({
               next: (steps) => {
+                this.missionSteps = steps;
                 this.applyFlowStatuses(steps);
                 this.updateOperationalMetrics(steps, executions, active.id);
               },
@@ -1404,7 +1437,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
     this.applyFlowStatusesToFlows();
     this.buildHubStatus(steps);
-    this.cdr.detectChanges();
+    // Removed cdr.detectChanges() to prevent aggressive flashing
   }
 
   private buildHubStatus(steps: ExecutionStepResponse[]): void {
@@ -1414,16 +1447,18 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       if (!key) continue;
       const c = counts.get(key) || { total: 0, completed: 0, running: 0, failed: 0 };
       c.total++;
-      if (step.status === 'COMPLETED') c.completed++;
+      if (step.status === 'COMPLETED' || step.status === 'SKIPPED') c.completed++;
       else if (step.status === 'RUNNING') c.running++;
       else if (step.status === 'FAILED') c.failed++;
       counts.set(key, c);
     }
     const next: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
     counts.forEach((c, key) => {
-      const pct = c.total > 0 ? Math.round((c.completed / c.total) * 100) : 0;
+      // Give running steps a 50% completion weight for visual progress
+      const simulatedCompleted = c.completed + (c.running * 0.5);
+      const pct = c.total > 0 ? Math.min(100, Math.round((simulatedCompleted / c.total) * 100)) : 0;
       if (c.running > 0) {
-        next[key] = { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true, pct };
+        next[key] = { text: 'Running', cls: 'text-green-500', border: 'border-green-500', pulse: true, pct };
       } else if (c.failed > 0) {
         next[key] = { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false, pct };
       } else if (c.completed === c.total) {
@@ -1439,32 +1474,48 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     const agent = this.agentStatusList.find(a => a.id === step.agentId);
     if (agent) {
       const name = (agent.name || '').toLowerCase();
-      if (name.includes('research')) return 'research';
-      if (name.includes('script')) return 'script';
-      if (name.includes('blog')) return 'blog';
-      if (name.includes('seo')) return 'seo';
-      if (name.includes('voice') || name.includes('audio')) return 'voice';
-      if (name.includes('thumbnail')) return 'thumbnail';
-      if (name.includes('image')) return 'image';
-      if (name.includes('video')) return 'video';
+      const category = (agent.category || '').toLowerCase();
+      const desc = (agent.description || '').toLowerCase();
+      
+      const check = (str: string) => name.includes(str) || category.includes(str) || desc.includes(str);
+
+      if (check('voice') || check('audio') || check('tts') || check('speak')) return 'voice';
+      if (check('research') || check('search') || check('gather')) return 'research';
+      if (check('script') || check('write') || check('author') || check('plan')) return 'script';
+      if (check('blog') || check('article') || check('post')) return 'blog';
+      if (check('seo') || check('optimiz') || check('keyword')) return 'seo';
+      if (check('thumbnail') || check('thumb')) return 'thumbnail';
+      if (check('image') || check('picture') || check('visual')) return 'image';
+      if (check('video') || check('edit') || check('render')) return 'video';
     }
-    switch (step.stepType) {
-      case 'TTS': return 'voice';
-      case 'VIDEO_GENERATION': return 'video';
-      case 'IMAGE_GENERATION': return 'image';
-      case 'MUSIC_GENERATION': return null;
-      case 'PUBLISH': return null;
-      default: return null;
-    }
+    
+    const type = (step.stepType || '').toUpperCase();
+    if (type.includes('TTS') || type.includes('VOICE') || type.includes('AUDIO')) return 'voice';
+    if (type.includes('VIDEO') || type.includes('ANIMATION')) return 'video';
+    if (type.includes('IMAGE') || type.includes('PICTURE')) return 'image';
+    if (type.includes('RESEARCH') || type.includes('SEARCH')) return 'research';
+    if (type.includes('SCRIPT') || type.includes('WRITE') || type.includes('TEXT')) return 'script';
+    if (type.includes('SEO')) return 'seo';
+    if (type.includes('BLOG')) return 'blog';
+    if (type.includes('THUMBNAIL')) return 'thumbnail';
+    
+    // If it's a generic LLM call and it hasn't matched anything, we could map it to script as a fallback,
+    // but returning null means it won't light up any specific node (which might be technically correct for a generic node).
+    // Let's map generic LLM tasks to 'script' if it's completely unmatched, just so it shows up in the Core.
+    if (type === 'LLM_CALL' || type === 'GENERIC') return 'script';
+
+    return null;
   }
 
   private updateOperationalMetrics(steps: ExecutionStepResponse[], executions: ExecutionResponse[], executionId: string): void {
     const total = steps.length;
-    const completed = steps.filter(s => s.status === 'COMPLETED').length;
+    const completed = steps.filter(s => s.status === 'COMPLETED' || s.status === 'SKIPPED').length;
     const running = steps.filter(s => s.status === 'RUNNING').length;
     const pending = steps.filter(s => s.status === 'PENDING').length;
 
-    this.missionProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    // Give running steps a 50% completion weight for overall mission progress
+    const simulatedCompleted = completed + (running * 0.5);
+    this.missionProgress = total > 0 ? Math.min(100, Math.round((simulatedCompleted / total) * 100)) : 0;
     this.queueSize = pending + executions.filter(e => e.status === 'PENDING').length;
     this.cpuLoad = total > 0 ? Math.min(100, Math.round(((completed + running) / total) * 100)) : 0;
     this.gpuLoad = total > 0 ? Math.min(100, Math.round((running / total) * 100) * 3) : 0;
@@ -1536,6 +1587,58 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   triggerVoiceCommand(): void {
     window.dispatchEvent(new CustomEvent('trigger-operator-mic'));
+  }
+
+  onNodeClick(key: string): void {
+    if (!this.activeMission) return;
+    
+    // Find all steps for this node
+    const steps = this.missionSteps.filter(s => this.hubKeyForStep(s) === key);
+    
+    if (steps.length > 0) {
+      // Prefer the step that is PENDING_REVIEW, otherwise take the last one
+      const pendingStep = steps.find(s => s.reviewStatus === 'PENDING_REVIEW' || s.reviewStatus === 'PENDING' || s.status === 'PENDING_APPROVAL');
+      this.directReviewStep = pendingStep || steps[steps.length - 1];
+      this.openModal('direct-review');
+    } else {
+      this.showToast(`No execution data available for ${key.toUpperCase()} yet`, 'info');
+    }
+  }
+
+  approveDirectReview(): void {
+    if (!this.directReviewStep || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({ stepId: this.directReviewStep.id, decision: 'APPROVED' }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.closeModal();
+        if (this.activeMission?.id) this.loadFlowStatuses(this.activeMission.id);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+        this.showToast('Failed to approve step', 'error');
+      }
+    });
+  }
+
+  rejectDirectReview(): void {
+    if (!this.directReviewStep || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({
+      stepId: this.directReviewStep.id,
+      decision: 'REJECTED',
+      comments: this.reviewFeedback
+    }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.closeModal();
+        if (this.activeMission?.id) this.loadFlowStatuses(this.activeMission.id);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+        this.showToast('Failed to reject step', 'error');
+      }
+    });
   }
 
   private bootstrapLogs(): void {

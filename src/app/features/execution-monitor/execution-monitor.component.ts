@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject, interval, switchMap, takeUntil } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
 import { SseService } from '../../shared/services/sse.service';
@@ -39,20 +39,9 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg) => {
         if (msg.event.startsWith('execution.') || msg.event === 'step.completed') {
-          this.loadData();
+          this.loadData(false);
         }
       });
-    if (this.autoRefresh) {
-      interval(10000)
-        .pipe(
-          takeUntil(this.destroy$),
-          switchMap(() => {
-            this.loadData();
-            return [];
-          }),
-        )
-        .subscribe();
-    }
   }
 
   ngOnDestroy(): void {
@@ -60,8 +49,8 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  private loadData(): void {
-    this.loading = true;
+  private loadData(showSpinner = true): void {
+    if (showSpinner) this.loading = true;
     this.error = null;
 
     this.executionsService.getAll().subscribe({

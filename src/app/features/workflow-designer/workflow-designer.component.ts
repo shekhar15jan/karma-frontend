@@ -403,7 +403,7 @@ export class WorkflowDesignerComponent implements OnInit, OnDestroy {
 
   designNodeBorderClass(node: any): string {
     const activeStatus = this.activeStepsByAgent.get(node.agentId);
-    if (activeStatus === 'RUNNING') return 'border border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)] animate-pulse';
+    if (activeStatus === 'RUNNING') return 'border-2 border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)] animate-pulse';
     if (activeStatus === 'COMPLETED') return 'border-l-4 border-green-500';
     if (activeStatus === 'FAILED') return 'border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]';
     

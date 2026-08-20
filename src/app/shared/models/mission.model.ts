@@ -10,6 +10,7 @@ export interface MissionResponse {
   progress: number;
   outputDirectory?: string;
   targetDurationSeconds?: number;
+  theme?: string;
   startedAt: string;
   completedAt: string;
   createdAt: string;

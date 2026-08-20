@@ -104,6 +104,14 @@ export class AdministrationComponent implements OnInit {
       description: 'Spoken narration words per scene (~2.3 words/sec). Drives real video length.',
       category: 'Video',
     },
+    'video.resolution': {
+      description: 'Output resolution as WxH (e.g. 1920x1080 for Full HD, 1280x720 for HD). Higher resolution keeps code and diagrams readable on small screens.',
+      category: 'Video',
+    },
+    'video.scene_motion': {
+      description: 'Per-scene motion: "animated" applies entrance, Ken Burns, timeline events and progress bars; "static" renders one frozen frame per scene. Always use "animated" for YouTube education videos.',
+      category: 'Video',
+    },
   };
 
   constructor(private readonly adminService: AdminService,

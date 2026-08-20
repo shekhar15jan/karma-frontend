@@ -136,6 +136,10 @@ export const routes: Routes = [
             (m) => m.AdministrationComponent,
           ),
       },
+      {
+        path: '**',
+        redirectTo: 'dashboard',
+      },
     ],
   },
 ];
