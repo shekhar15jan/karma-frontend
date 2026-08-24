@@ -239,13 +239,6 @@ interface ChatMessage {
 
       <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-primary-container shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
         
-        <!-- EXTREME LEFT: Wake up Karma -->
-        <div class="absolute left-6 flex items-center">
-          <button (click)="wakeUpKarma()" class="px-6 py-2 bg-primary/10 border border-primary/30 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-primary/20 transition-all shadow-lg group cursor-pointer">
-            <span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">light_mode</span> Wake up Karma
-          </button>
-        </div>
-
         <!-- CENTER: placeholder (controls moved to Active Mission panel) -->
         <div></div>
 
