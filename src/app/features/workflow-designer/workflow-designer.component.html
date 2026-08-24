@@ -139,7 +139,7 @@
         }
 
         <!-- Connections SVG layer -->
-        <svg class="absolute inset-0 w-full h-full pointer-events-none">
+        <svg class="absolute inset-0 w-full h-full pointer-events-none" style="overflow: visible;">
         <defs>
           <marker
             id="arrow"
@@ -150,27 +150,27 @@
             markerHeight="6"
             orient="auto-start-reverse"
           >
-            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="currentColor" class="text-primary-container" />
+            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#00e5ff" />
           </marker>
         </defs>
         @for (edge of edges; track edge.id) {
           <path
             [attr.d]="getNodePath(edge)"
             fill="none"
-            stroke="currentColor"
+            stroke="#00e5ff"
             stroke-width="2"
             marker-end="url(#arrow)"
-            class="text-primary-container glow-text transition-all duration-300"
+            class="glow-text transition-all duration-300"
           />
         }
         @if (isConnecting && sourceNodeId) {
           <path
             [attr.d]="getTempPath()"
             fill="none"
-            stroke="currentColor"
+            stroke="#00e5ff"
             stroke-width="1.5"
             marker-end="url(#arrow)"
-            class="text-primary-container opacity-60 transition-all duration-300"
+            class="opacity-60 transition-all duration-300"
           />
         }
       </svg>
@@ -200,19 +200,19 @@
           
           <!-- FIXED 4-SIDED PORTS -->
           <!-- Left Port (Input) -->
-          <div class="absolute -left-2 top-[42px] -translate-y-1/2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
+          <div class="absolute -left-2 top-[42px] -translate-y-1/2 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity z-30">
             <div class="w-3.5 h-3.5 rounded-full bg-surface-container border-2 border-outline-variant hover:border-primary transition-colors hover:scale-125" title="left (input)" (mouseup)="finishConnection(node, 'left', $event)"></div>
           </div>
           <!-- Top Port (Input) -->
-          <div class="absolute top-[-6px] left-[88px] -translate-x-1/2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
+          <div class="absolute top-[-6px] left-[88px] -translate-x-1/2 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity z-30">
             <div class="w-3.5 h-3.5 rounded-full bg-surface-container border-2 border-outline-variant hover:border-primary transition-colors hover:scale-125" title="top (input)" (mouseup)="finishConnection(node, 'top', $event)"></div>
           </div>
           <!-- Right Port (Output) -->
-          <div class="absolute -right-2 top-[42px] -translate-y-1/2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
+          <div class="absolute -right-2 top-[42px] -translate-y-1/2 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity z-30">
             <div class="w-3.5 h-3.5 rounded-full bg-surface-container border-2 border-primary hover:bg-primary/20 transition-all hover:scale-125 cursor-crosshair" title="right (output)" (mousedown)="startConnection(node, 'right', $event)"></div>
           </div>
           <!-- Bottom Port (Output) -->
-          <div class="absolute bottom-[-6px] left-[88px] -translate-x-1/2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-30">
+          <div class="absolute bottom-[-6px] left-[88px] -translate-x-1/2 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity z-30">
             <div class="w-3.5 h-3.5 rounded-full bg-surface-container border-2 border-primary hover:bg-primary/20 transition-all hover:scale-125 cursor-crosshair" title="bottom (output)" (mousedown)="startConnection(node, 'bottom', $event)"></div>
           </div>
 

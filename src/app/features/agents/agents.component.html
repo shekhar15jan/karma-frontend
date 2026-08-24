@@ -179,6 +179,24 @@
               }
             </div>
           </div>
+
+          <!-- MCP Servers -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">MCP Servers ({{ selectedMcpServerIds.length }} assigned)</label>
+            <div class="max-h-36 overflow-y-auto no-scrollbar bg-white/5 border border-outline-variant/30 rounded-lg p-2 flex flex-col gap-1">
+              @if (mcpServers.length === 0) {
+                <span class="text-[9px] text-on-surface-variant">No MCP servers configured yet.</span>
+              }
+              @for (mcp of mcpServers; track mcp.id) {
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-white/5 rounded px-1.5 py-1">
+                  <input type="checkbox" class="accent-cyan-400 cursor-pointer"
+                         [checked]="isMcpSelected(mcp.id)" (change)="toggleMcpServer(mcp.id)" />
+                  <span class="text-[10px] text-on-surface font-semibold">{{ mcp.name }}</span>
+                  <span class="text-[8px] text-on-surface-variant font-mono ml-auto uppercase">{{ mcp.transportType }}</span>
+                </label>
+              }
+            </div>
+          </div>
         </div>
 
         <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">

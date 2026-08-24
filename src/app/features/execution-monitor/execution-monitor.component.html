@@ -46,17 +46,23 @@
             <span>Model: {{ exec.modelUsed || 'N/A' }}</span>
             <span>Cost: ${{ formatCost(exec.totalCost) }}</span>
           </div>
+          @if (exec.status === 'FAILED' && exec.errorMessage) {
+            <div class="text-[9px] font-mono text-red-300 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 break-words whitespace-pre-wrap leading-relaxed">
+              <span class="font-bold text-red-400">Execution FAILED:</span> {{ exec.errorMessage }}
+            </div>
+          }
           @if (selectedExecution?.id === exec.id && steps.length > 0) {
             <div class="border-t border-outline-variant/20 pt-3 space-y-2">
               @for (step of steps; track step.id) {
                 <div class="p-2 bg-white/5 rounded-lg">
                   <div class="flex items-center justify-between cursor-pointer" (click)="toggleStep(step)">
                     <div class="flex items-center gap-2 text-[10px]">
-                      <span class="material-symbols-outlined text-[12px]" [class]="step.status === 'COMPLETED' ? 'text-green-400' : step.status === 'RUNNING' ? 'text-blue-400' : 'text-on-surface-variant'">
-                        {{ step.status === 'COMPLETED' ? 'check_circle' : step.status === 'RUNNING' ? 'sync' : 'schedule' }}
+                      <span class="material-symbols-outlined text-[12px]" [class]="step.status === 'COMPLETED' ? 'text-green-400' : step.status === 'FAILED' ? 'text-red-400' : step.status === 'RUNNING' ? 'text-blue-400 animate-spin' : 'text-on-surface-variant'">
+                        {{ step.status === 'COMPLETED' ? 'check_circle' : step.status === 'FAILED' ? 'error' : step.status === 'RUNNING' ? 'sync' : 'schedule' }}
                       </span>
                       <span>Step {{ step.id.substring(0, 6) }}</span>
                       <span class="text-on-surface-variant">{{ step.stepType }}</span>
+                      <span class="px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider border" [ngClass]="step.status === 'COMPLETED' ? 'bg-green-500/15 text-green-400 border-green-500/30' : step.status === 'FAILED' ? 'bg-red-500/15 text-red-400 border-red-500/30' : step.status === 'RUNNING' ? 'bg-blue-500/15 text-blue-400 border-blue-500/30 animate-pulse' : 'bg-white/5 text-on-surface-variant border-outline-variant/20'">{{ step.status }}</span>
                       @if (step.reviewStatus === 'PENDING_REVIEW') {
                         <span class="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-400 border border-orange-500/30">awaiting review</span>
                       } @else if (step.reviewStatus === 'REJECTED') {
@@ -68,6 +74,23 @@
                       <span class="material-symbols-outlined text-[12px] text-on-surface-variant transition-transform" [style.transform]="expandedStepId === step.id ? 'rotate(90deg)' : 'none'">chevron_right</span>
                     </div>
                   </div>
+                  @if (step.status === 'FAILED' && step.errorMessage) {
+                    <div class="mt-2 text-[9px] font-mono text-red-300 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 break-words whitespace-pre-wrap leading-relaxed">
+                      <span class="font-bold text-red-400">FAILED:</span> {{ step.errorMessage }}
+                      @if (step.errorMessage.includes('PayloadTooLarge') || step.errorMessage.includes('413')) {
+                        <span class="block mt-1 text-[8px] text-orange-300">Hint: prompt too large for this free model — try smaller scenesPerChunk or switch provider.</span>
+                      }
+                      @if (step.errorMessage.includes('429') || step.errorMessage.includes('Too Many Requests')) {
+                        <span class="block mt-1 text-[8px] text-yellow-300">Hint: rate limit — wait 60s or use fallback provider.</span>
+                      }
+                      @if (step.errorMessage.includes('unknown component') || step.errorMessage.includes('big-number')) {
+                        <span class="block mt-1 text-[8px] text-cyan-300">Hint: component type not in ALLOWED_COMPONENT_TYPES — auto-coerced next run.</span>
+                      }
+                      @if (step.errorMessage.includes('Target closed') || step.errorMessage.includes('Remotion')) {
+                        <span class="block mt-1 text-[8px] text-purple-300">Hint: browser OOM — use static mode (ffmpeg) or fewer scenes.</span>
+                      }
+                    </div>
+                  }
                   @if (expandedStepId === step.id) {
                     <div class="mt-2 space-y-2 border-t border-outline-variant/20 pt-2">
                       @if (step.modelUsed) {

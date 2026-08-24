@@ -46,6 +46,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'mcp-servers',
+        loadComponent: () =>
+          import('./features/mcp-servers/mcp-servers.component').then(
+            (m) => m.McpServersComponent,
+          ),
+      },
+      {
         path: 'agents/:id/trace',
         loadComponent: () =>
           import('./features/agent-trace/agent-trace.component').then(

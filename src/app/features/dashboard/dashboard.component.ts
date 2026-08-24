@@ -71,6 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   flowStepMap: Map<string, string> = new Map();
   hubStatus: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
+  failedStepDetail: { key: string; label: string; error: string } | null = null;
   activeMissionMode: 'AUTO' | 'REVIEW' | null = null;
 
   loading = false;
@@ -375,6 +376,20 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   hubPct(key: string): string {
     const s = this.hubStatus[key];
     return s ? s.pct + '%' : '0%';
+  }
+  hubRingColor(key: string): string {
+    const s = this.hubStatus[key];
+    if (!s) return 'rgba(255,255,255,0.2)';
+    if (s.text === 'Completed') return '#4ade80';
+    if (s.text === 'Failed') return '#f87171';
+    if (s.text === 'Running') return '#00e5ff';
+    return 'rgba(255,255,255,0.2)';
+  }
+  hubRingOffset(key: string): number {
+    const s = this.hubStatus[key];
+    const pct = s ? s.pct : 0;
+    const circ = 2 * Math.PI * 24; // 150.8
+    return circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
   }
 
   flowBadge(flow: any): { text: string; cls: string; border: string; pulse: boolean } {
@@ -1468,6 +1483,15 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
     this.hubStatus = next;
+    // Capture first failed step detail for UI banner
+    const failed = steps.find(s => s.status === 'FAILED' && s.errorMessage);
+    if (failed) {
+      const k = this.hubKeyForStep(failed) || 'unknown';
+      const label = this.hudNodes.find(n => n.key === k)?.label || k.toUpperCase();
+      this.failedStepDetail = { key: k, label, error: failed.errorMessage! };
+    } else {
+      this.failedStepDetail = null;
+    }
   }
 
   private hubKeyForStep(step: ExecutionStepResponse): string | null {

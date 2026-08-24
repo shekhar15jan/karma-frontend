@@ -8,6 +8,7 @@ import { SkillsService } from '../../shared/services/skills.service';
 import { AgentResponse } from '../../shared/models/agent.model';
 import { ProviderResponse } from '../../shared/models/provider.model';
 import { SkillResponse } from '../../shared/models/skill.model';
+import { McpServer, McpService } from '../../shared/services/mcp.service';
 import { StatusToggleComponent } from '../../shared/components/status-toggle/status-toggle.component';
 
 @Component({
@@ -21,8 +22,10 @@ export class AgentsComponent implements OnInit {
   agents: AgentResponse[] = [];
   providers: ProviderResponse[] = [];
   skills: SkillResponse[] = [];
+  mcpServers: McpServer[] = [];
   selectedAgent: AgentResponse | null = null;
   selectedSkillIds: string[] = [];
+  selectedMcpServerIds: string[] = [];
   isNewAgent = false;
   loading = false;
   private readonly togglingIds = new Set<string>();
@@ -31,13 +34,15 @@ export class AgentsComponent implements OnInit {
   constructor(
     private readonly agentsService: AgentsService,
     private readonly providersService: ProvidersService,
-    private readonly skillsService: SkillsService
+    private readonly skillsService: SkillsService,
+    private readonly mcpService: McpService
   ) {}
 
   ngOnInit(): void {
     this.loadAgents();
     this.loadProviders();
     this.loadSkills();
+    this.loadMcpServers();
   }
 
   loadAgents(): void {
@@ -67,6 +72,13 @@ export class AgentsComponent implements OnInit {
     this.skillsService.getAll().subscribe({
       next: (data) => this.skills = data.filter(s => s.status === 'ACTIVE' || s.status === 'INSTALLED'),
       error: (err) => console.error('Failed to load skills', err)
+    });
+  }
+
+  loadMcpServers(): void {
+    this.mcpService.getAll().subscribe({
+      next: (data) => this.mcpServers = data,
+      error: (err) => console.error('Failed to load MCP servers', err)
     });
   }
 
@@ -119,9 +131,23 @@ export class AgentsComponent implements OnInit {
     }
   }
 
+  isMcpSelected(serverId: string): boolean {
+    return this.selectedMcpServerIds.includes(serverId);
+  }
+
+  toggleMcpServer(serverId: string): void {
+    const idx = this.selectedMcpServerIds.indexOf(serverId);
+    if (idx >= 0) {
+      this.selectedMcpServerIds.splice(idx, 1);
+    } else {
+      this.selectedMcpServerIds.push(serverId);
+    }
+  }
+
   selectAgent(agent: AgentResponse): void {
     this.selectedAgent = { ...agent };
     this.selectedSkillIds = (agent.skills || []).map(s => s.id);
+    this.selectedMcpServerIds = (agent.mcpServers || []).map(s => s.id);
     this.isNewAgent = false;
   }
 
@@ -141,10 +167,12 @@ export class AgentsComponent implements OnInit {
       temperature: 0.7,
       memoryMode: 'OFF',
       skills: [],
+      mcpServers: [],
       createdAt: '',
       updatedAt: '',
     };
     this.selectedSkillIds = [];
+    this.selectedMcpServerIds = [];
     this.isNewAgent = true;
   }
 
@@ -196,6 +224,7 @@ export class AgentsComponent implements OnInit {
       temperature: this.selectedAgent.temperature ?? 0.7,
       memoryMode: this.selectedAgent.memoryMode || 'OFF',
       skillIds: this.selectedSkillIds,
+      mcpServerIds: this.selectedMcpServerIds,
     };
     const op = this.isNewAgent
       ? this.agentsService.create(payload)
