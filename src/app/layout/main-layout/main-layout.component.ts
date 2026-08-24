@@ -117,6 +117,9 @@ interface ChatMessage {
               <span class="text-sm font-medium text-primary-container glow-text">{{ currentTime }}</span>
               <span class="text-[9px] uppercase text-on-surface-variant">{{ currentDate }}</span>
             </div>
+            <button (click)="logout()" class="ml-2 px-4 py-1.5 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">power_settings_new</span> Bye Bye Karma
+            </button>
           </div>
         </div>
       </header>
@@ -243,16 +246,8 @@ interface ChatMessage {
           </button>
         </div>
 
-        <!-- CENTER: Mission Controls -->
-        <div class="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-2xl border border-primary/30">
-          <button (click)="stopMission()" class="px-6 py-2 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/30 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">stop_circle</span> Stop Mission
-          </button>
-          <div class="h-6 w-px bg-white/10 mx-2"></div>
-          <button (click)="publishNow()" class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">send</span> Publish
-          </button>
-        </div>
+        <!-- CENTER: placeholder (controls moved to Active Mission panel) -->
+        <div></div>
 
         <!-- EXTREME RIGHT: Bye Bye Karma & Version Info -->
         <div class="absolute right-6 flex items-center gap-6">
@@ -263,9 +258,6 @@ interface ChatMessage {
               <span class="text-[8px] text-green-500/70 font-bold uppercase">Encryption Active</span>
             </div>
           </div>
-          <button (click)="logout()" class="px-6 py-2 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Bye Bye Karma
-          </button>
         </div>
       </footer>
     </div>
