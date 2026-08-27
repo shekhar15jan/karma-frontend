@@ -132,6 +132,11 @@
               Cancel
             </button>
           }
+          @if (exec.status === 'FAILED') {
+            <button class="self-end px-3 py-1 bg-primary/20 border border-primary/40 text-primary text-[10px] font-bold rounded-lg hover:bg-primary/30 flex items-center gap-1" (click)="$event.stopPropagation(); resumeExecution(exec)">
+              <span class="material-symbols-outlined text-[14px]">play_arrow</span> Resume
+            </button>
+          }
         </div>
       }
       @if (executions.length === 0) {

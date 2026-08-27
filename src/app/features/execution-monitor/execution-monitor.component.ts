@@ -95,6 +95,23 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
     });
   }
 
+  resumeExecution(exec: ExecutionResponse): void {
+    this.executionsService.getSteps(exec.id).subscribe({
+      next: (steps) => {
+        const failed = steps.find(s => s.status === 'FAILED');
+        const isVideo = failed?.stepType?.toUpperCase().includes('VIDEO');
+        const obs = isVideo ? this.executionsService.retryVideo(exec.id) : this.executionsService.retryScript(exec.id);
+        obs.subscribe({
+          next: () => this.loadData(),
+          error: () => this.loadData()
+        });
+      },
+      error: () => {
+        this.executionsService.retryScript(exec.id).subscribe(() => this.loadData());
+      }
+    });
+  }
+
   toggleStep(step: ExecutionStepResponse): void {
     this.expandedStepId = this.expandedStepId === step.id ? null : step.id;
   }

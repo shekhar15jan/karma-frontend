@@ -8,6 +8,7 @@ import { VoicePreferencesService } from '../../shared/services/voice-preferences
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkspacesService } from '../../shared/services/workspaces.service';
 import { KarmaActionService, KarmaUiAction } from '../../shared/services/karma-action.service';
+import { environment } from '../../../environments/environment';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -309,6 +310,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/workflows', label: 'Workflow Designer', icon: 'hub' },
     { path: '/agents', label: 'Agents', icon: 'smart_toy' },
+    { path: '/executions', label: 'Executions', icon: 'play_circle' },
     { path: '/artifacts', label: 'Artifacts', icon: 'inventory_2' },
     { path: '/calendar', label: 'Calendar', icon: 'calendar_today' },
     { path: '/knowledge', label: 'Knowledge', icon: 'menu_book' },
@@ -334,6 +336,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         this.activeLanguage = lang;
         if (this.recognition) {
           this.recognition.lang = this.sttLanguageCodes[lang] || 'en-US';
+          // P3.1: apply the new locale immediately by bouncing an active recognizer
+          if (this.isListening) {
+            this.stopListening();
+            setTimeout(() => {
+              const busy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+              if (!busy && !this.isKarmaSpeaking && this.karmaVoiceSpeechEnabled) {
+                this.startListening();
+              }
+            }, 400);
+          }
         }
       }
       this.preferredVoice = this.voicePrefs.voice();
@@ -585,17 +597,20 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
       this.recognition.onend = () => {
         this.isListening = false;
-        // Auto-restart loop if Karma Voice is still active AND Karma is not currently speaking
-        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+        // P3.2 single-owner gate: restart ONLY when the TTS queue is fully drained,
+        // with a debounce to prevent InvalidStateError double-starts.
+        const queueBusy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking && !queueBusy) {
           setTimeout(() => {
-            try {
-              if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+            const stillBusy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+            if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking && !stillBusy) {
+              try {
                 this.recognition.start();
+              } catch (e) {
+                console.warn('Voice restart skipped:', e);
               }
-            } catch (e) {
-              console.error('Error restarting voice loop:', e);
             }
-          }, 300);
+          }, 400);
         } else {
           this.voiceText = 'Click to speak';
         }
@@ -670,23 +685,90 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
     const history = this.buildChatHistory();
-    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage, history }).subscribe({
-      next: (res) => {
-        const reply = res.reply || 'I processed your request.';
-        if (res.intent === 'language' && res.target) {
-          this.switchLanguage(res.target);
+    this.streamKarma(command, currentPage, history);
+  }
+
+  /** P5: consume SSE /voice/chat/stream; falls back to classic POST on any failure. */
+  private streamKarma(command: string, currentPage: string,
+                      history: Array<{ role: string; content: string }>): void {
+    const token = localStorage.getItem('karma_token') || '';
+    const base = environment.apiUrl.replace(/\/api\/?$/, '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+
+    const finishClassic = () => {
+      clearTimeout(timer);
+      this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage, history }).subscribe({
+        next: (res) => { this.onKarmaResponse(res); },
+        error: () => { this.karmaReply('I am having trouble connecting to my AI. Please try again.'); }
+      });
+    };
+
+    fetch(base + '/api/v1/voice/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text: command, currentPage, preferredLanguage: this.activeLanguage, history }),
+      signal: controller.signal
+    }).then((r) => {
+      if (!r.ok || !r.body) throw new Error('no-stream');
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let karmaMsg: ChatMessage | null = null;
+      const pump = (): any => reader.read().then(({ done, value }): any => {
+        if (done) { clearTimeout(timer); return; }
+        buf += dec.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buf.indexOf('\n\n')) !== -1) {
+          const raw = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          const evm = /^event:\s*(.+)$/m.exec(raw);
+          const ev = evm ? evm[1].trim() : 'message';
+          const data = raw.split('\n').filter(l => l.startsWith('data:')).map(l => l.replace(/^data:\s?/, '')).join('');
+          if (!data) continue;
+          if (ev === 'chunk') {
+            if (!karmaMsg) {
+              karmaMsg = { sender: 'karma', text: '', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isTyping: false };
+              this.chatMessages.push(karmaMsg);
+            }
+            karmaMsg.text += (karmaMsg.text ? ' ' : '') + data;
+            continue;
+          }
+          if (ev === 'final') {
+            clearTimeout(timer);
+            try {
+              const res = JSON.parse(data);
+              // Authoritative final replaces the progressive render
+              if (karmaMsg) { karmaMsg.text = res.reply || karmaMsg.text; }
+              this.onKarmaResponse(res, karmaMsg ?? undefined);
+            } catch {}
+            return;
+          }
         }
-        this.karmaReply(reply, res.language);
-        if (res.intent === 'navigate' && res.target && !res.action) {
-          const route = '/' + this.normalizeRoute(res.target);
-          this.router.navigate([route]);
-        }
-        this.handleKarmaAction(res);
-      },
-      error: () => {
-        this.karmaReply('I am having trouble connecting to my AI. Please try again.');
-      }
-    });
+        return pump();
+      }).catch(() => {});
+      pump();
+    }).catch(() => finishClassic());
+  }
+
+  /** Shared post-processing for both streaming and classic paths. */
+  private onKarmaResponse(res: any, existingMsg?: ChatMessage): void {
+    const reply = res.reply || 'I processed your request.';
+    if (res.intent === 'language' && res.target) {
+      this.switchLanguage(res.target);
+    }
+    if (existingMsg) {
+      existingMsg.isTyping = false;
+      this.showToast(reply, 'graphic_eq');
+      this.speak(reply, res.language, existingMsg);
+    } else {
+      this.karmaReply(reply, res.language);
+    }
+    if (res.intent === 'navigate' && res.target && !res.action && !(Array.isArray(res.actions) && res.actions.length)) {
+      const route = '/' + this.normalizeRoute(res.target);
+      this.router.navigate([route]);
+    }
+    this.handleKarmaAction(res);
   }
 
   private normalizeRoute(page: string): string {
@@ -723,26 +805,47 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ];
 
   private handleKarmaAction(res: any): void {
-    const action: KarmaUiAction | undefined = res?.action;
-    if (!action?.type) return;
+    // Multi-step plan: execute sequentially; single action remains the common path.
+    const list: KarmaUiAction[] = Array.isArray(res?.actions) && res.actions.length > 0
+      ? res.actions.filter((a: any) => a?.type)
+      : (res?.action?.type ? [res.action] : []);
+    if (list.length === 0) return;
 
-    if (action.type === 'navigate' && action.params && action.params['page']) {
-      const route = '/' + this.normalizeRoute(String(action.params['page']));
-      this.router.navigate([route]).then(() => this.karmaActions.dispatch(action));
-      return;
-    }
-
-    if (this.dashboardActionTypes.includes(action.type)) {
-      const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
-      if (currentPage !== 'dashboard') {
-        this.router.navigate(['/dashboard']).then(() => this.karmaActions.dispatch(action));
-      } else {
-        this.karmaActions.dispatch(action);
+    const runSequentially = async () => {
+      for (const action of list.slice(0, 5)) {
+        await this.runSingleKarmaAction(action);
       }
-      return;
-    }
+    };
+    runSequentially();
+  }
 
-    this.karmaActions.dispatch(action);
+  private runSingleKarmaAction(action: KarmaUiAction): Promise<void> {
+    return new Promise((resolve) => {
+      if (action.type === 'navigate' && action.params && action.params['page']) {
+        this.router.navigate(['/' + this.normalizeRoute(String(action.params['page']))]).then(() => {
+          this.karmaActions.dispatch(action);
+          setTimeout(resolve, 500);
+        });
+        return;
+      }
+
+      if (this.dashboardActionTypes.includes(action.type)) {
+        const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
+        if (currentPage !== 'dashboard') {
+          this.router.navigate(['/dashboard']).then(() => {
+            this.karmaActions.dispatch(action);
+            setTimeout(resolve, 500);
+          });
+        } else {
+          this.karmaActions.dispatch(action);
+          setTimeout(resolve, 500);
+        }
+        return;
+      }
+
+      this.karmaActions.dispatch(action);
+      resolve();
+    });
   }
 
   private buildChatHistory(): Array<{ role: string; content: string }> {
@@ -806,8 +909,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.isProcessingSpeechQueue = false;
       this.isKarmaSpeaking = false;
       window.dispatchEvent(new CustomEvent('karma-speaking', { detail: false }));
+      // P3.2: debounced mic resume after the queue fully drains
       if (this.karmaVoiceSpeechEnabled) {
-        this.startListening(); // Resume listening when queue is fully empty
+        setTimeout(() => {
+          const busy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+          if (!busy && this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+            this.startListening();
+          }
+        }, 400);
       }
       return;
     }
@@ -885,6 +994,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       else if (item.language.startsWith('ur')) body.voice = 'ur-IN-GulNeural';
       else if (item.language.startsWith('fr')) body.voice = 'fr-FR-DeniseNeural';
       else if (item.language.startsWith('de')) body.voice = 'de-DE-KatjaNeural';
+      else if (item.language.startsWith('ja')) body.voice = 'ja-JP-NanamiNeural';
+      else if (item.language.startsWith('zh')) body.voice = 'zh-CN-XiaoxiaoNeural';
       else if (this.preferredVoice) body.voice = this.preferredVoice;
     } else {
       // Force an English voice for English text

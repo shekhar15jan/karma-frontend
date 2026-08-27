@@ -29,6 +29,14 @@ export class ExecutionsService {
     return this.api.postData(`/v1/executions/${id}/cancel`, {});
   }
 
+  retryVideo(id: string): Observable<unknown> {
+    return this.api.postData(`/v1/executions/${id}/retry-video`, {});
+  }
+
+  retryScript(id: string): Observable<unknown> {
+    return this.api.postData(`/v1/executions/${id}/retry-script`, {});
+  }
+
   getStatus(id: string): Observable<unknown> {
     return this.api.getData(`/v1/executions/${id}/status`);
   }

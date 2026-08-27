@@ -448,6 +448,55 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  stopActiveMission(): void {
+    if (!this.activeMission?.id) return;
+    this.executionsService.getAll().subscribe({
+      next: (executions) => {
+        const active = executions.find(e =>
+          e.status === 'RUNNING' || e.status === 'PENDING' || e.status === 'WAITING' || e.status === 'PAUSED');
+        if (!active) {
+          this.showToast('No active executions to stop', 'info');
+          return;
+        }
+        this.executionsService.cancel(active.id).subscribe({
+          next: () => {
+            this.showToast('Mission stopped', 'stop_circle');
+            this.loadDashboard();
+          },
+          error: () => this.showToast('Failed to stop mission', 'error')
+        });
+      },
+      error: () => this.showToast('Failed to fetch executions', 'error')
+    });
+  }
+
+  publishActiveMission(): void {
+    this.router.navigate(['/publishing']);
+  }
+
+  resumeFailedExecution(): void {
+    if (!this.activeMission?.id || !this.failedStepDetail) return;
+    this.executionsService.getAll(this.activeMission.id).subscribe({
+      next: (executions) => {
+        const failed = executions.find(e => e.status === 'FAILED');
+        if (!failed) {
+          this.showToast('No failed execution to resume', 'info');
+          return;
+        }
+        const isVideo = this.failedStepDetail?.key === 'video';
+        const obs = isVideo ? this.executionsService.retryVideo(failed.id) : this.executionsService.retryScript(failed.id);
+        obs.subscribe({
+          next: () => {
+            this.showToast(`Resuming ${this.failedStepDetail?.label} from last chunk...`, 'play_arrow');
+            this.loadDashboard();
+          },
+          error: (err) => this.showToast('Resume failed: ' + (err?.error?.message || err?.message), 'error')
+        });
+      },
+      error: () => this.showToast('Failed to fetch executions', 'error')
+    });
+  }
+
   toggleDiagnosticsSidebar() {
     this.showDiagnosticsSidebar = !this.showDiagnosticsSidebar;
   }
