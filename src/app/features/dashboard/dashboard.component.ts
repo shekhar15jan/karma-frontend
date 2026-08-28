@@ -1532,8 +1532,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     });
     this.hubStatus = next;
-    // Capture first failed step detail for UI banner
-    const failed = steps.find(s => s.status === 'FAILED' && s.errorMessage);
+    // Capture first failed step detail for UI banner — hide stale FAILED if same hub is now RUNNING (retry in progress)
+    const runningHubs = new Set(steps.filter(s => s.status === 'RUNNING').map(s => this.hubKeyForStep(s)).filter(Boolean) as string[]);
+    const failed = steps.find(s => s.status === 'FAILED' && s.errorMessage && !runningHubs.has(this.hubKeyForStep(s) || ''));
     if (failed) {
       const k = this.hubKeyForStep(failed) || 'unknown';
       const label = this.hudNodes.find(n => n.key === k)?.label || k.toUpperCase();

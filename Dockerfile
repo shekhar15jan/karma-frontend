@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ARG BUILD_STAMP
+ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN BUILD_STAMP_VALUE="${BUILD_STAMP:-$(date +%s)}" \
  && npm run build \
  && echo "{\"version\":\"${BUILD_STAMP_VALUE}\"}" > dist/browser/version.json
