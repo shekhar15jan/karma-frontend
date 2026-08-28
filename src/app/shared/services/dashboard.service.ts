@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ApiService } from './api.service';
 import { MissionResponse } from '../models/mission.model';
 import { FlowResponse } from '../models/flow.model';
@@ -17,6 +17,10 @@ export class DashboardService {
 
   getFlows(): Observable<FlowResponse[]> {
     return this.api.getData<FlowResponse[]>('/v1/flows');
+  }
+
+  deleteFlow(id: string): Observable<void> {
+    return this.api.delete<void>(`/v1/flows/${id}`).pipe(map(r => r.data));
   }
 
   getPendingApprovals(): Observable<ArtifactResponse[]> {

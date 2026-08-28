@@ -21,7 +21,7 @@ export class WorkspacesComponent implements OnInit {
   expandedWorkspace: string | null = null;
 
   showCreateModal = false;
-  newWorkspace = { name: '', description: '' };
+  newWorkspace = { name: '', description: '', defaultOutputDirectory: '' };
   editingWorkspaceId: string | null = null;
 
   showProjectModal = false;
@@ -79,13 +79,13 @@ export class WorkspacesComponent implements OnInit {
   }
 
   openCreateModal(): void {
-    this.newWorkspace = { name: '', description: '' };
+    this.newWorkspace = { name: '', description: '', defaultOutputDirectory: '' };
     this.editingWorkspaceId = null;
     this.showCreateModal = true;
   }
 
   openEditModal(ws: WorkspaceResponse): void {
-    this.newWorkspace = { name: ws.name, description: ws.description };
+    this.newWorkspace = { name: ws.name, description: ws.description, defaultOutputDirectory: ws.defaultOutputDirectory || '' };
     this.editingWorkspaceId = ws.id;
     this.showCreateModal = true;
   }
@@ -99,7 +99,11 @@ export class WorkspacesComponent implements OnInit {
     if (!this.newWorkspace.name) return;
     
     this.loading = true;
-    const req = { name: this.newWorkspace.name, description: this.newWorkspace.description };
+    const req = {
+      name: this.newWorkspace.name,
+      description: this.newWorkspace.description,
+      defaultOutputDirectory: this.newWorkspace.defaultOutputDirectory?.trim() || undefined
+    };
     const op = this.editingWorkspaceId
       ? this.workspacesService.update(this.editingWorkspaceId, req)
       : this.workspacesService.create(req);

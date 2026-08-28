@@ -6,21 +6,28 @@ import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { DashboardService } from '../../shared/services/dashboard.service';
 import { ExecutionsService } from '../../shared/services/executions.service';
+import { Router } from '@angular/router';
 import { MissionsService } from '../../shared/services/missions.service';
 import { WorkspacesService } from '../../shared/services/workspaces.service';
 import { ProjectsService } from '../../shared/services/projects.service';
+import { SourceDocumentsService } from '../../shared/services/source-documents.service';
 import { MissionResponse } from '../../shared/models/mission.model';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { ProjectResponse } from '../../shared/models/project.model';
-import { FlowResponse } from '../../shared/models/flow.model';
+import { FlowResponse, FlowDetail } from '../../shared/models/flow.model';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
 import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
 import { AgentsService } from '../../shared/services/agents.service';
 import { ProvidersService } from '../../shared/services/providers.service';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { KarmaActionService } from '../../shared/services/karma-action.service';
+import { WorkflowsService } from '../../shared/services/workflows.service';
+import { ReviewsService } from '../../shared/services/reviews.service';
+import { SseService } from '../../shared/services/sse.service';
+import { PendingStepReviewResponse } from '../../shared/models/pending-step-review.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../shared/services/api.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-dashboard',
@@ -31,10 +38,18 @@ import { ApiService } from '../../shared/services/api.service';
 })
 export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   activeMission: (MissionResponse & { formattedDate?: string }) | null = null;
+  activeStepsByAgent = new Map<string, string>(); // agentId -> status (e.g. RUNNING, COMPLETED, PENDING, FAILED)
   flowsList: (FlowResponse & { icon?: string; status?: string })[] = [];
   selectedFlowForDiagram: (FlowResponse & { icon?: string; status?: string }) | null = null;
+  selectedFlowDetail: FlowDetail | null = null;
+  flowDetailLoading = false;
+  designNodes: any[] = [];
+  designEdges: any[] = [];
+  designBounds = { minX: 0, minY: 0, width: 800, height: 600 };
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
   missionProgress = 0;
+  missionSteps: ExecutionStepResponse[] = [];
+  directReviewStep: ExecutionStepResponse | null = null;
 
   hudNodes = [
     { key: 'research', label: 'RESEARCH', icon: 'search', left: 260, top: 50 },
@@ -54,12 +69,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   workers: { id: number; name: string; task: string; status: string; progress: number }[] = [];
   logs: string[] = [];
 
-  private flowStatusInterval: any;
-  private flowStepMap = new Map<string, string>();
+  flowStepMap: Map<string, string> = new Map();
+  hubStatus: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
+  failedStepDetail: { key: string; label: string; error: string } | null = null;
+  activeMissionMode: 'AUTO' | 'REVIEW' | null = null;
 
   loading = false;
   error: string | null = null;
-  runMode: 'AUTO' | 'REVIEW' = 'REVIEW';
+  runMode: 'AUTO' | 'REVIEW' = 'AUTO';
   heardCommand = 'Say "Wake up Karma" to begin';
 
   @ViewChild('flowsContainer') flowsContainer!: ElementRef;
@@ -83,6 +100,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     voice: 'Healthy' as string
   };
   agentStatusList: any[] = [];
+  pendingStepReviews: PendingStepReviewResponse[] = [];
+  selectedReviewStep: PendingStepReviewResponse | null = null;
+  reviewFeedback = '';
+  reviewSubmitting = false;
   defaultAgents = [
     { name: 'Research Agent', icon: 'search', colorClass: 'text-green-400', status: 'Standby' },
     { name: 'Planner Agent', icon: 'assignment', colorClass: 'text-blue-400', status: 'Standby' },
@@ -123,6 +144,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   showProjectModal = false;
   isCreatingProject = false;
   newProjectName = '';
+  selectedSourceFile: File | null = null;
   newMission = {
     workspaceId: '' as string,
     projectId: '' as string,
@@ -130,37 +152,19 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     description: '' as string,
     missionType: 'VIDEO' as string,
     priority: 'MEDIUM' as string,
-    providerId: '' as string
+    providerId: '' as string,
+    outputDirectory: '' as string,
+    targetDurationSeconds: '' as string,
+    theme: 'whiteboard' as string
   };
   selectedFlowIds: string[] = [];
-  flowsPresetDirty = false;
-  private missionTypePresets: Record<string, string[]> = {
-    VIDEO: ['Research', 'Script', 'Video', 'Publishing'],
-    BLOG: ['Research', 'Blog', 'Publishing'],
-    SCRIPT: ['Research', 'Script'],
-    VOICE: ['Voice'],
-    THUMBNAIL: ['Thumbnail'],
-    WORKFLOW: ['Research', 'Script', 'Video', 'Publishing'],
-  };
-
-  private flowByName(name: string): (FlowResponse & { icon?: string; status?: string }) | undefined {
-    return this.flowsList.find(f => (f.name || '').toLowerCase().includes(name.toLowerCase()));
-  }
-
-  applyFlowPreset(): void {
-    if (this.flowsPresetDirty) return;
-    const preset = this.missionTypePresets[this.newMission.missionType] || [];
-    this.selectedFlowIds = preset
-      .map(name => this.flowByName(name)?.id)
-      .filter((id): id is string => !!id);
-  }
+  selectedFlowId: string = '';
 
   isFlowSelected(flowId: string): boolean {
     return this.selectedFlowIds.includes(flowId);
   }
 
   toggleFlow(flowId: string): void {
-    this.flowsPresetDirty = true;
     const idx = this.selectedFlowIds.indexOf(flowId);
     if (idx >= 0) {
       this.selectedFlowIds.splice(idx, 1);
@@ -170,7 +174,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   toggleAllFlows(): void {
-    this.flowsPresetDirty = true;
     this.selectedFlowIds = this.allFlowsSelected()
       ? []
       : this.flowsList.filter(f => f.enabled !== false).map(f => f.id);
@@ -181,15 +184,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return enabled.length > 0 && this.selectedFlowIds.length === enabled.length;
   }
 
-  onMissionTypeChange(): void {
-    this.flowsPresetDirty = false;
-    this.applyFlowPreset();
-  }
-
   onWorkspaceChange(): void {
     this.projects = [];
     this.newMission.projectId = '';
     if (this.newMission.workspaceId) {
+      const ws = this.workspaces.find(w => w.id === this.newMission.workspaceId);
+      if (ws?.defaultOutputDirectory && !this.newMission.outputDirectory) {
+        this.newMission.outputDirectory = ws.defaultOutputDirectory;
+      }
       this.loadProjects(this.newMission.workspaceId);
     }
   }
@@ -207,6 +209,32 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   closeProjectModal(): void {
     this.showProjectModal = false;
+  }
+
+  openMissionModal(): void {
+    if (this.workspaces.length === 0) {
+      this.showToast('Please create a workspace first', 'error');
+      return;
+    }
+    this.newMission = {
+      workspaceId: this.workspaces[0].id,
+      projectId: '',
+      name: '',
+      description: '',
+      missionType: 'VIDEO',
+      priority: 'HIGH',
+      providerId: '',
+      outputDirectory: this.workspaces[0].defaultOutputDirectory || '',
+      targetDurationSeconds: '',
+      theme: 'whiteboard'
+    };
+    if (this.projects.length > 0) {
+      this.newMission.projectId = this.projects[0].id;
+    }
+    this.selectedSourceFile = null;
+    this.selectedFlowId = this.flowsList.length > 0 ? this.flowsList[0].id : '';
+    this.selectedFlowIds = this.selectedFlowId ? [this.selectedFlowId] : [];
+    this.activeModal = 'create-mission';
   }
 
   getWorkspaceName(): string {
@@ -253,7 +281,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       missionType: this.newMission.missionType,
       priority: this.newMission.priority,
       providerId: this.newMission.providerId || undefined,
-      selectedFlowIds: this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined
+      selectedFlowIds: this.selectedFlowId ? [this.selectedFlowId] : (this.selectedFlowIds.length > 0 ? [...this.selectedFlowIds] : undefined),
+      outputDirectory: this.newMission.outputDirectory?.trim() || undefined,
+      targetDurationSeconds: this.newMission.targetDurationSeconds
+        ? Math.max(30, Number(this.newMission.targetDurationSeconds))
+        : undefined,
+      theme: this.newMission.theme
     };
     this.missionsService.create(payload).subscribe({
       next: (created) => {
@@ -262,14 +295,44 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.activeModal = null;
         this.newMission.name = '';
         this.newMission.description = '';
-        this.flowsPresetDirty = false;
-        this.applyFlowPreset();
+        this.newMission.targetDurationSeconds = '';
         this.loadMissions(this.newMission.projectId);
-        if (runAfterCreate) {
-          this.executionsService.trigger(created.id, this.runMode).subscribe({
-            next: () => this.showToast('Mission execution started', 'play_arrow'),
-            error: () => this.showToast('Failed to start execution', 'error')
-          });
+        
+        const triggerExecution = () => {
+          if (runAfterCreate) {
+            this.executionsService.trigger(created.id, this.runMode).subscribe({
+              next: () => {
+                this.showToast('Mission execution started', 'play_arrow');
+                this.router.navigate(['/executions']);
+              },
+              error: (err) => this.showToast('Failed to start execution: ' + (err?.error?.message || err?.message || 'missing flows or configuration'), 'error')
+            });
+          }
+        };
+
+        if (this.selectedSourceFile) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            this.sourceDocsService.upload({
+              missionId: created.id,
+              filename: this.selectedSourceFile!.name,
+              format: this.selectedSourceFile!.name.split('.').pop() || 'txt',
+              content: content
+            }).subscribe({
+              next: () => {
+                this.showToast('Source document uploaded', 'check_circle');
+                triggerExecution();
+              },
+              error: (err) => {
+                this.showToast('Failed to upload source document', 'error');
+                triggerExecution(); // Trigger anyway or fail? Let's trigger anyway.
+              }
+            });
+          };
+          reader.readAsText(this.selectedSourceFile);
+        } else {
+          triggerExecution();
         }
       },
       error: (err) => {
@@ -279,30 +342,61 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  onFileSelected(event: any): void {
+    const file = event.target.files[0];
+    if (file) {
+      this.selectedSourceFile = file;
+    }
+  }
+
   isAgentReady(status: string): boolean {
     return status === 'Ready' || status === 'Healthy' || status === 'ACTIVE' || status === 'ONLINE';
   }
 
   hudState(key: string): { text: string; cls: string; border: string; pulse: boolean } {
-    const flow = this.flowsList.find(f =>
-      key === 'seo'
-        ? f.category === 'PLANNING'
-        : (f.name || '').toLowerCase().includes(key) || f.category.toLowerCase().includes(key)
-    );
-    if (!flow) return { text: 'Idle', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
-    switch (flow.status) {
-      case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
-      case 'IN_PROGRESS':
-      case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
-      case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
-      default: return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
-    }
+    const s = this.hubStatus[key];
+    if (s) return { text: s.text, cls: s.cls, border: s.border, pulse: s.pulse };
+    return { text: 'Idle', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
+  }
+
+  hudCircleCls(key: string): string {
+    const base = 'w-14 h-14 rounded-full glass-panel flex items-center justify-center';
+    const s = this.hubStatus[key];
+    if (!s) return `${base} border-outline-variant/50 opacity-60`;
+    const glow = s.pulse
+      ? ' rotating-green-light'
+      : s.text === 'Completed'
+        ? ' shadow-[0_0_18px_rgba(74,222,128,0.35)]'
+        : s.text === 'Failed'
+          ? ' shadow-[0_0_18px_rgba(239,68,68,0.35)]'
+          : '';
+    return `${base} ${s.border}${glow}`;
+  }
+
+  hubPct(key: string): string {
+    const s = this.hubStatus[key];
+    return s ? s.pct + '%' : '0%';
+  }
+  hubRingColor(key: string): string {
+    const s = this.hubStatus[key];
+    if (!s) return 'rgba(255,255,255,0.2)';
+    if (s.text === 'Completed') return '#4ade80';
+    if (s.text === 'Failed') return '#f87171';
+    if (s.text === 'Running') return '#00e5ff';
+    return 'rgba(255,255,255,0.2)';
+  }
+  hubRingOffset(key: string): number {
+    const s = this.hubStatus[key];
+    const pct = s ? s.pct : 0;
+    const circ = 2 * Math.PI * 24; // 150.8
+    return circ * (1 - Math.max(0, Math.min(100, pct)) / 100);
   }
 
   flowBadge(flow: any): { text: string; cls: string; border: string; pulse: boolean } {
     if (!flow) return { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false };
     switch (flow.status) {
       case 'COMPLETED': return { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false };
+      case 'RUNNING':
       case 'IN_PROGRESS':
       case 'ACTIVE': return { text: 'Running', cls: 'text-[#00e5ff]', border: 'border-[#00e5ff]', pulse: true };
       case 'FAILED': return { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false };
@@ -323,22 +417,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     let svg: string;
     if (t.includes('google') || t.includes('gemini'))
       svg = '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>';
-    else if (t.includes('openai'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#10a37f"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">O</text></svg>';
-    else if (t.includes('anthropic') || t.includes('claude'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#d97706"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">C</text></svg>';
     else if (t.includes('groq'))
       svg = '<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#f97316"/></svg>';
     else if (t.includes('opencode') || t.includes('zen'))
       svg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#00e5ff" opacity="0.2"/><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="13" font-weight="bold" font-family="sans-serif">Z</text></svg>';
     else if (t.includes('edge') || t.includes('tts'))
       svg = '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="#0078d4"/><path d="M12 7v10M8 10l4-3 4 3" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>';
-    else if (t.includes('elevenlabs'))
-      svg = '<svg viewBox="0 0 24 24"><path d="M3 12h2v4H3zm4-6h2v16H7zm4-4h2v24h-2zm4 6h2v12h-2zm4-2h2v10h-2z" fill="#8b5cf6"/></svg>';
-    else if (t.includes('stability'))
-      svg = '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#a855f7"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="sans-serif">S</text></svg>';
-    else if (t.includes('ffmpeg'))
-      svg = '<svg viewBox="0 0 24 24"><text x="12" y="16" text-anchor="middle" fill="#00e5ff" font-size="11" font-weight="bold" font-family="sans-serif">Ff</text></svg>';
+    else if (t.includes('remotion'))
+      svg = '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="#00e5ff" stroke-width="1.5"/><path d="M20 10l-3 2 3 2" stroke="#00e5ff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     else if (t.includes('openrouter'))
       svg = '<svg viewBox="0 0 24 24"><polygon points="12,4 20,20 4,20" fill="#8b5cf6" opacity="0.3"/><polygon points="12,8 17,18 7,18" fill="#8b5cf6"/></svg>';
     else
@@ -346,14 +432,68 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.sanitizer.bypassSecurityTrustHtml(svg);
   }
 
+  setRunMode(mode: 'AUTO' | 'REVIEW'): void {
+    this.runMode = mode;
+    this.showToast(`Run mode set to ${mode}`, 'toggle_on');
+  }
+
   triggerMission(missionId: string): void {
     this.executionsService.trigger(missionId, this.runMode).subscribe({
       next: () => {
         this.showToast(`Mission execution triggered (${this.runMode})`, 'play_arrow');
       },
-      error: () => {
-        this.showToast('Failed to trigger mission', 'error');
+      error: (err) => {
+        this.showToast('Failed to trigger mission: ' + (err?.error?.message || err?.message || 'missing configuration'), 'error');
       }
+    });
+  }
+
+  stopActiveMission(): void {
+    if (!this.activeMission?.id) return;
+    this.executionsService.getAll().subscribe({
+      next: (executions) => {
+        const active = executions.find(e =>
+          e.status === 'RUNNING' || e.status === 'PENDING' || e.status === 'WAITING' || e.status === 'PAUSED');
+        if (!active) {
+          this.showToast('No active executions to stop', 'info');
+          return;
+        }
+        this.executionsService.cancel(active.id).subscribe({
+          next: () => {
+            this.showToast('Mission stopped', 'stop_circle');
+            this.loadDashboard();
+          },
+          error: () => this.showToast('Failed to stop mission', 'error')
+        });
+      },
+      error: () => this.showToast('Failed to fetch executions', 'error')
+    });
+  }
+
+  publishActiveMission(): void {
+    this.router.navigate(['/publishing']);
+  }
+
+  resumeFailedExecution(): void {
+    if (!this.activeMission?.id || !this.failedStepDetail) return;
+    this.executionsService.getAll(this.activeMission.id).subscribe({
+      next: (executions) => {
+        const failed = executions.find(e => e.status === 'FAILED');
+        if (!failed) {
+          this.showToast('No failed execution to resume', 'info');
+          return;
+        }
+        const isVideo = this.failedStepDetail?.key === 'video';
+        const obs = isVideo ? this.executionsService.retryVideo(failed.id) : this.executionsService.retryScript(failed.id);
+        obs.subscribe({
+          next: () => {
+            this.showToast(`Resuming ${this.failedStepDetail?.label} from last chunk...`, 'play_arrow');
+            this.loadDashboard();
+          },
+          error: (err) => this.showToast('Resume failed: ' + (err?.error?.message || err?.message), 'error')
+        });
+      },
+      error: () => this.showToast('Failed to fetch executions', 'error')
     });
   }
 
@@ -415,22 +555,308 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | null = null;
+  activeModal: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | 'direct-review' | null = null;
 
-  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission') {
+  openModal(modalType: 'agents' | 'providers' | 'flows' | 'approvals' | 'threads' | 'create-mission' | 'flow-diagram' | 'review' | 'direct-review') {
     this.activeModal = modalType;
   }
 
   openFlowDiagram(flow: (FlowResponse & { icon?: string; status?: string })) {
     this.selectedFlowForDiagram = flow;
+    this.selectedFlowDetail = null;
+    this.flowDetailLoading = true;
     this.activeModal = 'flow-diagram';
     this.cdr.detectChanges();
+    this.workflowsService.getFlowDetails(flow.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (detail) => {
+          this.selectedFlowDetail = detail;
+          this.flowDetailLoading = false;
+          this.buildDesignView(detail);
+          this.cdr.detectChanges();
+        },
+        error: () => {
+          this.flowDetailLoading = false;
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   closeModal() {
     this.activeModal = null;
     this.selectedFlowForDiagram = null;
+    this.selectedFlowDetail = null;
+    this.selectedReviewStep = null;
+    this.directReviewStep = null;
+    this.designNodes = [];
+    this.designEdges = [];
     this.cdr.detectChanges();
+  }
+
+  loadPendingReviews(): void {
+    this.reviewsService.getPendingStepReviews()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (steps) => {
+          this.pendingStepReviews = steps;
+          if (this.selectedReviewStep) {
+            const match = steps.find(s => s.stepId === this.selectedReviewStep!.stepId);
+            this.selectedReviewStep = match ?? null;
+          }
+        },
+        error: () => {}
+      });
+  }
+
+  pendingReviewForAgent(agentId: string): PendingStepReviewResponse | null {
+    return this.pendingStepReviews.find(s => s.agentId === agentId) || null;
+  }
+
+  selectReviewForDiagram(step: PendingStepReviewResponse): void {
+    this.selectedReviewStep = step;
+    this.reviewFeedback = '';
+    this.cdr.detectChanges();
+  }
+
+  approveReviewStep(): void {
+    const step = this.selectedReviewStep;
+    if (!step || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({ stepId: step.stepId, decision: 'APPROVED' }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.afterReviewAction(step);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+      }
+    });
+  }
+
+  rejectReviewStep(): void {
+    const step = this.selectedReviewStep;
+    if (!step || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({
+      stepId: step.stepId,
+      decision: 'REJECTED',
+      comments: this.reviewFeedback
+    }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.afterReviewAction(step);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+      }
+    });
+  }
+
+  private afterReviewAction(step: PendingStepReviewResponse): void {
+    this.reviewFeedback = '';
+    this.loadPendingReviews();
+    if (this.activeMission?.id) {
+      this.loadFlowStatuses(this.activeMission.id);
+    }
+  }
+
+  stepTypeLabel(type: string): string {
+    switch (type) {
+      case 'LLM_CALL': return 'LLM Call';
+      case 'IMAGE_GENERATION': return 'Image Generation';
+      case 'TTS': return 'Voiceover';
+      case 'VIDEO_GENERATION': return 'Video Assembly';
+      case 'MUSIC_GENERATION': return 'Music Generation';
+      case 'PUBLISH': return 'Publish';
+      default: return type || 'Unknown';
+    }
+  }
+
+  reviewRetriesExhausted(step: PendingStepReviewResponse | null): boolean {
+    return !!step && (step.retryCount ?? 0) >= (step.maxRetries || 3);
+  }
+
+  reviewOutputUrls(step: any): string[] {
+    if (!step || !step.outputData) return [];
+    const trimmed = step.outputData.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('http') || trimmed.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
+      const apiBase = environment.apiUrl;
+      const token = localStorage.getItem('karma_token') || '';
+      return trimmed.split(/\r?\n/).map((u: string) => {
+        let url = u.trim();
+        if (/^[a-zA-Z]:[\\/]/.test(url)) {
+          return `${apiBase}/v1/artifacts/stream?path=${encodeURIComponent(url)}&token=${token}`;
+        }
+        return url;
+      }).filter((u: string) => u.length > 0);
+    }
+    return [];
+  }
+
+  private buildDesignView(detail: FlowDetail): void {
+    const rawNodes = Array.isArray(detail.design?.nodes) ? detail.design.nodes : [];
+    const rawEdges = Array.isArray(detail.design?.edges) ? detail.design.edges : [];
+
+    const nodes = rawNodes.map((n: any) => ({
+      id: String(n.id),
+      label: n.label || n.agentName || 'Agent',
+      agentId: n.agentId || '',
+      agentName: n.agentName || '',
+      status: (n.status === 'ready' || n.status === 'configured' || n.status === 'pending') ? n.status : 'pending',
+      stepKind: n.stepKind === 'VIDEO' || n.stepKind === 'PUBLISH' ? n.stepKind : 'AGENT',
+      x: Number(n.x) || 80,
+      y: Number(n.y) || 80,
+    }));
+
+    const edges = rawEdges.map((e: any) => ({
+      id: String(e.id || `edge-${Math.random()}`),
+      source: String(e.source ?? e.from),
+      target: String(e.target ?? e.to),
+      sourcePort: e.sourcePort || 'right',
+      targetPort: e.targetPort || 'left',
+      handoff: e.handoff === undefined ? true : !!e.handoff,
+    }));
+
+    const incoming = new Set(edges.map(e => e.target));
+    const outgoing = new Set(edges.map(e => e.source));
+    const starts = nodes.filter(n => !incoming.has(n.id));
+    const sinks = nodes.filter(n => !outgoing.has(n.id));
+
+    const startSource = starts[0] || nodes[0];
+    const endSink = sinks[sinks.length - 1] || nodes[nodes.length - 1];
+
+    const startX = startSource ? (startSource.x as number) - 280 : 80;
+    const startY = startSource ? (startSource.y as number) : 80;
+    const endX = endSink ? (endSink.x as number) + 176 + 280 : 900;
+    const endY = endSink ? (endSink.y as number) : 80;
+
+    const allNodes: any[] = [
+      { id: 'start', label: 'Start', agentId: '', agentName: 'Flow Start', status: 'ready', stepKind: 'START', x: startX, y: startY },
+      ...nodes,
+      { id: 'end', label: 'Finish', agentId: '', agentName: 'Flow End', status: 'ready', stepKind: 'END', x: endX, y: endY },
+    ];
+
+    const allEdges: any[] = [...edges];
+    if (startSource) allEdges.push({ id: 'edge-start', source: 'start', target: startSource.id, sourcePort: 'right', targetPort: 'left', handoff: true });
+    if (endSink) allEdges.push({ id: 'edge-end', source: endSink.id, target: 'end', sourcePort: 'right', targetPort: 'left', handoff: true });
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of allNodes) {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + 176);
+      maxY = Math.max(maxY, n.y + 84);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
+
+    this.designNodes = allNodes;
+    this.designEdges = allEdges;
+    this.designBounds = { minX, minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  designNodeIcon(node: any): string {
+    if (node.stepKind === 'START') return 'play_arrow';
+    if (node.stepKind === 'END') return 'flag';
+    const agent = this.agentStatusList.find(a => a.id === node.agentId);
+    if (agent?.icon) return agent.icon;
+    const def = this.defaultAgents.find(d => d.name === node.agentName);
+    return def?.icon || 'smart_toy';
+  }
+
+  designNodeIconClass(node: any): string {
+    if (node.stepKind === 'START') return 'text-cyan-400';
+    if (node.stepKind === 'END') return 'text-green-400';
+    if (node.stepKind === 'VIDEO') return 'text-purple-400';
+    if (node.stepKind === 'PUBLISH') return 'text-green-400';
+    return 'text-[#00e5ff]';
+  }
+
+  designNodeBorderClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'border border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.4)] animate-pulse';
+    if (activeStatus === 'COMPLETED') return 'border-l-4 border-green-500';
+    if (activeStatus === 'FAILED') return 'border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]';
+    
+    if (node.stepKind === 'START' || node.stepKind === 'END') return 'border-l-4 border-cyan-400';
+    if (node.stepKind === 'VIDEO') return 'border-l-4 border-purple-500';
+    if (node.stepKind === 'PUBLISH') return 'border-l-4 border-green-500';
+    return 'border-l-4 border-primary-container';
+  }
+
+  designNodeBgClass(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus === 'RUNNING') return 'bg-primary/10';
+    if (activeStatus === 'COMPLETED') return 'bg-green-500/10';
+    if (activeStatus === 'FAILED') return 'bg-red-500/10';
+
+    if (node.stepKind === 'START') return 'bg-surface-container';
+    if (node.stepKind === 'END') return 'bg-surface-container';
+    return 'bg-surface-container';
+  }
+  
+  designNodeStatus(node: any): string {
+    const activeStatus = this.activeStepsByAgent.get(node.agentId);
+    if (activeStatus) return activeStatus;
+    return node.status;
+  }
+
+  designOutputX(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'bottom') return node.x + 88;
+    return node.x + 176;
+  }
+
+  designOutputY(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'bottom') return node.y + 84;
+    return node.y + 42;
+  }
+
+  designInputX(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.x + 88;
+    return node.x;
+  }
+
+  designInputY(nodeId: string, port?: string): number {
+    const node = this.designNodes.find(n => n.id === nodeId);
+    if (!node) return 0;
+    if (port === 'top') return node.y;
+    return node.y + 42;
+  }
+
+  designNodePath(edge: any): string {
+    const x1 = this.designOutputX(edge.source, edge.sourcePort);
+    const y1 = this.designOutputY(edge.source, edge.sourcePort);
+    const x2 = this.designInputX(edge.target, edge.targetPort);
+    const y2 = this.designInputY(edge.target, edge.targetPort);
+
+    let endX = x2;
+    let endY = y2;
+    if (edge.targetPort === 'top') {
+      endY = y2 - 4;
+    } else {
+      endX = x2 - 4;
+    }
+
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
+    if (edge.sourcePort === 'right' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'right' && edge.targetPort === 'top') {
+      return `M ${x1} ${y1} L ${x2} ${y1} L ${endX} ${endY}`;
+    } else if (edge.sourcePort === 'bottom' && edge.targetPort === 'left') {
+      return `M ${x1} ${y1} L ${x1} ${y2} L ${endX} ${endY}`;
+    }
+    return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${endX} ${endY}`;
   }
 
   get selectedFlowAgents(): any[] {
@@ -476,6 +902,31 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     
     return matchedAgents;
+  }
+
+  flowDetailRunStatusCls(status: string): string {
+    switch (status) {
+      case 'COMPLETED': return 'text-green-400 border-green-500/40 bg-green-500/10';
+      case 'FAILED': return 'text-red-400 border-red-500/40 bg-red-500/10';
+      case 'RUNNING': return 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10';
+      default: return 'text-on-surface-variant border-outline-variant/30 bg-white/5';
+    }
+  }
+
+  artifactTypeIcon(type: string): string {
+    const t = (type || '').toLowerCase();
+    if (t.includes('video')) return 'movie';
+    if (t.includes('image') || t.includes('thumb')) return 'image';
+    if (t.includes('audio') || t.includes('voice')) return 'music_note';
+    if (t.includes('pdf')) return 'picture_as_pdf';
+    return 'description';
+  }
+
+  fmtDateTime(ts: string | undefined | null): string {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
   }
 
   private wakeUpListener = (e: any) => {
@@ -528,17 +979,22 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private readonly dashboardService: DashboardService,
     private readonly executionsService: ExecutionsService,
+    private readonly router: Router,
     private readonly missionsService: MissionsService,
     private readonly workspacesService: WorkspacesService,
     private readonly projectsService: ProjectsService,
     private readonly agentsService: AgentsService,
     private readonly providersService: ProvidersService,
     private readonly artifactsService: ArtifactsService,
+    private readonly workflowsService: WorkflowsService,
+    private readonly reviewsService: ReviewsService,
     private readonly karmaActions: KarmaActionService,
     private readonly auth: AuthService,
     private readonly api: ApiService,
     private readonly cdr: ChangeDetectorRef,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
+    private readonly sourceDocsService: SourceDocumentsService,
+    private readonly sseService: SseService
   ) {}
 
   ngOnInit(): void {
@@ -555,11 +1011,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.addEventListener('operator-speaking', this.operatorSpeakingHandler);
     window.addEventListener('karma-speech-pulse', this.speechPulseHandler);
 
-    this.flowStatusInterval = setInterval(() => {
-      if (this.activeMission?.id) {
-        this.loadFlowStatuses(this.activeMission.id);
-      }
-    }, 10000);
+    this.sseService.connect();
+    this.sseService.onMessage()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((msg) => {
+        if (msg.event.startsWith('execution.') || msg.event.startsWith('mission.') || msg.event.startsWith('step.')) {
+          if (this.activeMission?.id) {
+            this.loadFlowStatuses(this.activeMission.id);
+          }
+          this.loadPendingReviews();
+        }
+      });
   }
 
   private reportActionOutcome(action: any, success: boolean, note?: string): void {
@@ -682,18 +1144,35 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.reportActionOutcome(action, false, 'project/name missing');
         return;
       }
+      const validFlows = this.flowsList.filter(f => f.enabled !== false).map(f => f.id);
+      const selectedFlowIds = Array.isArray(params.selectedFlowIds)
+        ? (params.selectedFlowIds as string[]).filter(id => validFlows.includes(id))
+        : [];
+      const targetDurationSeconds = params.targetDurationSeconds
+        ? Math.max(30, Number(params.targetDurationSeconds))
+        : undefined;
       this.missionsService.create({
         projectId,
         name: String(params.name),
         description: params.description,
         missionType: params.missionType,
         priority: params.priority,
-        providerId: params.providerId
+        providerId: params.providerId,
+        selectedFlowIds: selectedFlowIds.length > 0 ? selectedFlowIds : undefined,
+        targetDurationSeconds,
+        theme: params.theme
       }).subscribe({
         next: (mission) => {
           this.showToast(`KARMA created mission "${mission.name}"`, 'check_circle');
           this.loadDashboard();
-          this.reportActionOutcome(action, true, `mission "${mission.name}" created`);
+          const mode = (params.runMode === 'AUTO' || params.runMode === 'REVIEW') ? params.runMode : undefined;
+          if (mode) {
+            this.executionsService.trigger(mission.id, mode).subscribe({
+              next: () => this.showToast(`KARMA started mission execution (${mode})`, 'play_arrow'),
+              error: () => this.showToast('KARMA created mission but failed to start execution', 'error')
+            });
+          }
+          this.reportActionOutcome(action, true, `mission "${mission.name}" created${mode ? ` and running (${mode})` : ''}`);
         },
         error: (err) => {
           this.showToast('KARMA failed to create mission: ' + (err?.error?.message || 'error'), 'error');
@@ -806,9 +1285,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.drawInterval) {
       clearInterval(this.drawInterval);
     }
-    if (this.flowStatusInterval) {
-      clearInterval(this.flowStatusInterval);
-    }
     window.removeEventListener('resize', this.resizeListener);
     window.removeEventListener('heard-voice-command', this.heardVoiceListener);
     window.removeEventListener('system-diagnostic-start', this.systemDiagnosticStartListener);
@@ -825,6 +1301,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loading = true;
 
     this.loadWorkspacesAndMissions();
+    this.loadPendingReviews();
 
     this.dashboardService.getFlows()
       .pipe(takeUntil(this.destroy$))
@@ -841,7 +1318,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
             status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
           }));
           this.applyFlowStatusesToFlows();
-          this.applyFlowPreset();
         },
         error: (err) => {
           console.error('Failed to fetch flows', err);
@@ -902,6 +1378,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
               pulseClass: ''
             };
           });
+          if (this.missionSteps && this.missionSteps.length > 0) {
+            this.applyFlowStatuses(this.missionSteps);
+          }
         },
         error: (err) => {
           console.error('Failed to fetch agents', err);
@@ -950,7 +1429,8 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (missions) => {
-          this.activeMission = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING') || null;
+          const running = missions.find((m: any) => m.status === 'RUNNING' || m.status === 'WAITING');
+          this.activeMission = running || (missions.length > 0 ? missions[0] : null);
           if (this.activeMission?.createdAt) {
             this.activeMission.formattedDate = new Date(this.activeMission.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           }
@@ -968,16 +1448,27 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private loadFlowStatuses(missionId: string): void {
+    // Reset state for new mission
+    this.missionProgress = 0;
+    this.queueSize = 0;
+    this.cpuLoad = 0;
+    this.gpuLoad = 0;
+    this.hubStatus = {};
+    this.workers = [];
+    this.activeStepsByAgent.clear();
+    
     this.executionsService.getAll(missionId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (executions) => {
           if (executions.length === 0) return;
           const active = executions.find(e => e.status === 'RUNNING' || e.status === 'PENDING') || executions[0];
+          this.activeMissionMode = (active.mode === 'AUTO' || active.mode === 'REVIEW') ? active.mode : null;
           this.executionsService.getSteps(active.id)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
               next: (steps) => {
+                this.missionSteps = steps;
                 this.applyFlowStatuses(steps);
                 this.updateOperationalMetrics(steps, executions, active.id);
               },
@@ -990,11 +1481,17 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private applyFlowStatuses(steps: ExecutionStepResponse[]): void {
     const byFlow = new Map<string, ExecutionStepResponse[]>();
+    this.activeStepsByAgent.clear();
+
     for (const step of steps) {
       const arr = byFlow.get(step.flowId) || [];
       arr.push(step);
       byFlow.set(step.flowId, arr);
+      
+      // Keep track of the most recent status for each agent in this active execution
+      this.activeStepsByAgent.set(step.agentId, step.status);
     }
+    
     this.flowStepMap.clear();
     byFlow.forEach((flowSteps, flowId) => {
       if (flowSteps.some(s => s.status === 'RUNNING')) this.flowStepMap.set(flowId, 'IN_PROGRESS');
@@ -1003,15 +1500,96 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       else this.flowStepMap.set(flowId, 'PENDING');
     });
     this.applyFlowStatusesToFlows();
+    this.buildHubStatus(steps);
+    // Removed cdr.detectChanges() to prevent aggressive flashing
+  }
+
+  private buildHubStatus(steps: ExecutionStepResponse[]): void {
+    const counts = new Map<string, { total: number; completed: number; running: number; failed: number }>();
+    for (const step of steps) {
+      const key = this.hubKeyForStep(step);
+      if (!key) continue;
+      const c = counts.get(key) || { total: 0, completed: 0, running: 0, failed: 0 };
+      c.total++;
+      if (step.status === 'COMPLETED' || step.status === 'SKIPPED') c.completed++;
+      else if (step.status === 'RUNNING') c.running++;
+      else if (step.status === 'FAILED') c.failed++;
+      counts.set(key, c);
+    }
+    const next: Record<string, { text: string; cls: string; border: string; pulse: boolean; pct: number }> = {};
+    counts.forEach((c, key) => {
+      // Give running steps a 50% completion weight for visual progress
+      const simulatedCompleted = c.completed + (c.running * 0.5);
+      const pct = c.total > 0 ? Math.min(100, Math.round((simulatedCompleted / c.total) * 100)) : 0;
+      if (c.running > 0) {
+        next[key] = { text: 'Running', cls: 'text-green-500', border: 'border-green-500', pulse: true, pct };
+      } else if (c.failed > 0) {
+        next[key] = { text: 'Failed', cls: 'text-red-400', border: 'border-red-400', pulse: false, pct };
+      } else if (c.completed === c.total) {
+        next[key] = { text: 'Completed', cls: 'text-green-400', border: 'border-green-400', pulse: false, pct };
+      } else {
+        next[key] = { text: 'Pending', cls: 'text-on-surface-variant', border: 'border-outline-variant/50', pulse: false, pct };
+      }
+    });
+    this.hubStatus = next;
+    // Capture first failed step detail for UI banner — hide stale FAILED if same hub is now RUNNING (retry in progress)
+    const runningHubs = new Set(steps.filter(s => s.status === 'RUNNING').map(s => this.hubKeyForStep(s)).filter(Boolean) as string[]);
+    const failed = steps.find(s => s.status === 'FAILED' && s.errorMessage && !runningHubs.has(this.hubKeyForStep(s) || ''));
+    if (failed) {
+      const k = this.hubKeyForStep(failed) || 'unknown';
+      const label = this.hudNodes.find(n => n.key === k)?.label || k.toUpperCase();
+      this.failedStepDetail = { key: k, label, error: failed.errorMessage! };
+    } else {
+      this.failedStepDetail = null;
+    }
+  }
+
+  private hubKeyForStep(step: ExecutionStepResponse): string | null {
+    const agent = this.agentStatusList.find(a => a.id === step.agentId);
+    if (agent) {
+      const name = (agent.name || '').toLowerCase();
+      const category = (agent.category || '').toLowerCase();
+      const desc = (agent.description || '').toLowerCase();
+      
+      const check = (str: string) => name.includes(str) || category.includes(str) || desc.includes(str);
+
+      if (check('voice') || check('audio') || check('tts') || check('speak')) return 'voice';
+      if (check('research') || check('search') || check('gather')) return 'research';
+      if (check('script') || check('write') || check('author') || check('plan')) return 'script';
+      if (check('blog') || check('article') || check('post')) return 'blog';
+      if (check('seo') || check('optimiz') || check('keyword')) return 'seo';
+      if (check('thumbnail') || check('thumb')) return 'thumbnail';
+      if (check('image') || check('picture') || check('visual')) return 'image';
+      if (check('video') || check('edit') || check('render')) return 'video';
+    }
+    
+    const type = (step.stepType || '').toUpperCase();
+    if (type.includes('TTS') || type.includes('VOICE') || type.includes('AUDIO')) return 'voice';
+    if (type.includes('VIDEO') || type.includes('ANIMATION')) return 'video';
+    if (type.includes('IMAGE') || type.includes('PICTURE')) return 'image';
+    if (type.includes('RESEARCH') || type.includes('SEARCH')) return 'research';
+    if (type.includes('SCRIPT') || type.includes('WRITE') || type.includes('TEXT')) return 'script';
+    if (type.includes('SEO')) return 'seo';
+    if (type.includes('BLOG')) return 'blog';
+    if (type.includes('THUMBNAIL')) return 'thumbnail';
+    
+    // If it's a generic LLM call and it hasn't matched anything, we could map it to script as a fallback,
+    // but returning null means it won't light up any specific node (which might be technically correct for a generic node).
+    // Let's map generic LLM tasks to 'script' if it's completely unmatched, just so it shows up in the Core.
+    if (type === 'LLM_CALL' || type === 'GENERIC') return 'script';
+
+    return null;
   }
 
   private updateOperationalMetrics(steps: ExecutionStepResponse[], executions: ExecutionResponse[], executionId: string): void {
     const total = steps.length;
-    const completed = steps.filter(s => s.status === 'COMPLETED').length;
+    const completed = steps.filter(s => s.status === 'COMPLETED' || s.status === 'SKIPPED').length;
     const running = steps.filter(s => s.status === 'RUNNING').length;
     const pending = steps.filter(s => s.status === 'PENDING').length;
 
-    this.missionProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    // Give running steps a 50% completion weight for overall mission progress
+    const simulatedCompleted = completed + (running * 0.5);
+    this.missionProgress = total > 0 ? Math.min(100, Math.round((simulatedCompleted / total) * 100)) : 0;
     this.queueSize = pending + executions.filter(e => e.status === 'PENDING').length;
     this.cpuLoad = total > 0 ? Math.min(100, Math.round(((completed + running) / total) * 100)) : 0;
     this.gpuLoad = total > 0 ? Math.min(100, Math.round((running / total) * 100) * 3) : 0;
@@ -1085,6 +1663,58 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     window.dispatchEvent(new CustomEvent('trigger-operator-mic'));
   }
 
+  onNodeClick(key: string): void {
+    if (!this.activeMission) return;
+    
+    // Find all steps for this node
+    const steps = this.missionSteps.filter(s => this.hubKeyForStep(s) === key);
+    
+    if (steps.length > 0) {
+      // Prefer the step that is PENDING_REVIEW, otherwise take the last one
+      const pendingStep = steps.find(s => s.reviewStatus === 'PENDING_REVIEW' || s.reviewStatus === 'PENDING' || s.status === 'PENDING_APPROVAL');
+      this.directReviewStep = pendingStep || steps[steps.length - 1];
+      this.openModal('direct-review');
+    } else {
+      this.showToast(`No execution data available for ${key.toUpperCase()} yet`, 'info');
+    }
+  }
+
+  approveDirectReview(): void {
+    if (!this.directReviewStep || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({ stepId: this.directReviewStep.id, decision: 'APPROVED' }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.closeModal();
+        if (this.activeMission?.id) this.loadFlowStatuses(this.activeMission.id);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+        this.showToast('Failed to approve step', 'error');
+      }
+    });
+  }
+
+  rejectDirectReview(): void {
+    if (!this.directReviewStep || this.reviewSubmitting) return;
+    this.reviewSubmitting = true;
+    this.reviewsService.submit({
+      stepId: this.directReviewStep.id,
+      decision: 'REJECTED',
+      comments: this.reviewFeedback
+    }).subscribe({
+      next: () => {
+        this.reviewSubmitting = false;
+        this.closeModal();
+        if (this.activeMission?.id) this.loadFlowStatuses(this.activeMission.id);
+      },
+      error: () => {
+        this.reviewSubmitting = false;
+        this.showToast('Failed to reject step', 'error');
+      }
+    });
+  }
+
   private bootstrapLogs(): void {
     const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     this.logs = [
@@ -1093,5 +1723,51 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       `[SYS] ${stamp} - Mounting Agent Runtime Engine`,
       `[SYS] ${stamp} - Awaiting active mission dispatch...`
     ];
+  }
+
+  get canDeleteFlows(): boolean {
+    return (this.auth.user()?.role || 'OPERATOR').toUpperCase() === 'ADMIN';
+  }
+
+  deleteFlow(flow: any): void {
+    if (flow?.isSystem) {
+      this.showToast('System flow cannot be deleted', 'lock');
+      return;
+    }
+    if (!this.canDeleteFlows) {
+      this.showToast('Your role does not allow deleting flows', 'lock');
+      return;
+    }
+    if (!window.confirm(`Delete flow "${flow?.name}"?`)) return;
+    this.dashboardService.deleteFlow(flow.id).subscribe({
+      next: () => {
+        this.flowsList = this.flowsList.filter(f => f.id !== flow.id);
+        this.showToast('Flow deleted', 'check_circle');
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || err?.message || 'Failed to delete flow';
+        this.showToast(String(msg), 'error');
+        this.loadFlows();
+      }
+    });
+  }
+
+  private loadFlows(): void {
+    this.dashboardService.getFlows().pipe(takeUntil(this.destroy$)).subscribe({
+      next: (flows) => {
+        this.flowsList = flows.map(f => ({
+          ...f,
+          icon: f.category === 'RESEARCH' ? 'manage_search'
+              : f.category === 'CONTENT' ? 'edit_note'
+              : f.category === 'MEDIA' ? 'movie'
+              : f.category === 'REVIEW' ? 'rate_review'
+              : f.category === 'PUBLISHING' ? 'publish'
+              : 'account_tree',
+          status: (f.status as string) || (f.enabled ? 'ACTIVE' : 'PENDING')
+        }));
+        this.applyFlowStatusesToFlows();
+      },
+      error: () => {}
+    });
   }
 }

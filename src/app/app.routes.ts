@@ -46,6 +46,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'mcp-servers',
+        loadComponent: () =>
+          import('./features/mcp-servers/mcp-servers.component').then(
+            (m) => m.McpServersComponent,
+          ),
+      },
+      {
         path: 'agents/:id/trace',
         loadComponent: () =>
           import('./features/agent-trace/agent-trace.component').then(
@@ -109,6 +116,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'skills',
+        loadComponent: () =>
+          import('./features/skill-library/skill-library.component').then(
+            (m) => m.SkillLibraryComponent,
+          ),
+      },
+      {
         path: 'providers',
         loadComponent: () =>
           import('./features/provider-center/provider-center.component').then(
@@ -128,6 +142,10 @@ export const routes: Routes = [
           import('./features/administration/administration.component').then(
             (m) => m.AdministrationComponent,
           ),
+      },
+      {
+        path: '**',
+        redirectTo: 'dashboard',
       },
     ],
   },

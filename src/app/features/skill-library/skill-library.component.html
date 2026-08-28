@@ -1,0 +1,138 @@
+<div class="flex flex-col h-[calc(100vh-160px)] overflow-hidden select-none gap-6">
+  <!-- Title Header -->
+  <div class="glass-panel p-4 rounded-xl flex justify-between items-center shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary text-2xl">handyman</span>
+      <div>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-none">Skill Library</h2>
+        <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider mt-1 block">Create capabilities, attach them to agents</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <select class="bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary cursor-pointer"
+              [(ngModel)]="categoryFilter">
+        <option value="">All categories</option>
+        @for (cat of categories; track cat) {
+          <option [ngValue]="cat">{{ cat }}</option>
+        }
+      </select>
+      <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all flex items-center gap-1.5 cursor-pointer" (click)="newSkill()">
+        <span class="material-symbols-outlined text-sm">add</span> New Skill
+      </button>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="flex-grow flex flex-col items-center justify-center gap-3">
+      <div class="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <span class="text-xs text-on-surface-variant uppercase font-mono tracking-widest animate-pulse">Loading Skills...</span>
+    </div>
+  }
+
+  @if (error) {
+    <div class="flex-grow flex flex-col items-center justify-center gap-3">
+      <span class="material-symbols-outlined text-red-400 text-3xl">error</span>
+      <span class="text-xs text-on-surface-variant">{{ error }}</span>
+      <button (click)="loadSkills()" class="px-4 py-1.5 bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/30 transition-all cursor-pointer">Retry</button>
+    </div>
+  }
+
+  @if (!loading && !error) {
+    <div class="flex-grow overflow-y-auto no-scrollbar pb-6">
+      @if (filteredSkills.length === 0) {
+        <div class="flex flex-col items-center justify-center gap-3 py-16 text-center">
+          <span class="material-symbols-outlined text-on-surface-variant text-3xl">lightbulb</span>
+          <span class="text-xs text-on-surface-variant">No skills here yet. Create one to assign to an agent.</span>
+          <button class="px-4 py-1.5 bg-primary/10 border border-primary/30 text-on-surface text-xs font-bold rounded-lg hover:bg-primary/20 transition-all cursor-pointer" (click)="newSkill()">New Skill</button>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          @for (skill of filteredSkills; track skill.id) {
+            <div class="glass-panel rounded-xl p-5 flex flex-col justify-between gap-4 border border-outline-variant/25 hover:border-primary/45 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.05)]">
+              <div class="flex justify-between items-start border-b border-outline-variant/20 pb-2.5">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+                  <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0.5 flex items-center gap-2">{{ skill.name }}
+                    @if (skill.isSystem) {
+                      <span class="px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-primary border border-primary/30 rounded" title="System default skill">System</span>
+                    }
+                  </h4>
+                    <span class="text-[9px] font-mono text-primary-container uppercase tracking-wider">{{ skill.category || 'General' }}</span>
+                  </div>
+                </div>
+                <app-status-toggle [checked]="isLive(skill.status)" [label]="skill.status || 'ACTIVE'"
+                                   (toggled)="toggleSkill(skill)"></app-status-toggle>
+              </div>
+
+              <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-3">{{ skill.description }}</p>
+
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[8px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"
+                      [ngClass]="(skill.assignedAgentCount || 0) > 0 ? 'bg-cyan-400/20 text-cyan-300' : 'bg-white/10 text-on-surface-variant'">
+                  <span class="material-symbols-outlined text-[10px]">link</span>
+                  @if ((skill.assignedAgentCount || 0) > 0) {
+                    Connected · {{ skill.assignedAgentCount }}
+                  } @else {
+                    Not connected
+                  }
+                </span>
+                @if (skill.status === 'DRAFT') {
+                  <span class="text-[8px] text-on-surface-variant">Deactivated — hidden from agents</span>
+                }
+              </div>
+
+              <div class="flex gap-2">
+                <button class="flex-1 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer" (click)="editSkill(skill)">
+                  <span class="material-symbols-outlined text-sm">edit</span> Edit
+                </button>
+                <button class="px-3 py-1.5 border text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1"
+                        [ngClass]="skill.isSystem ? 'bg-white/5 border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 cursor-pointer'"
+                        [disabled]="skill.isSystem"
+                        [title]="skill.isSystem ? 'System skill cannot be deleted' : 'Delete skill'"
+                        (click)="deleteSkill(skill)">
+                  <span class="material-symbols-outlined text-sm">{{ skill.isSystem ? 'lock' : 'delete' }}</span>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Skill modal -->
+  @if (isNewSkill || selectedSkill) {
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="selectedSkill = null; isNewSkill = false">
+      <div class="glass-panel rounded-2xl p-6 w-[440px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+        <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
+          <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">{{ isNewSkill ? 'New Skill' : 'Edit Skill' }}</h4>
+          <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="selectedSkill = null; isNewSkill = false">&times;</button>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Skill Name</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-bold" [(ngModel)]="form.name" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Category</label>
+            <input class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="form.category" />
+          </div>
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Description</label>
+            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="form.description" rows="3"></textarea>
+            <span class="text-[9px] text-on-surface-variant">This text is injected into the agent's prompt as an available-skill instruction.</span>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="selectedSkill = null; isNewSkill = false">Cancel</button>
+          <button type="button" class="px-4 py-1.5 bg-gradient-to-r from-primary/30 to-secondary/30 border border-primary/50 text-on-surface text-xs font-bold rounded-lg hover:from-primary/45 hover:to-secondary/45 transition-all shadow-[0_0_15px_rgba(0,229,255,0.1)] cursor-pointer disabled:opacity-40"
+                  [disabled]="!form.name || !form.name.trim()"
+                  (click)="saveSkill()">{{ isNewSkill ? 'Create Skill' : 'Save Changes' }}</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

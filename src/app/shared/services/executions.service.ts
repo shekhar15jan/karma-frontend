@@ -21,12 +21,20 @@ export class ExecutionsService {
     return this.api.getData<ExecutionStepResponse[]>(`/v1/executions/${id}/steps`);
   }
 
-  trigger(missionId: string, mode: string = 'REVIEW'): Observable<unknown> {
+  trigger(missionId: string, mode: string = 'AUTO'): Observable<unknown> {
     return this.api.postData(`/v1/executions/trigger/${missionId}?mode=${mode}`, {});
   }
 
   cancel(id: string): Observable<unknown> {
     return this.api.postData(`/v1/executions/${id}/cancel`, {});
+  }
+
+  retryVideo(id: string): Observable<unknown> {
+    return this.api.postData(`/v1/executions/${id}/retry-video`, {});
+  }
+
+  retryScript(id: string): Observable<unknown> {
+    return this.api.postData(`/v1/executions/${id}/retry-script`, {});
   }
 
   getStatus(id: string): Observable<unknown> {

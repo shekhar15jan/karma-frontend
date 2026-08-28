@@ -8,6 +8,7 @@ import { VoicePreferencesService } from '../../shared/services/voice-preferences
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkspacesService } from '../../shared/services/workspaces.service';
 import { KarmaActionService, KarmaUiAction } from '../../shared/services/karma-action.service';
+import { environment } from '../../../environments/environment';
 import { WorkspaceResponse } from '../../shared/models/workspace.model';
 import { firstValueFrom } from 'rxjs';
 
@@ -33,7 +34,7 @@ interface ChatMessage {
       }
 
       <!-- TOP APP BAR -->
-      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/95 backdrop-blur-xl border-b border-[#00e5ff] shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
+      <header class="fixed top-0 w-full h-16 z-50 flex justify-between items-center px-6 py-3 bg-background/95 backdrop-blur-xl border-b border-primary-container shadow-[0_2px_15px_rgba(0,229,255,0.4)]">
         <div class="flex items-center gap-6">
           <button (click)="toggleSidebar()" class="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all cursor-pointer">
             {{ showSidebar ? 'menu_open' : 'menu' }}
@@ -107,6 +108,7 @@ interface ChatMessage {
             </div>
           </div>
           <div class="flex items-center gap-1">
+            <button (click)="toggleTheme()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" [title]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">{{ isDarkMode ? 'light_mode' : 'dark_mode' }}</button>
             <button (click)="showToast('Global Search coming soon', 'search')" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Search">search</button>
             <button (click)="toggleChat()" class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all p-2 cursor-pointer" title="Karma Chat Panel">chat_bubble</button>
             <div class="relative">
@@ -116,18 +118,21 @@ interface ChatMessage {
               <span class="text-sm font-medium text-primary-container glow-text">{{ currentTime }}</span>
               <span class="text-[9px] uppercase text-on-surface-variant">{{ currentDate }}</span>
             </div>
+            <button (click)="logout()" class="ml-2 px-4 py-1.5 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-[16px]">power_settings_new</span> Bye Bye Karma
+            </button>
           </div>
         </div>
       </header>
 
       <!-- SIDE NAV BAR -->
-      <aside class="fixed left-0 top-0 h-full flex flex-col py-24 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-[#00e5ff] shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
+      <aside class="fixed left-0 top-0 h-full flex flex-col pt-24 pb-6 z-40 bg-surface-container-low/40 backdrop-blur-2xl border-r border-primary-container shadow-[2px_0_20px_rgba(0,229,255,0.25)] transition-all duration-300"
              [ngClass]="showSidebar ? 'w-56' : 'w-20 items-center'">
         <div class="flex flex-col gap-0.5 flex-grow overflow-y-auto no-scrollbar px-3">
           @for (item of navItems; track item.path) {
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-primary/10 text-primary-container border-l-4 border-[#00e5ff] shadow-[0_0_15px_rgba(0,229,255,0.1)]"
+              routerLinkActive="bg-primary/10 text-primary-container border-l-4 border-l-primary-container shadow-[0_0_15px_rgba(0,229,255,0.1)]"
               [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
               class="flex items-center gap-4 py-2.5 text-on-surface-variant hover:text-primary hover:bg-white/5 transition-all rounded-lg text-decoration-none"
               [ngClass]="showSidebar ? 'px-4' : 'justify-center w-12 px-0'"
@@ -140,7 +145,7 @@ interface ChatMessage {
           }
         </div>
         <!-- User Profile (AI Chat triggers on click) -->
-        <div class="mt-auto px-4 pb-8 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
+        <div class="mt-auto px-4 pb-2 flex flex-col items-center gap-4 cursor-pointer group" (click)="toggleChat()">
           <div class="relative flex items-center justify-center">
             <div class="rounded-full border border-primary/40 flex items-center justify-center p-1 group-hover:border-primary transition-all" 
                  [ngClass]="{'w-24 h-24': showSidebar, 'w-12 h-12': !showSidebar, 'animate-pulse border-white shadow-[0_0_20px_rgba(255,255,255,1)]': isKarmaSpeaking}">
@@ -233,25 +238,10 @@ interface ChatMessage {
         </div>
       }
 
-      <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-[#00e5ff] shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
+      <footer class="fixed bottom-0 h-20 z-50 bg-background/80 backdrop-blur-3xl border-t border-primary-container shadow-[0_-2px_20px_rgba(0,229,255,0.4)] flex items-center justify-center px-6 transition-all duration-300 right-0" [ngClass]="showSidebar ? 'left-56' : 'left-20'">
         
-        <!-- EXTREME LEFT: Wake up Karma -->
-        <div class="absolute left-6 flex items-center">
-          <button (click)="wakeUpKarma()" class="px-6 py-2 bg-primary/10 border border-primary/30 text-on-surface font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-primary/20 transition-all shadow-lg group cursor-pointer">
-            <span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">light_mode</span> Wake up Karma
-          </button>
-        </div>
-
-        <!-- CENTER: Mission Controls -->
-        <div class="flex items-center gap-3 bg-white/5 px-4 py-1.5 rounded-2xl border border-primary/30">
-          <button (click)="stopMission()" class="px-6 py-2 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/30 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">stop_circle</span> Stop Mission
-          </button>
-          <div class="h-6 w-px bg-white/10 mx-2"></div>
-          <button (click)="publishNow()" class="px-8 py-2 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[11px] rounded-lg flex items-center gap-2 hover:bg-green-600/30 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">send</span> Publish
-          </button>
-        </div>
+        <!-- CENTER: placeholder (controls moved to Active Mission panel) -->
+        <div></div>
 
         <!-- EXTREME RIGHT: Bye Bye Karma & Version Info -->
         <div class="absolute right-6 flex items-center gap-6">
@@ -262,9 +252,6 @@ interface ChatMessage {
               <span class="text-[8px] text-green-500/70 font-bold uppercase">Encryption Active</span>
             </div>
           </div>
-          <button (click)="logout()" class="px-6 py-2 bg-red-600/10 border border-red-500/20 text-red-400 font-medium text-[11px] rounded-lg flex items-center gap-2 hover:bg-red-600/20 transition-all cursor-pointer">
-            <span class="material-symbols-outlined text-[18px]">power_settings_new</span> Bye Bye Karma
-          </button>
         </div>
       </footer>
     </div>
@@ -281,6 +268,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   // Karma AI speech configuration
   karmaVoiceSpeechEnabled = false;
+
+  // Theme State
+  isDarkMode = true;
 
   // Speech Recognition States (Operator Mic)
   isListening = false;
@@ -318,13 +308,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   protected readonly allNavItems = [
     { path: '/workspaces', label: 'Workspaces', icon: 'workspaces' },
     { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/workflows', label: 'Flows', icon: 'hub' },
+    { path: '/workflows', label: 'Workflow Designer', icon: 'hub' },
     { path: '/agents', label: 'Agents', icon: 'smart_toy' },
+    { path: '/executions', label: 'Executions', icon: 'play_circle' },
     { path: '/artifacts', label: 'Artifacts', icon: 'inventory_2' },
     { path: '/calendar', label: 'Calendar', icon: 'calendar_today' },
     { path: '/knowledge', label: 'Knowledge', icon: 'menu_book' },
     { path: '/prompts', label: 'Prompts', icon: 'terminal' },
+    { path: '/skills', label: 'Skills', icon: 'handyman' },
     { path: '/providers', label: 'AI Providers', icon: 'key' },
+    { path: '/mcp-servers', label: 'MCP Servers', icon: 'settings_input_component' },
     { path: '/reviews', label: 'Reviews', icon: 'rate_review' },
     { path: '/publishing', label: 'Publishing', icon: 'publish' },
     { path: '/administration', label: 'Settings', icon: 'settings', adminOnly: true },
@@ -343,6 +336,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         this.activeLanguage = lang;
         if (this.recognition) {
           this.recognition.lang = this.sttLanguageCodes[lang] || 'en-US';
+          // P3.1: apply the new locale immediately by bouncing an active recognizer
+          if (this.isListening) {
+            this.stopListening();
+            setTimeout(() => {
+              const busy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+              if (!busy && !this.isKarmaSpeaking && this.karmaVoiceSpeechEnabled) {
+                this.startListening();
+              }
+            }, 400);
+          }
         }
       }
       this.preferredVoice = this.voicePrefs.voice();
@@ -357,6 +360,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     // Load persisted voice & language preferences
     this.voicePrefs.loadCatalog().catch(() => {});
     this.voicePrefs.loadPreferences().catch(() => {});
+
+    // Load Theme Preference
+    const savedTheme = localStorage.getItem('karma-theme');
+    if (savedTheme === 'light') {
+      this.isDarkMode = false;
+      document.documentElement.classList.remove('dark');
+    } else {
+      this.isDarkMode = true;
+      document.documentElement.classList.add('dark');
+    }
 
     this.loadWorkspaces();
 
@@ -539,6 +552,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.showSidebar = !this.showSidebar;
   }
 
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
+    if (this.isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('karma-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('karma-theme', 'light');
+    }
+  }
+
   initSpeech() {
     const Speech = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (Speech) {
@@ -573,17 +597,20 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
       this.recognition.onend = () => {
         this.isListening = false;
-        // Auto-restart loop if Karma Voice is still active AND Karma is not currently speaking
-        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+        // P3.2 single-owner gate: restart ONLY when the TTS queue is fully drained,
+        // with a debounce to prevent InvalidStateError double-starts.
+        const queueBusy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+        if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking && !queueBusy) {
           setTimeout(() => {
-            try {
-              if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+            const stillBusy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+            if (this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking && !stillBusy) {
+              try {
                 this.recognition.start();
+              } catch (e) {
+                console.warn('Voice restart skipped:', e);
               }
-            } catch (e) {
-              console.error('Error restarting voice loop:', e);
             }
-          }, 300);
+          }, 400);
         } else {
           this.voiceText = 'Click to speak';
         }
@@ -658,23 +685,90 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
     const history = this.buildChatHistory();
-    this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage, history }).subscribe({
-      next: (res) => {
-        const reply = res.reply || 'I processed your request.';
-        if (res.intent === 'language' && res.target) {
-          this.switchLanguage(res.target);
+    this.streamKarma(command, currentPage, history);
+  }
+
+  /** P5: consume SSE /voice/chat/stream; falls back to classic POST on any failure. */
+  private streamKarma(command: string, currentPage: string,
+                      history: Array<{ role: string; content: string }>): void {
+    const token = localStorage.getItem('karma_token') || '';
+    const base = environment.apiUrl.replace(/\/api\/?$/, '');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+
+    const finishClassic = () => {
+      clearTimeout(timer);
+      this.api.postData<any>('/v1/voice/chat', { text: command, currentPage, preferredLanguage: this.activeLanguage, history }).subscribe({
+        next: (res) => { this.onKarmaResponse(res); },
+        error: () => { this.karmaReply('I am having trouble connecting to my AI. Please try again.'); }
+      });
+    };
+
+    fetch(base + '/api/v1/voice/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text: command, currentPage, preferredLanguage: this.activeLanguage, history }),
+      signal: controller.signal
+    }).then((r) => {
+      if (!r.ok || !r.body) throw new Error('no-stream');
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let karmaMsg: ChatMessage | null = null;
+      const pump = (): any => reader.read().then(({ done, value }): any => {
+        if (done) { clearTimeout(timer); return; }
+        buf += dec.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buf.indexOf('\n\n')) !== -1) {
+          const raw = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          const evm = /^event:\s*(.+)$/m.exec(raw);
+          const ev = evm ? evm[1].trim() : 'message';
+          const data = raw.split('\n').filter(l => l.startsWith('data:')).map(l => l.replace(/^data:\s?/, '')).join('');
+          if (!data) continue;
+          if (ev === 'chunk') {
+            if (!karmaMsg) {
+              karmaMsg = { sender: 'karma', text: '', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isTyping: false };
+              this.chatMessages.push(karmaMsg);
+            }
+            karmaMsg.text += (karmaMsg.text ? ' ' : '') + data;
+            continue;
+          }
+          if (ev === 'final') {
+            clearTimeout(timer);
+            try {
+              const res = JSON.parse(data);
+              // Authoritative final replaces the progressive render
+              if (karmaMsg) { karmaMsg.text = res.reply || karmaMsg.text; }
+              this.onKarmaResponse(res, karmaMsg ?? undefined);
+            } catch {}
+            return;
+          }
         }
-        this.karmaReply(reply, res.language);
-        if (res.intent === 'navigate' && res.target && !res.action) {
-          const route = '/' + this.normalizeRoute(res.target);
-          this.router.navigate([route]);
-        }
-        this.handleKarmaAction(res);
-      },
-      error: () => {
-        this.karmaReply('I am having trouble connecting to my AI. Please try again.');
-      }
-    });
+        return pump();
+      }).catch(() => {});
+      pump();
+    }).catch(() => finishClassic());
+  }
+
+  /** Shared post-processing for both streaming and classic paths. */
+  private onKarmaResponse(res: any, existingMsg?: ChatMessage): void {
+    const reply = res.reply || 'I processed your request.';
+    if (res.intent === 'language' && res.target) {
+      this.switchLanguage(res.target);
+    }
+    if (existingMsg) {
+      existingMsg.isTyping = false;
+      this.showToast(reply, 'graphic_eq');
+      this.speak(reply, res.language, existingMsg);
+    } else {
+      this.karmaReply(reply, res.language);
+    }
+    if (res.intent === 'navigate' && res.target && !res.action && !(Array.isArray(res.actions) && res.actions.length)) {
+      const route = '/' + this.normalizeRoute(res.target);
+      this.router.navigate([route]);
+    }
+    this.handleKarmaAction(res);
   }
 
   private normalizeRoute(page: string): string {
@@ -711,26 +805,47 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ];
 
   private handleKarmaAction(res: any): void {
-    const action: KarmaUiAction | undefined = res?.action;
-    if (!action?.type) return;
+    // Multi-step plan: execute sequentially; single action remains the common path.
+    const list: KarmaUiAction[] = Array.isArray(res?.actions) && res.actions.length > 0
+      ? res.actions.filter((a: any) => a?.type)
+      : (res?.action?.type ? [res.action] : []);
+    if (list.length === 0) return;
 
-    if (action.type === 'navigate' && action.params && action.params['page']) {
-      const route = '/' + this.normalizeRoute(String(action.params['page']));
-      this.router.navigate([route]).then(() => this.karmaActions.dispatch(action));
-      return;
-    }
-
-    if (this.dashboardActionTypes.includes(action.type)) {
-      const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
-      if (currentPage !== 'dashboard') {
-        this.router.navigate(['/dashboard']).then(() => this.karmaActions.dispatch(action));
-      } else {
-        this.karmaActions.dispatch(action);
+    const runSequentially = async () => {
+      for (const action of list.slice(0, 5)) {
+        await this.runSingleKarmaAction(action);
       }
-      return;
-    }
+    };
+    runSequentially();
+  }
 
-    this.karmaActions.dispatch(action);
+  private runSingleKarmaAction(action: KarmaUiAction): Promise<void> {
+    return new Promise((resolve) => {
+      if (action.type === 'navigate' && action.params && action.params['page']) {
+        this.router.navigate(['/' + this.normalizeRoute(String(action.params['page']))]).then(() => {
+          this.karmaActions.dispatch(action);
+          setTimeout(resolve, 500);
+        });
+        return;
+      }
+
+      if (this.dashboardActionTypes.includes(action.type)) {
+        const currentPage = this.router.url.replace(/^\//, '') || 'dashboard';
+        if (currentPage !== 'dashboard') {
+          this.router.navigate(['/dashboard']).then(() => {
+            this.karmaActions.dispatch(action);
+            setTimeout(resolve, 500);
+          });
+        } else {
+          this.karmaActions.dispatch(action);
+          setTimeout(resolve, 500);
+        }
+        return;
+      }
+
+      this.karmaActions.dispatch(action);
+      resolve();
+    });
   }
 
   private buildChatHistory(): Array<{ role: string; content: string }> {
@@ -794,8 +909,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       this.isProcessingSpeechQueue = false;
       this.isKarmaSpeaking = false;
       window.dispatchEvent(new CustomEvent('karma-speaking', { detail: false }));
+      // P3.2: debounced mic resume after the queue fully drains
       if (this.karmaVoiceSpeechEnabled) {
-        this.startListening(); // Resume listening when queue is fully empty
+        setTimeout(() => {
+          const busy = this.speechQueue.length > 0 || this.isProcessingSpeechQueue;
+          if (!busy && this.karmaVoiceSpeechEnabled && !this.isKarmaSpeaking) {
+            this.startListening();
+          }
+        }, 400);
       }
       return;
     }
@@ -873,6 +994,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       else if (item.language.startsWith('ur')) body.voice = 'ur-IN-GulNeural';
       else if (item.language.startsWith('fr')) body.voice = 'fr-FR-DeniseNeural';
       else if (item.language.startsWith('de')) body.voice = 'de-DE-KatjaNeural';
+      else if (item.language.startsWith('ja')) body.voice = 'ja-JP-NanamiNeural';
+      else if (item.language.startsWith('zh')) body.voice = 'zh-CN-XiaoxiaoNeural';
       else if (this.preferredVoice) body.voice = this.preferredVoice;
     } else {
       // Force an English voice for English text
