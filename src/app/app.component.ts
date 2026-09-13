@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { AppVersionService } from './core/app-version/app-version.service';
 
 @Component({
   selector: 'app-root',
@@ -8,4 +9,10 @@ import { RouterOutlet } from '@angular/router';
   template: `<router-outlet></router-outlet>`,
   styles: [`:host { display: contents; }`],
 })
-export class AppComponent {}
+export class AppComponent implements OnInit {
+  constructor(private readonly appVersion: AppVersionService) {}
+
+  ngOnInit(): void {
+    this.appVersion.start();
+  }
+}

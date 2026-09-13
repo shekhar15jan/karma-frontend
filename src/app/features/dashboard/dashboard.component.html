@@ -1,42 +1,162 @@
 <div class="grid grid-cols-[300px_1fr_310px] gap-4 h-[calc(100vh-176px)] w-full overflow-hidden select-none">
+  <!-- ACTIVE MISSION — top span left → System Status (replaces toast) -->
+  <div class="col-span-3 glass-panel rounded-xl p-3 flex flex-col gap-2 shrink-0">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+        <div class="flex items-center gap-2">
+          <span class="text-[9px] font-mono px-1.5 py-0.5 rounded border" [ngClass]="activeMission?.status === 'RUNNING' ? 'bg-[#00e5ff]/10 text-[#00e5ff] border-[#00e5ff]/30 animate-pulse' : activeMission?.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400 border-green-500/30' : activeMission?.status === 'FAILED' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-white/5 text-on-surface-variant border-outline-variant/20'">{{ activeMission?.status || 'Idle' }} {{ missionProgress }}%</span>
+          <button (click)="openModal('create-mission')" class="text-[9px] font-label-mono uppercase tracking-widest text-primary hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer flex items-center gap-1">
+            <span class="material-symbols-outlined text-[12px]">add_circle</span> New
+          </button>
+        </div>
+      </div>
+    @if (activeMission) {
+      <div class="flex gap-3 items-stretch">
+        <div class="w-1/4 flex flex-col gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-outline-variant/20">
+          <div class="flex gap-2.5 items-start">
+            <div class="w-10 h-10 bg-primary/10 rounded border border-[#00e5ff]/30 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-primary-container text-[18px]">description</span>
+            </div>
+            <div class="space-y-1 min-w-0 flex-1">
+              <p class="text-[12px] font-bold text-on-surface mb-0 truncate" [title]="activeMission.name">{{ activeMission.name }}</p>
+              <p class="text-[9px] text-on-surface-variant font-label-mono uppercase mb-0">{{ activeMission.missionType || 'Standard Mission' }}</p>
+              @if (activeMissionMode) {
+                <span class="inline-flex items-center gap-1 text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
+                      [ngClass]="activeMissionMode === 'REVIEW' ? 'text-[#00e5ff] border-[#00e5ff]/40 bg-[#00e5ff]/10' : 'text-green-400 border-green-500/40 bg-green-500/10'">{{ activeMissionMode }}</span>
+              }
+              <p class="text-[8px] text-on-surface-variant mb-0">Created: {{ activeMission.formattedDate || 'Just now' }}</p>
+            </div>
+          </div>
+          <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30">
+            <div class="h-full transition-all duration-500" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.6)]' : activeMission.status === 'FAILED' ? 'bg-red-500' : 'bg-[#00e5ff] shadow-[0_0_10px_#00e5ff]'" [style.width.%]="missionProgress"></div>
+          </div>
+          <!-- Stop / Publish / Resume action buttons inside mission card (1/3 area) -->
+          @if (activeMission.status === 'RUNNING' || activeMission.status === 'PENDING' || activeMission.status === 'WAITING') {
+            <button (click)="stopActiveMission()" class="w-full py-1.5 bg-red-600/20 border border-red-500/50 text-red-500 font-bold text-[9px] rounded-lg flex items-center justify-center gap-1.5 hover:bg-red-600/30 transition-all cursor-pointer" title="Stop Mission">
+              <span class="material-symbols-outlined text-[14px]">stop_circle</span> STOP MISSION
+            </button>
+          }
+          @if (activeMission.status === 'COMPLETED') {
+            <button (click)="publishActiveMission()" class="w-full py-1.5 bg-green-600/20 border border-green-500/50 text-green-500 font-bold text-[9px] rounded-lg flex items-center justify-center gap-1.5 hover:bg-green-600/30 transition-all cursor-pointer" title="Publish">
+              <span class="material-symbols-outlined text-[14px]">send</span> PUBLISH
+            </button>
+          }
+          @if (activeMission.status === 'FAILED' && failedStepDetail) {
+            <button (click)="resumeFailedExecution()" class="w-full py-1.5 bg-primary/20 border border-primary/40 text-primary font-bold text-[9px] rounded-lg flex items-center justify-center gap-1.5 hover:bg-primary/30 transition-all cursor-pointer" title="Resume from failed step (reuses completed chunks)">
+              <span class="material-symbols-outlined text-[14px]">play_arrow</span> RESUME
+            </button>
+          }
+        </div>
+        <div class="w-3/4 flex flex-col">
+          @if (failedStepDetail) {
+            <div class="flex-1 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 flex gap-2 items-start backdrop-blur-md shadow-[0_0_20px_rgba(239,68,68,0.15)]">
+              <span class="material-symbols-outlined text-red-400 text-[16px] mt-0.5 shrink-0 animate-pulse">error</span>
+              <div class="min-w-0 flex-1">
+                <p class="text-[9px] font-bold tracking-widest uppercase text-red-400 mb-1">{{ failedStepDetail.label }} FAILED — ERROR</p>
+                <p class="text-[9px] font-mono text-red-200 break-words leading-relaxed line-clamp-2">{{ failedStepDetail.error }}</p>
+                <p class="text-[7px] font-mono text-red-300/60 mt-1">Toast • {{ failedStepDetail.key }} • {{ missionProgress }}% • resumes from last chunk</p>
+              </div>
+              <button (click)="failedStepDetail=null" class="shrink-0 p-1 text-on-surface-variant hover:text-red-400 hover:bg-white/5 rounded transition-colors" title="Dismiss">
+                <span class="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          } @else if (activeMission.status === 'COMPLETED') {
+            <div class="flex-1 p-3 rounded-lg bg-green-500/10 border border-green-500/30 flex flex-col items-center justify-center gap-1">
+              <span class="material-symbols-outlined text-green-400 text-[20px]">check_circle</span>
+              <p class="text-[10px] font-bold tracking-widest uppercase text-green-400">COMPLETED</p>
+            </div>
+          } @else if (activeMission.status === 'RUNNING') {
+            <div class="flex-1 p-3 rounded-lg bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex flex-col items-center justify-center gap-1">
+              <span class="material-symbols-outlined text-[#00e5ff] text-[18px] animate-spin">sync</span>
+              <p class="text-[9px] font-bold tracking-widest uppercase text-[#00e5ff] animate-pulse">RUNNING {{ missionProgress }}%</p>
+            </div>
+          } @else {
+            <div class="flex-1 p-3 rounded-lg bg-white/5 border border-outline-variant/20 flex items-center justify-center">
+              <p class="text-[9px] font-mono text-on-surface-variant">{{ activeMission.status }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="flex flex-col items-center justify-center py-4 text-on-surface-variant gap-2">
+        <span class="material-symbols-outlined text-[28px] opacity-50">flight_takeoff</span>
+        <p class="text-[11px] mb-0">No active missions found</p>
+      </div>
+    }
+  </div>
   <!-- LEFT COLUMN -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-y-auto no-scrollbar">
-    <!-- Active Mission -->
-    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 shrink-0 h-[240px]">
-      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+    <!-- Active Mission moved to top span — hidden here -->
+    <div class="hidden">
+      <div class="flex justify-between items-center shrink-0">
+        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Active Mission</h3>
+        <button (click)="openModal('create-mission')" class="text-[9px] font-label-mono uppercase tracking-widest text-primary hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer flex items-center gap-1">
+          <span class="material-symbols-outlined text-[12px]">add_circle</span> New
+        </button>
+      </div>
       @if (activeMission) {
-        <div class="flex gap-3 items-start mt-1">
-          <div class="w-12 h-12 bg-primary/10 rounded border border-[#00e5ff]/30 flex items-center justify-center shrink-0">
-            <span class="material-symbols-outlined text-primary-container">description</span>
-          </div>
-          <div class="space-y-1 min-w-0">
-            <p class="text-[13px] font-bold text-on-surface mb-0 truncate" [title]="activeMission.name">{{ activeMission.name }}</p>
-            <p class="text-[10px] text-on-surface-variant font-label-mono uppercase mb-0">{{ activeMission.missionType || 'Standard Mission' }}</p>
-            <p class="text-[9px] text-on-surface-variant mb-0">Created: {{ activeMission.formattedDate || 'Just now' }}</p>
-          </div>
-        </div>
-        <div class="space-y-2 mt-2">
-          <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-            <!-- Simulated progress based on status -->
-            <div class="bg-[#00e5ff] h-full shadow-[0_0_10px_#00e5ff]" [style.width]="activeMission.status === 'COMPLETED' ? '100%' : '72%'"></div>
-          </div>
-          <div class="flex justify-between text-[10px] text-on-surface-variant font-label-mono">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400' : 'bg-[#00e5ff]'"></span>
-              <span>Status: {{ activeMission.status }}</span>
+        <div class="flex gap-3 items-stretch">
+          <!-- Left half — mission info -->
+          <div class="w-1/2 flex flex-col gap-2 p-2 rounded-lg bg-white/[0.03] border border-outline-variant/20">
+            <div class="flex gap-2.5 items-start">
+              <div class="w-10 h-10 bg-primary/10 rounded border border-[#00e5ff]/30 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-primary-container text-[18px]">description</span>
+              </div>
+              <div class="space-y-0.5 min-w-0 flex-1">
+                <p class="text-[12px] font-bold text-on-surface mb-0 truncate" [title]="activeMission.name">{{ activeMission.name }}</p>
+                <p class="text-[9px] text-on-surface-variant font-label-mono uppercase mb-0">{{ activeMission.missionType || 'Standard Mission' }}</p>
+                @if (activeMissionMode) {
+                  <span class="inline-flex items-center gap-1 text-[8px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
+                        [ngClass]="activeMissionMode === 'REVIEW' ? 'text-[#00e5ff] border-[#00e5ff]/40 bg-[#00e5ff]/10' : 'text-green-400 border-green-500/40 bg-green-500/10'">
+                    {{ activeMissionMode }}
+                  </span>
+                }
+              </div>
             </div>
-            <span>{{ activeMission.status === 'COMPLETED' ? '100%' : '72%' }}</span>
+            <div class="space-y-1.5 mt-1">
+              <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden border border-outline-variant/30">
+                <div class="h-full transition-all duration-500 shadow-[0_0_10px_#00e5ff]" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.6)]' : activeMission.status === 'FAILED' ? 'bg-red-500' : 'bg-[#00e5ff]'" [style.width.%]="missionProgress"></div>
+              </div>
+              <div class="flex justify-between text-[9px] text-on-surface-variant font-label-mono">
+                <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full" [ngClass]="activeMission.status === 'COMPLETED' ? 'bg-green-400' : activeMission.status === 'FAILED' ? 'bg-red-500' : 'bg-[#00e5ff] animate-pulse'"></span>{{ activeMission.status }}</span>
+                <span class="font-bold">{{ missionProgress }}%</span>
+              </div>
+            </div>
           </div>
-          <button (click)="triggerMission(activeMission!.id)" class="w-full mt-1 px-3 py-1.5 bg-green-600/20 border border-green-500/50 text-green-500 text-xs font-bold rounded-lg hover:bg-green-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-            <span class="material-symbols-outlined text-sm">play_arrow</span>
-            <span>Run Mission</span>
-          </button>
+          <!-- Right half — status / failure -->
+          <div class="w-1/2 flex flex-col">
+            @if (failedStepDetail) {
+              <div class="flex-1 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 flex gap-2 items-start">
+                <span class="material-symbols-outlined text-red-400 text-[14px] mt-0.5 shrink-0">error</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[9px] font-bold tracking-widest uppercase text-red-400 mb-1">{{ failedStepDetail.label }} FAILED</p>
+                  <p class="text-[9px] font-mono text-red-200 break-words leading-relaxed line-clamp-4">{{ failedStepDetail.error }}</p>
+                  <p class="text-[7px] font-mono text-red-300/60 mt-1">{{ failedStepDetail.key }} • Execution Monitor →</p>
+                </div>
+              </div>
+            } @else if (activeMission.status === 'COMPLETED') {
+              <div class="flex-1 p-3 rounded-lg bg-green-500/10 border border-green-500/30 flex flex-col items-center justify-center gap-1">
+                <span class="material-symbols-outlined text-green-400 text-[20px]">check_circle</span>
+                <p class="text-[10px] font-bold tracking-widest uppercase text-green-400">COMPLETED</p>
+                <p class="text-[8px] font-mono text-green-300/80">All agents done</p>
+              </div>
+            } @else if (activeMission.status === 'RUNNING') {
+              <div class="flex-1 p-3 rounded-lg bg-[#00e5ff]/10 border border-[#00e5ff]/30 flex flex-col items-center justify-center gap-1">
+                <span class="material-symbols-outlined text-[#00e5ff] text-[18px] animate-spin">sync</span>
+                <p class="text-[9px] font-bold tracking-widest uppercase text-[#00e5ff] animate-pulse">RUNNING</p>
+                <p class="text-[8px] font-mono text-on-surface-variant">{{ missionProgress }}% • Live via SSE</p>
+              </div>
+            } @else {
+              <div class="flex-1 p-3 rounded-lg bg-white/5 border border-outline-variant/20 flex items-center justify-center">
+                <p class="text-[9px] font-mono text-on-surface-variant">{{ activeMission.status }}</p>
+              </div>
+            }
+          </div>
         </div>
       } @else {
         <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
           <span class="material-symbols-outlined text-[32px] opacity-50">flight_takeoff</span>
           <p class="text-[11px] mb-0">No active missions found</p>
-          <button (click)="openModal('create-mission')" class="mt-2 text-[10px] px-3 py-1 bg-primary/20 text-primary border border-primary/30 rounded cursor-pointer hover:bg-primary/30 transition-colors">Start Mission</button>
         </div>
       }
     </div>
@@ -104,8 +224,11 @@
                 </div>
                 @if (expandedProviders.has(provider.id) && provider.models?.length) {
                   <div class="px-2 pb-1.5 flex flex-wrap gap-1">
-                    @for (m of provider.models; track m) {
+                    @for (m of provider.models.slice(0, 8); track m) {
                       <span class="text-[7px] px-1.5 py-0.5 bg-white/5 border border-outline-variant/20 rounded font-mono text-on-surface-variant">{{ m }}</span>
+                    }
+                    @if (provider.models.length > 8) {
+                      <span class="text-[7px] px-1.5 py-0.5 bg-white/5 border border-outline-variant/20 rounded font-mono text-on-surface-variant">+{{ provider.models.length - 8 }} more</span>
                     }
                   </div>
                 }
@@ -122,46 +245,8 @@
 
   <!-- CENTER AREA -->
   <section class="flex flex-col gap-4 h-full min-h-0 overflow-hidden">
-    <!-- Flows Pipeline -->
-    <div class="glass-panel rounded-xl p-4 flex flex-col gap-4 shrink-0">
-      <div class="flex justify-between items-center">
-        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Flows</h3>
-        <div class="flex items-center gap-2">
-          <button (click)="toggleDiagnosticsSidebar()" class="text-[9px] flex items-center gap-1 text-green-400 hover:text-green-300 transition-colors bg-green-400/10 border border-green-400/30 px-2 py-0.5 rounded cursor-pointer">
-            <span class="material-symbols-outlined text-[12px] animate-pulse">sensors</span> Diagnostics
-          </button>
-          <button (click)="openModal('flows')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
-        </div>
-      </div>
-      <div #flowsContainer class="flex flex-nowrap gap-3 px-6 w-full overflow-x-auto no-scrollbar pb-2 scroll-smooth">
-        @if (flowsList && flowsList.length > 0) {
-          @for (flow of flowsList; track flow.id) {
-            <div class="flex flex-col gap-2 shrink-0 w-36 bg-white/5 border border-outline-variant/30 rounded-lg p-3 transition-all cursor-pointer hover:bg-white/10 hover:border-primary/50"
-                 (click)="openFlowDiagram(flow); $event.stopPropagation()"
-                 [ngClass]="{'border-green-400 bg-green-400/5': flow.status === 'COMPLETED', 'border-[#00e5ff] bg-[#00e5ff]/5': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE'}">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full border flex items-center justify-center transition-colors shrink-0"
-                     [ngClass]="{'border-green-400 bg-green-400/10 text-green-400 shadow-[0_0_10px_rgba(74,222,128,0.2)]': flow.status === 'COMPLETED', 'border-[#00e5ff] bg-[#00e5ff]/10 text-[#00e5ff] animate-pulse shadow-[0_0_10px_rgba(0,229,255,0.4)]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'border-outline-variant bg-white/5 opacity-50 text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">
-                  <span class="material-symbols-outlined text-[16px]">{{ flow.icon || 'account_tree' }}</span>
-                </div>
-                <div class="flex flex-col overflow-hidden">
-                  <span class="text-[10px] font-bold text-on-surface truncate" [title]="flow.name">{{ flow.name }}</span>
-                  <span class="text-[8px] uppercase font-mono truncate" [ngClass]="{'text-green-400': flow.status === 'COMPLETED', 'text-[#00e5ff]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flow.status || 'PENDING' }}</span>
-                </div>
-              </div>
-            </div>
-          }
-        } @else {
-          <div class="w-full text-center py-6 text-on-surface-variant flex flex-col items-center justify-center gap-2">
-            <span class="material-symbols-outlined text-[24px] opacity-50">account_tree</span>
-            <span class="text-[11px]">No workflows running</span>
-          </div>
-        }
-      </div>
-    </div>
-
     <!-- Central Hub (Karma Core) -->
-    <div class="flex-grow relative flex items-center justify-center overflow-visible py-4">
+    <div class="flex-grow relative flex flex-col items-center justify-center overflow-visible py-4">
       <div class="absolute inset-0 pointer-events-none" id="connection-lines-container"></div>
       <div class="relative w-[520px] h-[520px] flex items-center justify-center">
         <!-- Concentric HUD Rings (SVG for precision) -->
@@ -172,43 +257,59 @@
         <!-- Orbital Nodes Container -->
         <div class="absolute inset-0" id="nodes-container">
           <!-- Research (Top - 270deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('research')" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 50px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]">
-                <span class="material-symbols-outlined text-green-400">search</span>
+              <div [class]="hudCircleCls('research')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('research')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('research')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('research').cls">search</span>
               </div>
               <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">RESEARCH</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <span class="text-[8px] font-bold" [class]="hudState('research').cls">{{ hudState('research').text }} {{ hubPct('research') }}</span>
             </div>
           </div>
           <!-- Script (45deg - Top Right) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('script')" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">description</span>
+              <div [class]="hudCircleCls('script')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('script')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('script')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('script').cls">description</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SCRIPT</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">SCRIPT</p>
+              <span class="text-[8px] font-bold" [class]="hudState('script').cls">{{ hudState('script').text }} {{ hubPct('script') }}</span>
             </div>
           </div>
           <!-- Blog (Right - 0deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('blog')" style="transform: translate(-50%, -50%); margin: 0; left: 470px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">feed</span>
+              <div [class]="hudCircleCls('blog')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('blog')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('blog')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('blog').cls">feed</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">BLOG</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">BLOG</p>
+              <span class="text-[8px] font-bold" [class]="hudState('blog').cls">{{ hudState('blog').text }} {{ hubPct('blog') }}</span>
             </div>
           </div>
           <!-- SEO (135deg - Bottom Right) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('seo')" style="transform: translate(-50%, -50%); margin: 0; left: 408px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-green-400">
-                <span class="material-symbols-outlined text-green-400">bar_chart</span>
+              <div [class]="hudCircleCls('seo')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('seo')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('seo')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('seo').cls">bar_chart</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">SEO</p>
-              <span class="text-[8px] text-green-400 font-bold">100%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">SEO</p>
+              <span class="text-[8px] font-bold" [class]="hudState('seo').cls">{{ hudState('seo').text }} {{ hubPct('seo') }}</span>
             </div>
           </div>
           <!-- Karma Core (Center) -->
@@ -235,43 +336,59 @@
             </div>
           </div>
           <!-- Voice (Bottom - 90deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('voice')" style="transform: translate(-50%, -50%); margin: 0; left: 260px; top: 470px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-secondary shadow-[0_0_15px_rgba(209,188,255,0.3)]">
-                <span class="material-symbols-outlined text-secondary">mic</span>
+              <div [class]="hudCircleCls('voice')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('voice')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('voice')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('voice').cls">mic</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VOICE</p>
-              <span class="text-[8px] text-secondary font-bold">Generating</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">VOICE</p>
+              <span class="text-[8px] font-bold" [class]="hudState('voice').cls">{{ hudState('voice').text }} {{ hubPct('voice') }}</span>
             </div>
           </div>
           <!-- Video (225deg - Bottom Left) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('video')" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 408px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-primary-container shadow-[0_0_15_rgba(0,229,255,0.3)]">
-                <span class="material-symbols-outlined text-primary-container">videocam</span>
+              <div [class]="hudCircleCls('video')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('video')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('video')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('video').cls">videocam</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">VIDEO</p>
-              <span class="text-[8px] text-primary-container font-bold">Rendering 45%</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">VIDEO</p>
+              <span class="text-[8px] font-bold" [class]="hudState('video').cls">{{ hudState('video').text }} {{ hubPct('video') }}</span>
             </div>
           </div>
           <!-- Thumbnail (Left - 180deg) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('thumbnail')" style="transform: translate(-50%, -50%); margin: 0; left: 50px; top: 260px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-outline-variant/50">
-                <span class="material-symbols-outlined text-on-surface-variant">grid_view</span>
+              <div [class]="hudCircleCls('thumbnail')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('thumbnail')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('thumbnail')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('thumbnail').cls">grid_view</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">THUMBNAIL</p>
-              <span class="text-[8px] text-on-surface-variant font-bold">Pending</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">THUMBNAIL</p>
+              <span class="text-[8px] font-bold" [class]="hudState('thumbnail').cls">{{ hudState('thumbnail').text }} {{ hubPct('thumbnail') }}</span>
             </div>
           </div>
           <!-- Image (315deg - Top Left) -->
-          <div class="karma-node" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
+          <div class="karma-node cursor-pointer hover:scale-110 transition-transform duration-200" (click)="onNodeClick('image')" style="transform: translate(-50%, -50%); margin: 0; left: 112px; top: 112px;">
             <div class="flex flex-col items-center">
-              <div class="w-14 h-14 rounded-full glass-panel flex items-center justify-center border-orange-400 shadow-[0_0_15px_rgba(251,146,60,0.3)]">
-                <span class="material-symbols-outlined text-orange-400">image</span>
+              <div [class]="hudCircleCls('image')" style="position: relative;">
+                <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                  <circle cx="28" cy="28" r="24" fill="none" [attr.stroke]="hubRingColor('image')" stroke-width="3" stroke-linecap="round" [attr.stroke-dasharray]="150.8" [attr.stroke-dashoffset]="hubRingOffset('image')" class="transition-all duration-700 drop-shadow-[0_0_6px_currentColor]"/>
+                </svg>
+                <span class="material-symbols-outlined relative z-10" [class]="hudState('image').cls">image</span>
               </div>
-              <p class="text-[9px] mt-1 font-bold uppercase mb-0">IMAGE</p>
-              <span class="text-[8px] text-orange-400 font-bold">Generating 8/12</span>
+              <p class="text-[9px] mt-1 font-bold uppercase text-on-surface mb-0">IMAGE</p>
+              <span class="text-[8px] font-bold" [class]="hudState('image').cls">{{ hudState('image').text }} {{ hubPct('image') }}</span>
             </div>
           </div>
         </div>
@@ -285,9 +402,29 @@
           <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 rounded-full"></div>
           
           <div class="w-36 h-36 rounded-full glass-panel flex items-center justify-center relative z-10">
-            <div class="text-center relative z-10">
+            <div class="text-center relative z-10 flex flex-col items-center">
               <h2 class="text-headline-md font-bold tracking-[0.2em] text-on-surface mb-0 leading-none">KARMA</h2>
               <h3 class="text-[12px] font-bold tracking-[0.5em] text-[#00e5ff] mb-0 mt-1">CORE</h3>
+              <div class="mt-3 w-full px-2">
+                @if (activeMission) {
+                  <div class="flex justify-center">
+                    <div class="flex rounded-xl overflow-hidden border-2 border-outline-variant/30 shadow-[0_0_15px_rgba(0,229,255,0.2)]">
+                      <button (click)="triggerMission(activeMission!.id)" class="w-[38px] h-[38px] bg-green-600/20 text-green-500 hover:bg-green-600/30 transition-colors flex items-center justify-center border-r border-outline-variant/20 cursor-pointer" title="Run Mission">
+                        <span class="material-symbols-outlined text-[19px]">play_arrow</span>
+                      </button>
+                      <button (click)="openModal('create-mission')" class="w-[38px] h-[38px] bg-primary/20 text-primary hover:bg-primary/30 transition-colors flex items-center justify-center cursor-pointer" title="New Mission">
+                        <span class="material-symbols-outlined text-[19px]">add_circle</span>
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="flex justify-center">
+                    <button (click)="openModal('create-mission')" class="w-[43px] h-[43px] rounded-xl bg-primary/20 border-2 border-primary/30 text-primary hover:bg-primary/30 hover:scale-105 transition-all flex items-center justify-center shadow-[0_0_20px_rgba(0,229,255,0.4)] cursor-pointer" title="Start Mission">
+                      <span class="material-symbols-outlined text-[24px]">add_circle</span>
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
           </div>
         </div>
@@ -394,40 +531,7 @@
       </div>
     </div>
 
-    <!-- Pending Approvals -->
-    <div class="glass-panel rounded-xl p-4 flex flex-col gap-3 flex-grow overflow-hidden min-h-0">
-      <div class="flex justify-between items-center shrink-0">
-        <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Pending Approvals</h3>
-        <button (click)="openModal('approvals')" class="text-[9px] text-on-surface-variant hover:text-primary-container transition-colors bg-transparent border-0 p-0 cursor-pointer">View All</button>
-      </div>
-      <div class="space-y-2 overflow-y-auto flex-grow h-full pr-2 no-scrollbar">
-        @if (pendingApprovals && pendingApprovals.length > 0) {
-          @for (approval of pendingApprovals; track approval.id) {
-            <div class="flex items-start gap-3 p-2 bg-white/5 rounded-lg border border-primary/10 transition-colors hover:bg-white/10">
-              <div class="w-10 h-10 rounded flex items-center justify-center shrink-0 border"
-                   [ngClass]="{'bg-red-600/20 border-red-500/30 text-red-500': approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT', 'bg-blue-600/20 border-blue-500/30 text-blue-400': approval.type === 'BLOG_POST' || approval.type === 'ARTICLE', 'bg-[#00e5ff]/20 border-[#00e5ff]/30 text-[#00e5ff]': approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN', 'bg-primary/20 border-primary/30 text-primary': (approval.type ? !['VIDEO_SCRIPT','SCRIPT','BLOG_POST','ARTICLE','SOCIAL_POST','LINKEDIN'].includes(approval.type) : true)}">
-                @if (approval.type === 'VIDEO_SCRIPT' || approval.type === 'SCRIPT') { <span class="material-symbols-outlined text-[20px]">play_circle</span> }
-                @else if (approval.type === 'BLOG_POST' || approval.type === 'ARTICLE') { <span class="material-symbols-outlined text-[20px]">article</span> }
-                @else if (approval.type === 'SOCIAL_POST' || approval.type === 'LINKEDIN') { <span class="text-[18px] font-bold flex items-center justify-center">in</span> }
-                @else { <span class="material-symbols-outlined text-[20px]">inventory_2</span> }
-              </div>
-              <div class="flex-grow min-w-0">
-                <div class="flex justify-between items-center"><p class="text-[10px] font-bold truncate mb-0" [title]="approval.title || approval.name">{{ approval.title || approval.name || 'Artifact Review' }}</p><span class="text-[8px] text-on-surface-variant">{{ approval.formattedDate || 'Just now' }}</span></div>
-                <div class="flex gap-1.5 mt-1.5">
-                  <button (click)="showToast('Reviewing ' + (approval.title || 'Artifact'), 'preview')" class="flex-grow py-1 bg-white/5 border border-primary/30 text-[9px] rounded hover:bg-primary/10 text-on-surface transition-colors cursor-pointer">Review</button>
-                  <button (click)="showToast('Approved ' + (approval.title || 'Artifact'), 'check_circle')" class="flex-grow py-1 bg-green-600/60 border border-green-500/40 text-[9px] rounded font-bold text-white transition-colors cursor-pointer hover:bg-green-500/80">Approve</button>
-                </div>
-              </div>
-            </div>
-          }
-        } @else {
-          <div class="flex flex-col items-center justify-center py-6 text-on-surface-variant gap-2">
-            <span class="material-symbols-outlined text-[32px] opacity-50">fact_check</span>
-            <p class="text-[11px] mb-0 text-center px-4">No artifacts currently waiting for human approval.</p>
-          </div>
-        }
-      </div>
-    </div>
+
 
     <!-- Voice Commands -->
     <div class="glass-panel rounded-xl p-4 flex flex-col shrink-0">
@@ -517,7 +621,7 @@
 </div>
 
 <!-- Dynamic Overlay Modal -->
-@if (activeModal && activeModal !== 'flow-diagram') {
+@if (activeModal && activeModal !== 'flow-diagram' && activeModal !== 'review' && activeModal !== 'direct-review') {
   <div class="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
     <!-- Click outside to close (invisible backdrop) -->
     <div class="absolute inset-0 cursor-pointer" (click)="closeModal()"></div>
@@ -592,8 +696,11 @@
                   <div class="mt-3 pt-3 border-t border-outline-variant/20">
                     <p class="text-[9px] text-on-surface-variant font-mono uppercase tracking-wider mb-1.5">Models ({{ provider.models.length }})</p>
                     <div class="flex flex-wrap gap-1.5">
-                      @for (m of provider.models; track m) {
+                      @for (m of provider.models.slice(0, 10); track m) {
                         <span class="px-2 py-0.5 bg-white/5 border border-outline-variant/20 text-[9px] text-on-surface rounded font-mono">{{ m }}</span>
+                      }
+                      @if (provider.models.length > 10) {
+                        <span class="px-2 py-0.5 bg-white/5 border border-outline-variant/20 text-[9px] text-on-surface-variant rounded font-mono">+{{ provider.models.length - 10 }} more</span>
                       }
                     </div>
                   </div>
@@ -619,8 +726,17 @@
                     <span class="material-symbols-outlined" [ngClass]="{'text-green-400': flow.status === 'COMPLETED', 'text-[#00e5ff]': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flow.icon || 'account_tree' }}</span>
                     {{ flow.name }}
                   </h4>
+                  <div class="flex items-center gap-2">
                   <span class="px-2 py-1 text-[9px] rounded font-bold uppercase"
                         [ngClass]="{'bg-green-400/20 text-green-400': flow.status === 'COMPLETED', 'bg-[#00e5ff]/20 text-[#00e5ff] animate-pulse': flow.status === 'IN_PROGRESS' || flow.status === 'ACTIVE', 'bg-white/10 text-on-surface-variant': flow.status !== 'COMPLETED' && flow.status !== 'IN_PROGRESS' && flow.status !== 'ACTIVE'}">{{ flowBadge(flow).text }}</span>
+                  <button class="px-2 py-1.5 border text-xs font-bold rounded-lg transition-all flex items-center justify-center"
+                          [ngClass]="(flow.isSystem || !canDeleteFlows) ? 'bg-white/5 border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 cursor-pointer'"
+                          [disabled]="flow.isSystem || !canDeleteFlows"
+                          [title]="flow.isSystem ? 'System flow cannot be deleted' : 'Delete flow'"
+                          (click)="deleteFlow(flow)">
+                    <span class="material-symbols-outlined text-sm">{{ flow.isSystem ? 'lock' : 'delete' }}</span>
+                  </button>
+                </div>
                 </div>
                 <p class="text-[11px] text-on-surface-variant leading-relaxed">{{ flow.description || 'No description available.' }}</p>
                 <p class="text-[9px] uppercase font-mono text-on-surface-variant/70 mt-2">{{ flow.category || 'GENERAL' }}</p>
@@ -706,9 +822,19 @@
 
         @if (activeModal === 'create-mission') {
           <div class="space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-3">
               <p class="text-[11px] text-on-surface-variant mb-0">Create a new mission to kick off an automated workflow.</p>
-              <span class="text-[9px] font-mono uppercase text-on-surface-variant/60">Mode: {{ runMode }}</span>
+              <div class="flex items-center gap-1 bg-white/5 border border-outline-variant/30 rounded-lg p-0.5 shrink-0">
+                <span class="text-[9px] font-mono uppercase text-on-surface-variant/60 px-1.5">Mode</span>
+                <button (click)="setRunMode('REVIEW')" [class]="runMode === 'REVIEW' ? 'bg-primary/20 text-[#00e5ff] border border-primary/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]' : 'text-on-surface-variant border border-transparent hover:text-on-surface'"
+                        class="px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer">
+                  REVIEW
+                </button>
+                <button (click)="setRunMode('AUTO')" [class]="runMode === 'AUTO' ? 'bg-primary/20 text-[#00e5ff] border border-primary/40 shadow-[0_0_8px_rgba(0,229,255,0.2)]' : 'text-on-surface-variant border border-transparent hover:text-on-surface'"
+                        class="px-2.5 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer">
+                  AUTO
+                </button>
+              </div>
             </div>
 
             @if (workspaces.length === 0) {
@@ -770,7 +896,7 @@
               <div class="grid grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
                   <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Mission Type</label>
-                  <select [(ngModel)]="newMission.missionType" (ngModelChange)="onMissionTypeChange()"
+                  <select [(ngModel)]="newMission.missionType"
                           class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
                     @for (type of ['VIDEO', 'BLOG', 'SCRIPT', 'VOICE', 'THUMBNAIL', 'WORKFLOW']; track type) {
                       <option [value]="type">{{ type }}</option>
@@ -784,6 +910,22 @@
                     @for (p of ['LOW', 'MEDIUM', 'HIGH', 'URGENT']; track p) {
                       <option [value]="p">{{ p }}</option>
                     }
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Source Document (Required)</label>
+                  <input type="file" (change)="onFileSelected($event)" accept=".md,.txt"
+                         class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer" />
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Run Mode</label>
+                  <select [(ngModel)]="runMode"
+                          class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
+                    <option value="REVIEW">REVIEW (Require Human Approval)</option>
+                    <option value="AUTO">AUTO (Fully Autonomous)</option>
                   </select>
                 </div>
               </div>
@@ -832,6 +974,34 @@
                 </select>
               </div>
 
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Video Theme</label>
+                  <select [(ngModel)]="newMission.theme"
+                          class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50 cursor-pointer">
+                    @for (t of ['whiteboard', 'corporate', 'minimal', 'dark', 'glass', 'technical', 'codeatcloud', 'auto']; track t) {
+                      <option [value]="t">{{ t === 'auto' ? 'Auto (vary per run)' : (t | titlecase) }}</option>
+                    }
+                  </select>
+                  <span class="text-[9px] text-on-surface-variant/70">Default whiteboard. Auto rotates the style (theme, transitions) on every run.</span>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Output Folder <span class="normal-case text-on-surface-variant/60">(optional)</span></label>
+                  <input type="text" [(ngModel)]="newMission.outputDirectory"
+                         placeholder="e.g. clientA/video or a full Windows path under the output root"
+                         class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
+                  <span class="text-[9px] text-on-surface-variant/70">Blank inherits the workspace default folder.</span>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">Target Duration <span class="normal-case text-on-surface-variant/60">(seconds, optional)</span></label>
+                <input type="number" min="30" step="30" [(ngModel)]="newMission.targetDurationSeconds"
+                       placeholder="e.g. 900 = 15 min video"
+                       class="w-full bg-background border border-outline-variant/30 rounded-lg px-3 py-2 text-[12px] text-on-surface focus:outline-none focus:border-primary/50" />
+                <span class="text-[9px] text-on-surface-variant/70">Blank uses the global default (900s / 15 min). The story &amp; narration are written to hit this length.</span>
+              </div>
+
               <div class="flex gap-3 pt-2">
                 <button (click)="createMission(false)" [disabled]="isCreatingMission"
                         class="flex-grow py-2.5 bg-white/5 border border-outline-variant/40 text-[11px] font-bold text-on-surface rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer">
@@ -851,86 +1021,326 @@
   </div>
 }
 
-<!-- Flow Diagram Modal -->
+<!-- Fullscreen Flow Diagram + Review Split Dialog -->
 @if (activeModal === 'flow-diagram' && selectedFlowForDiagram) {
-  <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center" (click)="closeModal()">
-    <div class="glass-panel rounded-2xl flex flex-col w-[700px] max-h-[80vh] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-outline-variant/30 relative" (click)="$event.stopPropagation()">
-      <div class="p-4 border-b border-outline-variant/30 flex justify-between items-center bg-white/5">
-        <div class="flex flex-col">
-          <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-1">{{ selectedFlowForDiagram.name }}</h2>
-          <span class="text-[10px] text-on-surface-variant font-mono">{{ selectedFlowForDiagram.description || 'System execution workflow' }}</span>
+  <div class="fixed inset-0 bg-background/90 backdrop-blur-sm z-[120] flex flex-col" (click)="closeModal()">
+    <div class="flex flex-col flex-grow overflow-hidden" (click)="$event.stopPropagation()">
+      <!-- Header -->
+      <div class="px-5 py-3 border-b border-outline-variant/30 flex items-center justify-between bg-white/5 shrink-0">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="material-symbols-outlined text-[#00e5ff] text-xl">account_tree</span>
+          <div class="min-w-0">
+            <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0 leading-tight truncate">{{ selectedFlowForDiagram.name }}</h2>
+            <span class="text-[9px] font-mono text-on-surface-variant uppercase">
+              {{ selectedFlowForDiagram.description || 'System execution workflow' }}
+              @if (flowDetailLoading) { · loading run history... }
+            </span>
+          </div>
         </div>
-        <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer transition-colors" (click)="closeModal()">&times;</button>
+        <div class="flex items-center gap-2 shrink-0">
+          @if (selectedReviewStep) {
+            <span class="text-[9px] font-mono text-amber-400 uppercase">Rewritten {{ selectedReviewStep.retryCount }}× of {{ selectedReviewStep.maxRetries || 3 }}</span>
+          }
+          <a routerLink="/workflows" [queryParams]="{ flow: selectedFlowForDiagram.id }"
+             class="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 text-xs font-bold rounded-lg hover:bg-cyan-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+             title="Open this flow in the Workflow Designer">
+            <span class="material-symbols-outlined text-sm">hub</span>
+            Open in Designer
+          </a>
+          <button class="w-9 h-9 rounded-full bg-white/5 border border-outline-variant/30 text-on-surface-variant hover:text-red-400 hover:border-red-500/40 text-xl font-light cursor-pointer transition-colors flex items-center justify-center" (click)="closeModal()">&times;</button>
+        </div>
       </div>
-      <div class="p-8 overflow-y-auto no-scrollbar flex-grow bg-[#111111] flex flex-col items-center justify-center min-h-[300px]">
-        
-        <!-- Flow Diagram Container -->
-        <div class="flex items-center justify-center gap-2 w-full relative py-10 overflow-x-auto text-white">
-          
-          <!-- Input Node (The Flow itself) -->
-          <div class="flex flex-col items-center z-10 w-28 shrink-0">
-            <div class="w-16 h-16 rounded-2xl bg-zinc-800 border-2 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] flex items-center justify-center mb-3 transition-all"
-                 [ngClass]="selectedFlowForDiagram.status === 'IN_PROGRESS' || selectedFlowForDiagram.status === 'ACTIVE' ? 'animate-pulse' : ''">
-              <span class="material-symbols-outlined text-[32px] text-cyan-400">{{ selectedFlowForDiagram.icon || 'account_tree' }}</span>
+
+      <!-- Split body -->
+      <div class="flex flex-grow min-h-0 overflow-hidden">
+        <!-- LEFT HALF: Workflow Designer canvas -->
+        <div class="w-1/2 shrink-0 border-r border-outline-variant/30 flex flex-col bg-[#0d0f12] overflow-hidden">
+          <div class="px-4 py-2 border-b border-outline-variant/20 flex items-center justify-between shrink-0">
+            <span class="text-[9px] font-mono text-on-surface-variant uppercase">Workflow Design</span>
+            <span class="text-[8px] font-mono text-on-surface-variant/70 uppercase">{{ designNodes.length - 2 }} steps · {{ designEdges.length }} connections</span>
+          </div>
+
+          @if (designNodes.length === 0) {
+            <div class="flex-grow flex items-center justify-center text-on-surface-variant text-xs">
+              No design saved for this flow.
             </div>
-            <span class="text-[12px] font-bold text-white uppercase tracking-wider text-center drop-shadow-md">Flow Input</span>
-          </div>
+          } @else {
+            <div class="flex-grow min-h-0 overflow-auto no-scrollbar workflow-canvas">
+              <div class="relative"
+                   [style.width.px]="designBounds.width + 80"
+                   [style.height.px]="designBounds.height + 80">
+                <!-- dot-grid background -->
+                <div class="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(rgba(0,229,255,0.15)_1.5px,transparent_1.5px)] [background-size:20px_20px]"></div>
 
-          <!-- Connector Line -->
-          <div class="h-[4px] w-16 bg-gradient-to-r from-cyan-400 to-purple-500 relative shrink-0 rounded-full mx-2 shadow-[0_0_10px_rgba(34,211,238,0.5)]">
-            <!-- Animated particle on the line -->
-            <div class="absolute top-1/2 left-0 w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,1)] -translate-y-1/2 animate-[pulse_2s_infinite]"></div>
-            <!-- Arrow tip -->
-            <div class="absolute right-[-4px] top-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-purple-500 border-b-[6px] border-b-transparent -translate-y-1/2 z-20"></div>
-          </div>
+                <!-- Connections SVG layer -->
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" style="overflow: visible;">
+                  <defs>
+                    <marker id="flowArrow" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#00e5ff" />
+                    </marker>
+                  </defs>
+                  <g [attr.transform]="'translate(' + (40 - designBounds.minX) + ',' + (40 - designBounds.minY) + ')'">
+                    @for (edge of designEdges; track edge.id) {
+                      <path [attr.d]="designNodePath(edge)" fill="none" stroke="#00e5ff" stroke-width="2" marker-end="url(#flowArrow)" class="glow-text" />
+                    }
+                  </g>
+                </svg>
 
-          <!-- Agents Node -->
-          <div class="flex flex-col gap-4 z-10 shrink-0">
-            @for (agent of selectedFlowAgents; track agent.name) {
-              <div class="flex items-center gap-4 bg-zinc-900 border-2 border-white/20 rounded-xl p-4 shadow-2xl min-w-[240px]">
-                <div class="w-14 h-14 rounded-full border border-white/30 bg-white/10 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-[28px]" [ngClass]="agent.colorClass">{{ agent.icon }}</span>
+                <!-- Nodes -->
+                @for (node of designNodes; track node.id) {
+                  @if (pendingReviewForAgent(node.agentId); as rev) {
+                    <div
+                      class="absolute w-44 rounded-lg border cursor-pointer select-none z-20 flex flex-col overflow-visible transition-all"
+                      [class]="designNodeBgClass(node)"
+                      [ngClass]="{
+                        'border-orange-500/60 shadow-[0_0_20px_rgba(249,115,22,0.25)]': selectedReviewStep?.stepId !== rev.stepId,
+                        'border-primary shadow-[0_0_25px_rgba(0,229,255,0.3)]': selectedReviewStep?.stepId === rev.stepId
+                      }"
+                      [style.left.px]="node.x - designBounds.minX + 40"
+                      [style.top.px]="node.y - designBounds.minY + 40"
+                      (click)="selectReviewForDiagram(rev)"
+                    >
+                      <div class="flex items-center gap-3 p-3">
+                        <div class="w-8 h-8 rounded bg-white/5 flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
+                          <span class="material-symbols-outlined text-lg" [class]="designNodeIconClass(node)">{{ designNodeIcon(node) }}</span>
+                        </div>
+                        <div class="flex flex-col overflow-hidden min-w-0">
+                          <p class="mb-0 text-[12px] font-semibold text-on-surface truncate w-full leading-tight">{{ node.label }}</p>
+                          <div class="flex items-center gap-1 mt-0.5">
+                            <span class="text-[9px] text-on-surface-variant truncate">{{ node.agentName }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="px-3 pb-2 flex items-center justify-between border-t border-white/5 pt-2">
+                        <span class="text-[9px] font-mono uppercase text-orange-400 flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[11px]">rate_review</span> Review
+                        </span>
+                        <span class="text-[8px] font-mono font-bold uppercase text-orange-400">{{ rev.stepOrder + 1 }} · {{ rev.retryCount }}×</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <div
+                      class="absolute w-44 rounded-lg border border-outline-variant/30 shadow-lg select-none z-20 flex flex-col overflow-visible"
+                      [class]="designNodeBgClass(node)"
+                      [ngClass]="designNodeBorderClass(node)"
+                      [style.left.px]="node.x - designBounds.minX + 40"
+                      [style.top.px]="node.y - designBounds.minY + 40"
+                    >
+                      <div class="flex items-center gap-3 p-3">
+                        <div class="w-8 h-8 rounded bg-white/5 flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
+                          <span class="material-symbols-outlined text-lg" [class]="designNodeIconClass(node)">{{ designNodeIcon(node) }}</span>
+                        </div>
+                        <div class="flex flex-col overflow-hidden min-w-0">
+                          <p class="mb-0 text-[12px] font-semibold text-on-surface truncate w-full leading-tight">{{ node.label }}</p>
+                          <div class="flex items-center gap-1 mt-0.5">
+                            <span class="text-[9px] text-on-surface-variant truncate">{{ node.agentName }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="px-3 pb-2 flex items-center justify-between border-t border-white/5 pt-2">
+                        <div class="flex items-center gap-1">
+                          @if (designNodeStatus(node) === 'RUNNING') {
+                            <span class="material-symbols-outlined text-[10px] animate-spin text-[#00e5ff]">sync</span>
+                          }
+                          @if (designNodeStatus(node) === 'COMPLETED') {
+                            <span class="material-symbols-outlined text-[10px] text-green-400">check_circle</span>
+                          }
+                          @if (designNodeStatus(node) === 'FAILED') {
+                            <span class="material-symbols-outlined text-[10px] text-red-500">error</span>
+                          }
+                          <span class="text-[9px] font-mono uppercase"
+                                [ngClass]="{
+                                  'text-green-400': designNodeStatus(node) === 'COMPLETED' || node.stepKind === 'START' || node.stepKind === 'END' || designNodeStatus(node) === 'ready',
+                                  'text-[#00e5ff]': designNodeStatus(node) === 'RUNNING',
+                                  'text-red-500': designNodeStatus(node) === 'FAILED',
+                                  'text-on-surface-variant/70': designNodeStatus(node) !== 'COMPLETED' && designNodeStatus(node) !== 'RUNNING' && designNodeStatus(node) !== 'FAILED' && node.stepKind !== 'START' && node.stepKind !== 'END' && designNodeStatus(node) !== 'ready'
+                                }">
+                            {{ designNodeStatus(node) }}
+                          </span>
+                        </div>
+                        @if (node.stepKind && node.stepKind !== 'AGENT' && node.stepKind !== 'START' && node.stepKind !== 'END') {
+                          <span class="text-[8px] font-mono font-bold uppercase"
+                                [ngClass]="node.stepKind === 'VIDEO' ? 'text-purple-400' : 'text-green-400'">{{ node.stepKind }}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Run history / artifacts strip -->
+          @if (selectedFlowDetail && !flowDetailLoading) {
+            <div class="px-4 py-2 border-t border-outline-variant/20 shrink-0 flex items-center gap-4 text-[10px] font-mono text-on-surface-variant">
+              <span class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[13px] text-primary">history</span>
+                {{ selectedFlowDetail.runCount }} run{{ selectedFlowDetail.runCount === 1 ? '' : 's' }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[13px] text-cyan-400">inventory_2</span>
+                {{ selectedFlowDetail.artifacts.length }} artifact{{ selectedFlowDetail.artifacts.length === 1 ? '' : 's' }}
+              </span>
+              <span class="ml-auto flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-400/80"></span>
+                @for (step of pendingStepReviews; track step.stepId) {
+                  <button (click)="selectReviewForDiagram(step)"
+                          class="px-1.5 py-0.5 rounded bg-orange-500/20 border border-orange-500/40 text-orange-300 text-[8px] font-bold uppercase hover:bg-orange-500/30 transition-colors cursor-pointer">
+                    {{ step.agentName }}
+                  </button>
+                }
+                @if (pendingStepReviews.length === 0) {
+                  <span class="text-[8px] text-on-surface-variant/70 uppercase">no pending reviews</span>
+                }
+              </span>
+            </div>
+          }
+        </div>
+
+        <!-- RIGHT HALF: review content -->
+        <div class="flex flex-col flex-grow min-w-0 bg-[#111214] overflow-hidden">
+          @if (selectedReviewStep) {
+            <div class="px-5 py-3 border-b border-outline-variant/30 bg-white/5 shrink-0 flex items-center gap-3">
+              <div class="min-w-0">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-on-surface mb-0 leading-tight truncate">Review: {{ selectedReviewStep.agentName || 'Agent' }}</h3>
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase">
+                  {{ selectedReviewStep.flowName || 'Flow' }} · {{ stepTypeLabel(selectedReviewStep.stepType) }} · step {{ selectedReviewStep.stepOrder + 1 }}
+                  @if (selectedReviewStep.missionName) { · {{ selectedReviewStep.missionName }} }
+                </span>
+              </div>
+            </div>
+
+            <div class="flex-grow min-h-0 overflow-y-auto no-scrollbar p-5">
+              @if (selectedReviewStep.inputData) {
+                <div class="mb-4">
+                  <span class="text-[9px] font-mono text-on-surface-variant uppercase mb-1 block">Agent Input / Context</span>
+                  <pre class="p-3 bg-white/5 border border-outline-variant/20 rounded-xl text-[10px] text-on-surface leading-relaxed select-text font-mono whitespace-pre-wrap break-words mb-0">{{ selectedReviewStep.inputData }}</pre>
                 </div>
-                <div class="flex flex-col flex-grow">
-                  <span class="text-sm font-bold text-white truncate">{{ agent.name }}</span>
-                  <div class="flex items-center gap-1.5 mt-1.5">
-                    <span class="w-2 h-2 rounded-full" [ngClass]="selectedFlowForDiagram.status === 'IN_PROGRESS' || selectedFlowForDiagram.status === 'ACTIVE' ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,1)]' : (selectedFlowForDiagram.status === 'COMPLETED' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,1)]' : 'bg-gray-400')"></span>
-                    <span class="text-[10px] font-mono uppercase" [ngClass]="selectedFlowForDiagram.status === 'IN_PROGRESS' || selectedFlowForDiagram.status === 'ACTIVE' ? 'text-cyan-400' : (selectedFlowForDiagram.status === 'COMPLETED' ? 'text-green-400' : 'text-gray-400')">
-                      {{ selectedFlowForDiagram.status === 'IN_PROGRESS' || selectedFlowForDiagram.status === 'ACTIVE' ? 'Executing Tasks...' : (selectedFlowForDiagram.status === 'COMPLETED' ? 'Standby' : 'Waiting') }}
-                    </span>
+              }
+
+              <div class="mb-4">
+                <span class="text-[9px] font-mono text-on-surface-variant uppercase mb-1 block">Agent Output</span>
+
+                @if (selectedReviewStep.stepType === 'IMAGE_GENERATION' && reviewOutputUrls(selectedReviewStep).length > 0) {
+                  <div class="grid grid-cols-2 gap-3">
+                    @for (url of reviewOutputUrls(selectedReviewStep); track url) {
+                      <img [src]="url" class="w-full h-44 object-cover rounded-xl border border-outline-variant/30 bg-white/5" />
+                    }
                   </div>
-                </div>
+                } @else if ((selectedReviewStep.stepType === 'TTS' || selectedReviewStep.stepType === 'MUSIC_GENERATION') && reviewOutputUrls(selectedReviewStep).length > 0) {
+                  <audio [src]="reviewOutputUrls(selectedReviewStep)[0]" controls class="w-full" preload="metadata"></audio>
+                } @else if (selectedReviewStep.stepType === 'VIDEO_GENERATION' && reviewOutputUrls(selectedReviewStep).length > 0) {
+                  <video [src]="reviewOutputUrls(selectedReviewStep)[0]" controls class="w-full rounded-xl border border-outline-variant/30 bg-black" preload="metadata"></video>
+                } @else {
+                  <pre class="p-3 bg-white/5 border border-primary/30 rounded-xl text-xs text-on-surface leading-relaxed select-text font-mono whitespace-pre-wrap break-words mb-0">{{ selectedReviewStep.outputData || 'No output captured.' }}</pre>
+                }
               </div>
-            }
-            @if (selectedFlowAgents.length === 0) {
-              <div class="flex items-center gap-4 bg-zinc-900 border-2 border-white/10 rounded-xl p-4 shadow-2xl min-w-[240px] opacity-70">
-                <div class="w-14 h-14 rounded-full border border-white/20 bg-white/5 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined text-[28px] text-gray-400">smart_toy</span>
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-sm font-bold text-gray-300">System Agent</span>
-                  <span class="text-[10px] font-mono text-gray-500 mt-1 uppercase">Default Handler</span>
-                </div>
-              </div>
-            }
-          </div>
 
-          <!-- Connector Line 2 -->
-          <div class="h-[4px] w-16 bg-gradient-to-r from-purple-500 to-green-400 relative shrink-0 rounded-full mx-2 shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-            <!-- Arrow tip -->
-            <div class="absolute right-[-4px] top-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-l-[8px] border-l-green-400 border-b-[6px] border-b-transparent -translate-y-1/2 z-20"></div>
-          </div>
-
-          <!-- Output Node -->
-          <div class="flex flex-col items-center z-10 w-28 shrink-0">
-            <div class="w-16 h-16 rounded-2xl bg-zinc-800 border-2 border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.4)] flex items-center justify-center mb-3">
-              <span class="material-symbols-outlined text-[32px] text-green-400">task_alt</span>
+              @if (reviewRetriesExhausted(selectedReviewStep)) {
+                <div class="flex items-center gap-2 px-3 py-2 bg-red-600/10 border border-red-500/30 rounded-xl text-[10px] font-mono text-red-400 mb-4">
+                  <span class="material-symbols-outlined text-sm">error</span>
+                  Rewrite limit reached ({{ selectedReviewStep.retryCount }} of {{ selectedReviewStep.maxRetries || 3 }}). Rejecting will fail the execution.
+                </div>
+              }
             </div>
-            <span class="text-[12px] font-bold text-white uppercase tracking-wider text-center drop-shadow-md">Output</span>
-          </div>
 
+            <!-- Actions bar -->
+            <div class="px-5 py-3 border-t border-outline-variant/30 bg-white/5 shrink-0 flex flex-col gap-2">
+              <textarea [(ngModel)]="reviewFeedback" rows="2"
+                        placeholder="Feedback sent to the agent if you reject (e.g. make it more conversational, expand the intro...)"
+                        class="w-full p-2.5 bg-white/5 border border-outline-variant/25 rounded-lg text-xs text-on-surface placeholder-on-surface-variant/50 resize-none focus:outline-none focus:border-primary/50"></textarea>
+              <div class="flex gap-3">
+                <button (click)="approveReviewStep()" [disabled]="reviewSubmitting"
+                        class="flex-grow px-4 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                  <span class="material-symbols-outlined text-sm">check_circle</span> Approve & Continue
+                </button>
+                <button (click)="rejectReviewStep()" [disabled]="reviewSubmitting || reviewRetriesExhausted(selectedReviewStep)"
+                        class="px-4 py-2.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        [title]="reviewRetriesExhausted(selectedReviewStep) ? 'Rewrite limit reached' : ''">
+                  <span class="material-symbols-outlined text-sm">refresh</span> Reject & Rewrite
+                </button>
+              </div>
+            </div>
+          } @else {
+            <div class="flex-grow flex flex-col items-center justify-center gap-3 text-center text-on-surface-variant px-6">
+              <span class="material-symbols-outlined text-5xl opacity-40">rate_review</span>
+              <p class="text-xs m-0">Select an agent with a pending review on the workflow to inspect its output.</p>
+              @if (pendingStepReviews.length > 0) {
+                <div class="flex flex-col gap-1.5 mt-1 w-full max-w-[280px]">
+                  @for (step of pendingStepReviews; track step.stepId) {
+                    <button (click)="selectReviewForDiagram(step)"
+                            class="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-outline-variant/20 text-[10px] text-on-surface transition-colors cursor-pointer flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[12px] text-orange-400">rate_review</span>
+                      <span class="truncate flex-grow">{{ step.agentName }}</span>
+                      <span class="text-[8px] font-mono text-on-surface-variant">{{ step.flowName }}</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
         </div>
       </div>
+    </div>
+  </div>
+}
+
+<!-- Direct Content Review Modal -->
+@if (activeModal === 'direct-review' && directReviewStep) {
+  <div class="fixed inset-0 bg-background/90 backdrop-blur-sm z-[120] flex items-center justify-center p-8" (click)="closeModal()">
+    <div class="flex flex-col bg-[#111214] border border-outline-variant/30 rounded-2xl w-[800px] max-h-[85vh] overflow-hidden shadow-2xl" (click)="$event.stopPropagation()">
+       <!-- Header -->
+       <div class="px-5 py-4 border-b border-outline-variant/30 bg-white/5 shrink-0 flex items-center justify-between">
+         <h3 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-0">Review: {{ stepTypeLabel(directReviewStep.stepType) }}</h3>
+         <button class="w-8 h-8 rounded-full hover:bg-white/10 text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer" (click)="closeModal()">
+           <span class="material-symbols-outlined text-lg">close</span>
+         </button>
+       </div>
+       
+       <!-- Content -->
+       <div class="flex-grow min-h-0 overflow-y-auto p-5">
+         <div class="h-full">
+            <span class="text-[10px] font-mono text-on-surface-variant uppercase mb-2 block">Content Output</span>
+            @if (directReviewStep.stepType === 'TTS' || directReviewStep.stepType === 'MUSIC_GENERATION') {
+              <div class="space-y-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <div class="p-3 bg-white/5 border border-outline-variant/30 rounded-xl">
+                    <audio controls class="w-full h-10" [src]="url"></audio>
+                  </div>
+                }
+              </div>
+            } @else if (directReviewStep.stepType === 'VIDEO_GENERATION') {
+              <div class="space-y-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <video controls class="w-full rounded-xl border border-outline-variant/30" [src]="url"></video>
+                }
+              </div>
+            } @else if (directReviewStep.stepType === 'IMAGE_GENERATION' && reviewOutputUrls(directReviewStep).length > 0) {
+              <div class="grid grid-cols-2 gap-4">
+                @for (url of reviewOutputUrls(directReviewStep); track url) {
+                  <img [src]="url" class="w-full aspect-video object-cover rounded-xl border border-outline-variant/30">
+                }
+              </div>
+            } @else {
+              <pre class="p-4 bg-white/5 border border-outline-variant/20 rounded-xl text-xs text-on-surface leading-relaxed whitespace-pre-wrap break-words min-h-[200px]">{{ directReviewStep.outputData || 'No output captured.' }}</pre>
+            }
+         </div>
+       </div>
+
+       <!-- Actions (Only if pending approval) -->
+       @if (directReviewStep.reviewStatus === 'PENDING_REVIEW' || directReviewStep.reviewStatus === 'PENDING' || directReviewStep.status === 'PENDING_APPROVAL') {
+         <div class="px-5 py-4 border-t border-outline-variant/30 bg-white/5 shrink-0 flex flex-col gap-3">
+           <textarea [(ngModel)]="reviewFeedback" rows="2" placeholder="Feedback for rewrite (if rejecting)..." class="w-full p-2.5 bg-white/5 border border-outline-variant/25 rounded-lg text-xs text-on-surface resize-none focus:outline-none focus:border-primary/50"></textarea>
+           <div class="flex gap-3">
+             <button (click)="approveDirectReview()" [disabled]="reviewSubmitting" class="flex-grow py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+               <span class="material-symbols-outlined text-sm">check_circle</span> Approve & Continue
+             </button>
+             <button (click)="rejectDirectReview()" [disabled]="reviewSubmitting" class="flex-grow py-2.5 bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+               <span class="material-symbols-outlined text-sm">refresh</span> Reject & Rewrite
+             </button>
+           </div>
+         </div>
+       }
     </div>
   </div>
 }

@@ -8,6 +8,9 @@ export interface MissionResponse {
   priority: string;
   providerId: string;
   progress: number;
+  outputDirectory?: string;
+  targetDurationSeconds?: number;
+  theme?: string;
   startedAt: string;
   completedAt: string;
   createdAt: string;

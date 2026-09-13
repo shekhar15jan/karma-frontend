@@ -48,7 +48,9 @@ export class KnowledgeComponent implements OnInit {
           id: k.id,
           name: k.name,
           type: (k.category || 'pack').toLowerCase(),
-          size: '1 MB',
+          size: k.documentCount > 0
+            ? `${k.documentCount} file${k.documentCount > 1 ? 's' : ''}`
+            : '—',
           status: (k.status === 'INDEXING' || k.status === 'DRAFT' ? 'processing' : 'ready') as 'ready' | 'processing',
           uploaded_at: k.createdAt
         }));

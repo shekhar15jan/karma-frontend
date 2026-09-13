@@ -1,0 +1,163 @@
+<div class="h-full flex flex-col p-6 animate-fade-in relative z-10 overflow-y-auto">
+  <div class="flex items-center justify-between mb-8 shrink-0">
+    <div>
+      <h1 class="text-3xl font-light text-on-surface tracking-tight mb-2">MCP Servers</h1>
+      <p class="text-on-surface-variant text-sm">Manage Model Context Protocol connections for your AI Agents</p>
+    </div>
+    <button (click)="openModal()" class="px-5 py-2.5 bg-primary text-on-primary rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+      <span class="material-symbols-outlined text-lg">add</span>
+      Add Server
+    </button>
+  </div>
+
+  @if (loading) {
+    <div class="flex-1 flex items-center justify-center">
+      <div class="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+    </div>
+  } @else {
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      @for (server of servers; track server.id) {
+        <div class="bg-surface-container rounded-xl border border-outline-variant p-5 flex flex-col relative overflow-hidden group hover:border-primary/50 transition-colors">
+          <div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+          
+          <div class="flex justify-between items-start mb-4">
+            <h3 class="text-lg font-medium text-on-surface">{{ server.name }}</h3>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-medium tracking-wider uppercase bg-primary/10 text-primary border border-primary/20">
+                {{ server.transportType }}
+              </span>
+            </div>
+          </div>
+          
+          <div class="flex-1 space-y-3">
+            <div>
+              <p class="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Command / URL</p>
+              <p class="text-sm text-on-surface truncate font-mono bg-black/20 p-2 rounded">{{ server.commandOrUrl }}</p>
+            </div>
+            @if (server.args && server.args.length > 0) {
+              <div>
+                <p class="text-xs text-on-surface-variant uppercase tracking-wider mb-1">Arguments</p>
+                <div class="flex flex-wrap gap-1">
+                  @for (arg of server.args; track $index) {
+                    <span class="text-xs font-mono bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded">{{ arg }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          
+          <div class="mt-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              @if (statusMap[server.id]) {
+                <span class="w-2 h-2 rounded-full" [class.bg-green-500]="statusMap[server.id].running" [class.bg-gray-400]="!statusMap[server.id].running"></span>
+                <span class="text-xs" [class.text-green-500]="statusMap[server.id].running">{{ statusMap[server.id].running ? 'Running' : 'Stopped' }}</span>
+              }
+            </div>
+            <div class="flex gap-1">
+              @if (statusMap[server.id]?.running) {
+                <button (click)="stopServer(server.id)" class="text-xs px-2 py-1 bg-yellow-500/10 text-yellow-600 rounded hover:bg-yellow-500/20">Stop</button>
+              } @else {
+                <button (click)="startServer(server.id)" class="text-xs px-2 py-1 bg-green-500/10 text-green-600 rounded hover:bg-green-500/20">Start</button>
+              }
+              <button (click)="toggleTools(server)" class="text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20">{{ expandedServer === server.id ? 'Hide' : 'Tools' }}</button>
+            </div>
+          </div>
+
+          @if (expandedServer === server.id) {
+            <div class="mt-3 p-3 bg-black/20 rounded border border-outline-variant/30 max-h-40 overflow-auto">
+              @if (toolsLoading[server.id]) {
+                <p class="text-xs text-on-surface-variant">Loading tools…</p>
+              } @else {
+                <pre class="text-xs font-mono text-on-surface whitespace-pre-wrap break-words">{{ toolsMap[server.id] | json }}</pre>
+              }
+            </div>
+          }
+
+          <div class="mt-4 pt-4 border-t border-outline-variant flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button (click)="openModal(server)" class="w-8 h-8 rounded bg-surface-variant flex items-center justify-center text-on-surface hover:text-primary transition-colors">
+              <span class="material-symbols-outlined text-[18px]">edit</span>
+            </button>
+            <button (click)="delete(server.id)" class="w-8 h-8 rounded bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showModal) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-background/80 backdrop-blur-sm" (click)="closeModal()"></div>
+    
+    <div class="bg-surface rounded-2xl border border-outline-variant shadow-2xl w-full max-w-md relative z-10 overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+      <div class="p-5 border-b border-outline-variant flex items-center justify-between">
+        <h2 class="text-lg font-medium text-on-surface">{{ editingServer ? 'Edit' : 'Add' }} MCP Server</h2>
+        <button (click)="closeModal()" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-variant text-on-surface-variant transition-colors">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto">
+        <div class="space-y-5">
+          <div>
+            <label class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">Name</label>
+            <input type="text" [(ngModel)]="formData.name" class="w-full h-11 bg-surface-container border border-outline-variant rounded-lg px-4 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="e.g., Jira MCP">
+          </div>
+          
+          <div>
+            <label class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">Transport Type</label>
+            <select [(ngModel)]="formData.transportType" class="w-full h-11 bg-surface-container border border-outline-variant rounded-lg px-4 text-sm text-on-surface focus:outline-none focus:border-primary transition-all appearance-none cursor-pointer">
+              <option value="stdio">Stdio (Local Process)</option>
+              <option value="sse">SSE (Remote HTTP)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">Command or URL</label>
+            <input type="text" [(ngModel)]="formData.commandOrUrl" class="w-full h-11 bg-surface-container border border-outline-variant rounded-lg px-4 text-sm text-on-surface focus:outline-none focus:border-primary font-mono" placeholder="e.g., npx">
+          </div>
+          
+          <div>
+            <label class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">Arguments (Space separated)</label>
+            <input type="text" [(ngModel)]="argsString" class="w-full h-11 bg-surface-container border border-outline-variant rounded-lg px-4 text-sm text-on-surface focus:outline-none focus:border-primary font-mono" placeholder="e.g., -y @modelcontextprotocol/server-sqlite test.db">
+          </div>
+          
+          <div class="pt-2 border-t border-outline-variant/30">
+            <div class="flex items-center justify-between mb-3">
+              <label class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider">Environment Variables (e.g. API Tokens)</label>
+              <button (click)="addEnvVar()" class="text-[10px] uppercase font-bold text-primary hover:text-primary/80 bg-primary/10 px-2 py-1 rounded transition-colors">+ Add Variable</button>
+            </div>
+            
+            <div class="space-y-2">
+              @for (ev of envVarsList; track $index) {
+                <div class="flex items-center gap-2">
+                  <input type="text" [(ngModel)]="ev.key" class="w-1/3 h-9 bg-surface-container border border-outline-variant rounded-lg px-3 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" placeholder="Key (e.g. JIRA_API_TOKEN)">
+                  <input type="password" [(ngModel)]="ev.value" class="flex-1 h-9 bg-surface-container border border-outline-variant rounded-lg px-3 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" placeholder="Value">
+                  <button (click)="removeEnvVar($index)" class="w-8 h-9 rounded bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-red-400 transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
+              }
+              @if (envVarsList.length === 0) {
+                <div class="text-xs text-on-surface-variant italic py-2 text-center bg-surface-container/50 rounded-lg border border-dashed border-outline-variant/50">
+                  No environment variables defined
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-5 border-t border-outline-variant flex justify-end gap-3 bg-surface-container">
+        <button (click)="closeModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors">
+          Cancel
+        </button>
+        <button (click)="save()" class="px-5 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-[0_0_10px_rgba(0,229,255,0.2)]">
+          {{ editingServer ? 'Save Changes' : 'Create Server' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

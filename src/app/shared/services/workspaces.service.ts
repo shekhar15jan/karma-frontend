@@ -6,12 +6,14 @@ import { WorkspaceResponse } from '../models/workspace.model';
 export interface CreateWorkspaceRequest {
   name: string;
   description?: string;
+  defaultOutputDirectory?: string;
 }
 
 export interface UpdateWorkspaceRequest {
   name?: string;
   description?: string;
   status?: string;
+  defaultOutputDirectory?: string;
 }
 
 @Injectable({ providedIn: 'root' })

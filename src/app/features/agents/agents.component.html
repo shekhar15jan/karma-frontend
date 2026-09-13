@@ -38,11 +38,16 @@
               <div class="flex items-center gap-3">
                 <span class="material-symbols-outlined text-primary text-xl">{{ getMappedIcon(agent.icon || '') }}</span>
                 <div>
-                  <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0.5">{{ agent.name }}</h4>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-on-surface mb-0.5 flex items-center gap-2">{{ agent.name }}
+                    @if (agent.isSystem) {
+                      <span class="px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-primary border border-primary/30 rounded" title="System default agent">System</span>
+                    }
+                  </h4>
                   <span class="text-[9px] font-mono text-primary-container uppercase tracking-wider">{{ agent.category || 'General' }}</span>
                 </div>
               </div>
-              <span class="text-[8px] px-2 py-0.5 rounded-full font-bold" [ngClass]="agent.status === 'ACTIVE' ? 'bg-green-400/20 text-green-400' : 'bg-white/10 text-on-surface-variant'">{{ agent.status || 'ACTIVE' }}</span>
+              <app-status-toggle [checked]="agent.status === 'ACTIVE'" [label]="agent.status || 'ACTIVE'"
+                                 (toggled)="toggleAgent(agent)"></app-status-toggle>
             </div>
 
             <!-- Description -->
@@ -52,11 +57,11 @@
             <div class="grid grid-cols-2 gap-2 py-2 border-y border-outline-variant/20 text-center bg-white/5 rounded-lg text-[10px]">
               <div>
                 <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Provider</span>
-                <span class="font-bold text-on-surface truncate block">{{ agent.defaultProviderId ? agent.defaultProviderId.substring(0, 8) + '...' : 'Default' }}</span>
+                <span class="font-bold text-on-surface truncate block" [title]="getProviderLabel(agent)">{{ getProviderLabel(agent) }}</span>
               </div>
               <div>
-                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Category</span>
-                <span class="font-bold text-primary">{{ agent.category || 'General' }}</span>
+                <span class="text-[8px] font-mono text-on-surface-variant uppercase block">Model</span>
+                <span class="font-bold text-primary truncate block" [title]="getModelLabel(agent)">{{ getModelLabel(agent) }}</span>
               </div>
             </div>
 
@@ -68,8 +73,12 @@
               <a routerLink="/agents/{{ agent.id }}/trace" class="flex-1 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                 <span class="material-symbols-outlined text-sm">device_hub</span> Trace
               </a>
-              <button class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer" (click)="deleteAgent(agent)">
-                <span class="material-symbols-outlined text-sm">delete</span>
+              <button class="px-3 py-1.5 border text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1"
+                      [ngClass]="agent.isSystem ? 'bg-white/5 border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 cursor-pointer'"
+                      [disabled]="agent.isSystem"
+                      [title]="agent.isSystem ? 'System agent cannot be deleted' : 'Delete agent'"
+                      (click)="deleteAgent(agent)">
+                <span class="material-symbols-outlined text-sm">{{ agent.isSystem ? 'lock' : 'delete' }}</span>
               </button>
             </div>
           </div>
@@ -81,7 +90,7 @@
   <!-- Tune parameters modal -->
   @if (selectedAgent) {
     <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center" (click)="selectedAgent = null">
-      <div class="glass-panel rounded-2xl p-6 w-[440px] flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
+      <div class="glass-panel rounded-2xl p-6 w-[540px] max-h-[90vh] overflow-y-auto no-scrollbar flex flex-col gap-5 border border-primary/30 shadow-[0_0_40px_rgba(0,229,255,0.15)] relative" (click)="$event.stopPropagation()">
         <div class="flex justify-between items-center border-b border-outline-variant/20 pb-3">
           <h4 class="text-sm font-bold uppercase tracking-wider text-on-surface mb-0">{{ isNewAgent ? 'New Agent' : 'Tune ' + selectedAgent.name }}</h4>
           <button class="text-on-surface-variant hover:text-red-400 bg-transparent border-0 text-xl font-light cursor-pointer" (click)="selectedAgent = null">&times;</button>
@@ -98,7 +107,95 @@
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Description</label>
-            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="selectedAgent.description" rows="3"></textarea>
+            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="selectedAgent.description" rows="2"></textarea>
+          </div>
+
+          <!-- Provider -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Provider</label>
+            <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
+                    [(ngModel)]="selectedAgent.defaultProviderId" (ngModelChange)="onProviderChange()">
+              <option [ngValue]="''">System default</option>
+              @for (provider of providers; track provider.id) {
+                <option [ngValue]="provider.id">{{ provider.name }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Model -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Model</label>
+            <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
+                    [(ngModel)]="selectedAgent.model">
+              <option [ngValue]="''">Provider default</option>
+              @for (model of availableModels; track model) {
+                <option [ngValue]="model">{{ model }}</option>
+              }
+            </select>
+            @if (!selectedProvider) {
+              <span class="text-[9px] text-on-surface-variant">Choose a provider to list its models.</span>
+            }
+          </div>
+
+          <!-- Temperature -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Temperature (0 – 1)</label>
+            <div class="flex items-center gap-3">
+              <input type="range" min="0" max="1" step="0.05"
+                     class="flex-1 accent-cyan-400 cursor-pointer"
+                     [(ngModel)]="selectedAgent.temperature" />
+              <input type="number" min="0" max="1" step="0.05"
+                     class="w-16 bg-white/5 border border-outline-variant/30 rounded-lg px-2 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary text-center"
+                     [(ngModel)]="selectedAgent.temperature" />
+            </div>
+          </div>
+
+          <!-- Memory mode -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Memory Mode</label>
+            <select class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
+                    [(ngModel)]="selectedAgent.memoryMode">
+              <option value="OFF">OFF — no memory</option>
+              <option value="USER">USER — only explicit memories</option>
+              <option value="AUTO">AUTO — explicit + auto-learned</option>
+            </select>
+            <span class="text-[9px] text-on-surface-variant">Memory is pulled from the mission owner's profile when this agent runs.</span>
+          </div>
+
+          <!-- Skills -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">Skills ({{ selectedSkillIds.length }} assigned)</label>
+            <div class="max-h-36 overflow-y-auto no-scrollbar bg-white/5 border border-outline-variant/30 rounded-lg p-2 flex flex-col gap-1">
+              @if (skills.length === 0) {
+                <span class="text-[9px] text-on-surface-variant">No skills configured yet.</span>
+              }
+              @for (skill of skills; track skill.id) {
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-white/5 rounded px-1.5 py-1">
+                  <input type="checkbox" class="accent-cyan-400 cursor-pointer"
+                         [checked]="isSkillSelected(skill.id)" (change)="toggleSkill(skill.id)" />
+                  <span class="text-[10px] text-on-surface font-semibold">{{ skill.name }}</span>
+                  <span class="text-[8px] text-on-surface-variant font-mono ml-auto">{{ skill.category }}</span>
+                </label>
+              }
+            </div>
+          </div>
+
+          <!-- MCP Servers -->
+          <div class="space-y-1">
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">MCP Servers ({{ selectedMcpServerIds.length }} assigned)</label>
+            <div class="max-h-36 overflow-y-auto no-scrollbar bg-white/5 border border-outline-variant/30 rounded-lg p-2 flex flex-col gap-1">
+              @if (mcpServers.length === 0) {
+                <span class="text-[9px] text-on-surface-variant">No MCP servers configured yet.</span>
+              }
+              @for (mcp of mcpServers; track mcp.id) {
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-white/5 rounded px-1.5 py-1">
+                  <input type="checkbox" class="accent-cyan-400 cursor-pointer"
+                         [checked]="isMcpSelected(mcp.id)" (change)="toggleMcpServer(mcp.id)" />
+                  <span class="text-[10px] text-on-surface font-semibold">{{ mcp.name }}</span>
+                  <span class="text-[8px] text-on-surface-variant font-mono ml-auto uppercase">{{ mcp.transportType }}</span>
+                </label>
+              }
+            </div>
           </div>
         </div>
 

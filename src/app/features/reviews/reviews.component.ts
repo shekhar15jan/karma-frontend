@@ -1,11 +1,12 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subject, interval, takeUntil } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ArtifactsService } from '../../shared/services/artifacts.service';
 import { ReviewsService } from '../../shared/services/reviews.service';
 import { ArtifactResponse } from '../../shared/models/artifact.model';
 import { PendingStepReviewResponse } from '../../shared/models/pending-step-review.model';
+import { SseService } from '../../shared/services/sse.service';
 
 interface VideoDraft {
   id: string;
@@ -42,16 +43,21 @@ export class ReviewsComponent implements OnInit, OnDestroy {
   constructor(
     private readonly artifactsService: ArtifactsService,
     private readonly reviewsService: ReviewsService,
+    private readonly sseService: SseService,
   ) {}
 
   ngOnInit(): void {
     this.loadDrafts();
     this.loadStepReviews();
-    interval(5000)
+    
+    this.sseService.connect();
+    this.sseService.onMessage()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.loadDrafts(false);
-        this.loadStepReviews(false);
+      .subscribe((msg) => {
+        if (msg.event === 'execution.waiting' || msg.event === 'step.completed' || msg.event.startsWith('execution.')) {
+          this.loadDrafts(false);
+          this.loadStepReviews(false);
+        }
       });
   }
 

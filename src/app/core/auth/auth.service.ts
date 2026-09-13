@@ -32,6 +32,7 @@ export class AuthService {
 
   user = signal<AuthUser | null>(null);
   isAuthenticated = signal(false);
+  sessionExpired = signal(false);
 
   constructor(
     private injector: Injector,
@@ -113,6 +114,7 @@ export class AuthService {
   }
 
   private applyAuth(res: AuthLoginResponse, navigate: boolean): void {
+    this.sessionExpired.set(false);
     localStorage.setItem(this.tokenKey, res.accessToken);
     if (res.refreshToken) {
       localStorage.setItem(this.refreshTokenKey, res.refreshToken);
@@ -130,7 +132,10 @@ export class AuthService {
     this.applyAuth(res, true);
   }
 
-  logout(): void {
+  logout(sessionExpired = false): void {
+    if (sessionExpired) {
+      this.sessionExpired.set(true);
+    }
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.userKey);
     localStorage.removeItem(this.refreshTokenKey);

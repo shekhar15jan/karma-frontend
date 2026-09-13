@@ -4,6 +4,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { MissionsService } from '../../shared/services/missions.service';
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { ExecutionResponse, ExecutionStepResponse } from '../../shared/models/execution.model';
+import { SseService } from '../../shared/services/sse.service';
 
 interface WorkerState {
   id: string;
@@ -35,8 +36,8 @@ export class MissionControlComponent implements OnInit, OnDestroy {
   private refreshInterval: any;
 
   constructor(
-    private readonly missionsService: MissionsService,
     private readonly executionsService: ExecutionsService,
+    private readonly sseService: SseService,
   ) {}
 
   ngOnInit(): void {
@@ -45,15 +46,20 @@ export class MissionControlComponent implements OnInit, OnDestroy {
       `[SYS] ${stamp} - Mission Control online, awaiting execution data...`
     ];
     this.loadExecutions();
-    this.refreshInterval = setInterval(() => this.loadExecutions(), 10000);
+    
+    this.sseService.connect();
+    this.sseService.onMessage()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((msg) => {
+        if (msg.event.startsWith('execution.') || msg.event.startsWith('mission.') || msg.event.startsWith('step.')) {
+          this.loadExecutions();
+        }
+      });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-    }
   }
 
   private loadExecutions(): void {

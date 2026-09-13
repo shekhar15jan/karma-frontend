@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../auth.service';
@@ -89,7 +89,7 @@ import { AuthService } from '../auth.service';
     </div>
   `,
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   isLogin = true;
   email = '';
   password = '';
@@ -98,6 +98,13 @@ export class LoginComponent {
   error = '';
 
   constructor(private auth: AuthService) {}
+
+  ngOnInit(): void {
+    if (this.auth.sessionExpired()) {
+      this.error = 'Your session has expired. Please log in again.';
+      this.auth.sessionExpired.set(false);
+    }
+  }
 
   toggleMode(): void {
     this.isLogin = !this.isLogin;

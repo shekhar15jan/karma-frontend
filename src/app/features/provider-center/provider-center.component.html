@@ -39,23 +39,24 @@
                 <span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-wider">{{ provider.providerType }}</span>
               </div>
               
-              <div class="flex items-center gap-1.5 bg-white/5 border border-outline-variant/30 px-2.5 py-0.5 rounded-full">
-                <span class="w-2 h-2 rounded-full" 
-                  [class]="provider.status === 'CONNECTED' ? 'bg-green-500 shadow-[0_0_8px_rgba(74,222,128,0.5)]' : provider.status === 'ERROR' ? 'bg-red-500' : 'bg-white/20'"></span>
-                <span class="text-[9px] font-bold uppercase tracking-wider"
-                  [class]="provider.status === 'CONNECTED' ? 'text-green-400' : provider.status === 'ERROR' ? 'text-red-400' : 'text-on-surface-variant'">
-                  {{ provider.status }}
-                </span>
-              </div>
+              <app-status-toggle [checked]="provider.status === 'CONNECTED'"
+                                 [label]="!canConnect(provider) && provider.status !== 'CONNECTED' ? 'Key needed' : (provider.status || 'DISCONNECTED')"
+                                 [disabled]="!canConnect(provider) && provider.status !== 'CONNECTED'"
+                                 (toggled)="toggleProvider(provider)"></app-status-toggle>
             </div>
 
             <!-- Associated Models -->
             <div class="space-y-1 mt-1">
-              <span class="text-[9px] font-mono text-on-surface-variant uppercase block">Available Models</span>
+              <span class="text-[9px] font-mono text-on-surface-variant uppercase block">Available Models <span class="text-on-surface-variant/50">({{ provider.models.length }})</span></span>
               <div class="flex flex-wrap gap-1.5">
-                @for (model of provider.models; track model) {
+                @for (model of provider.models.slice(0, 6); track model) {
                   <span class="px-2 py-0.5 rounded border border-[#00e5ff]/20 bg-[#00e5ff]/5 text-[9px] font-mono text-primary-container">
                     {{ model }}
+                  </span>
+                }
+                @if (provider.models.length > 6) {
+                  <span class="px-2 py-0.5 rounded border border-outline-variant/30 bg-white/5 text-[9px] font-mono text-on-surface-variant">
+                    +{{ provider.models.length - 6 }} more
                   </span>
                 }
               </div>
@@ -105,31 +106,29 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Type</label>
-            <select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="google">Google Gemini / Imagen</option>
-              <option value="openrouter">OpenRouter (200+ Models)</option>
-              <option value="opencode">OpenCode Zen</option>
-              <option value="groq">Groq Cloud (Fast LLMs)</option>
-              <option value="stability">Stability AI (Image)</option>
-              <option value="edge-tts">Edge TTS (Voice)</option>
-              <option value="elevenlabs">ElevenLabs (Voice)</option>
-              <option value="ffmpeg">FFmpeg Local (Video)</option>
-            </select>
+<select [(ngModel)]="newProvider.providerType" class="bg-background border border-outline-variant/30 text-on-surface text-[12px] rounded p-2 focus:outline-none focus:border-primary/50 transition-colors">
+               <option value="google">Google Gemini / Imagen</option>
+               <option value="google-music">Google Music (Lyria 3)</option>
+               <option value="openrouter">OpenRouter (Free Models)</option>
+               <option value="opencode">OpenCode Zen</option>
+               <option value="groq">Groq Cloud (Fast LLMs)</option>
+               <option value="edge-tts">Edge TTS (Voice)</option>
+               <option value="remotion">Remotion Local (Video)</option>
+               <option value="cloudflare">Cloudflare Workers AI (Images)</option>
+             </select>
           </div>
           <div class="space-y-1">
-            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / FFmpeg)</span></label>
+            <label class="text-[9px] font-mono text-on-surface-variant uppercase">API Key <span class="text-on-surface-variant/60">(optional for Edge TTS / Remotion)</span></label>
             <input type="password" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="newProviderApiKey" placeholder="sk-••••••••••••••••••••" />
-            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenAI/Anthropic: get your key from their dashboard · For OpenCode/Groq: paste your key · Edge TTS: leave blank</span>
+            <span class="text-[8px] text-on-surface-variant">For OpenRouter/OpenCode/Groq: paste your key from their dashboard · Google: AI Studio key · Edge TTS: leave blank · Remotion: local renderer, leave blank · Cloudflare: API Token from Cloudflare dashboard</span>
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>
-            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProviderEndpoint" placeholder="https://api.openai.com/v1" />
+            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="newProviderEndpoint" placeholder="https://generativelanguage.googleapis.com/v1beta/models" />
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Supported Models (comma-separated)</label>
-            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="modelInputString" rows="3" placeholder="meta-llama/llama-3.1-405b-instruct, qwen/qwen-2.5-72b-instruct"></textarea>
+            <textarea class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary font-mono" [(ngModel)]="modelInputString" rows="3" placeholder="google/gemma-2-27b-it:free, gemini-3.5-flash, deepseek-v4-flash-free"></textarea>
           </div>
         </div>
 
@@ -158,7 +157,7 @@
           </div>
           <div class="space-y-1">
             <label class="text-[9px] font-mono text-on-surface-variant uppercase">Custom Endpoint Base URL (Optional)</label>
-            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="config.base_url" placeholder="https://api.openai.com/v1" />
+            <input type="url" class="w-full bg-white/5 border border-outline-variant/30 rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" [(ngModel)]="config.base_url" placeholder="https://generativelanguage.googleapis.com/v1beta/models" />
           </div>
 
           @if (testResult) {
@@ -166,8 +165,11 @@
               [class]="testResult.success ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-red-500/30 bg-red-500/10 text-red-400'">
               <span class="material-symbols-outlined text-sm mt-0.5">{{ testResult.success ? 'check_circle' : 'warning' }}</span>
               <div>
-                <p class="font-bold mb-0.5">{{ testResult.success ? 'Test Successful' : 'Validation Failed' }}</p>
+                <p class="font-bold mb-0.5">{{ testResult.success ? 'Test Successful' : 'Connection Failed' }}</p>
                 <p class="mb-0 text-[10px]">{{ testResult.message }}</p>
+                @if (testResult.success && testResult.modelCount != null) {
+                  <p class="mb-0 text-[10px] mt-1 text-primary-container">Synced {{ testResult.modelCount }} model{{ testResult.modelCount === 1 ? '' : 's' }} (cheapest-first)</p>
+                }
               </div>
             </div>
           }
@@ -175,7 +177,7 @@
 
         <div class="flex justify-end gap-2 border-t border-outline-variant/20 pt-4">
           <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 text-on-surface text-xs font-bold rounded-lg hover:bg-white/10 transition-all cursor-pointer" (click)="dismissModal()">Cancel</button>
-          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 hover:bg-white/10 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer" (click)="testConnection(selectedProvider)" [disabled]="testing">
+          <button type="button" class="px-4 py-1.5 bg-white/5 border border-outline-variant/30 hover:bg-white/10 text-on-surface text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer" (click)="testConnection(selectedProvider, config.api_key, config.base_url)" [disabled]="testing">
             @if (testing) {
               <span class="w-3.5 h-3.5 border-2 border-on-surface border-t-transparent rounded-full animate-spin"></span>
               <span>Testing...</span>

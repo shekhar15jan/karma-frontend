@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject, interval, switchMap, takeUntil } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { ExecutionsService } from '../../shared/services/executions.service';
 import { WorkflowsService } from '../../shared/services/workflows.service';
 import { SseService } from '../../shared/services/sse.service';
@@ -39,20 +39,9 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg) => {
         if (msg.event.startsWith('execution.') || msg.event === 'step.completed') {
-          this.loadData();
+          this.loadData(false);
         }
       });
-    if (this.autoRefresh) {
-      interval(10000)
-        .pipe(
-          takeUntil(this.destroy$),
-          switchMap(() => {
-            this.loadData();
-            return [];
-          }),
-        )
-        .subscribe();
-    }
   }
 
   ngOnDestroy(): void {
@@ -60,8 +49,8 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  private loadData(): void {
-    this.loading = true;
+  private loadData(showSpinner = true): void {
+    if (showSpinner) this.loading = true;
     this.error = null;
 
     this.executionsService.getAll().subscribe({
@@ -103,6 +92,23 @@ export class ExecutionMonitorComponent implements OnInit, OnDestroy {
   cancelExecution(id: string): void {
     this.executionsService.cancel(id).subscribe(() => {
       this.loadData();
+    });
+  }
+
+  resumeExecution(exec: ExecutionResponse): void {
+    this.executionsService.getSteps(exec.id).subscribe({
+      next: (steps) => {
+        const failed = steps.find(s => s.status === 'FAILED');
+        const isVideo = failed?.stepType?.toUpperCase().includes('VIDEO');
+        const obs = isVideo ? this.executionsService.retryVideo(exec.id) : this.executionsService.retryScript(exec.id);
+        obs.subscribe({
+          next: () => this.loadData(),
+          error: () => this.loadData()
+        });
+      },
+      error: () => {
+        this.executionsService.retryScript(exec.id).subscribe(() => this.loadData());
+      }
     });
   }
 

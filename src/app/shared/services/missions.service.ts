@@ -13,6 +13,9 @@ export interface CreateMissionRequest {
   providerId?: string;
   sourceDocumentIds?: string[];
   selectedFlowIds?: string[];
+  outputDirectory?: string;
+  targetDurationSeconds?: number;
+  theme?: string;
 }
 
 @Injectable({ providedIn: 'root' })
