@@ -149,4 +149,7 @@ export const routes: Routes = [
       },
     ],
   },
+  // Top-level wildcard: any path not matched above (e.g. /invalid-route)
+  // redirects to dashboard which then hits the authGuard and redirects to login if needed
+  { path: '**', redirectTo: '/', pathMatch: 'full' },
 ];
