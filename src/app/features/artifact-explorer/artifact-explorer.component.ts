@@ -31,6 +31,7 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
         <button (click)="filter = 'AUDIO'" [ngClass]="filter === 'AUDIO' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Audio</button>
         <button (click)="filter = 'VIDEO'" [ngClass]="filter === 'VIDEO' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Video</button>
         <button (click)="filter = 'IMAGE'" [ngClass]="filter === 'IMAGE' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">Images</button>
+        <button (click)="filter = 'YOUTUBE'" [ngClass]="filter === 'YOUTUBE' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-white/5 text-on-surface-variant'" class="px-3 py-1 rounded border text-xs">YouTube</button>
       </div>
 
       @if (loading) {
@@ -101,12 +102,14 @@ import { ArtifactResponse } from '../../shared/models/artifact.model';
             </div>
           </div>
           <div class="p-6 overflow-y-auto custom-scrollbar flex-grow flex items-center justify-center">
-            @if (isVideo(selected)) {
-              <video controls autoplay class="max-w-full max-h-[50vh] rounded-lg" [src]="previewUrl(selected)"></video>
+            @if (isMedia(selected) && !previewSrc) {
+              <span class="text-[11px] font-mono text-on-surface-variant">{{ previewError ? 'Preview unavailable.' : 'Loading preview...' }}</span>
+            } @else if (isVideo(selected)) {
+              <video controls autoplay class="max-w-full max-h-[50vh] rounded-lg" [src]="previewSrc"></video>
             } @else if (isAudio(selected)) {
-              <audio controls class="w-full" [src]="previewUrl(selected)"></audio>
+              <audio controls class="w-full" [src]="previewSrc"></audio>
             } @else if (isImage(selected)) {
-              <img [src]="previewUrl(selected)" class="max-w-full max-h-[50vh] rounded-lg" alt="{{ selected.name }}" />
+              <img [src]="previewSrc" class="max-w-full max-h-[50vh] rounded-lg" alt="{{ selected.name }}" />
             } @else {
               <pre class="text-[12px] font-mono text-on-surface whitespace-pre-wrap break-words leading-relaxed w-full">{{ selected.contentText || 'No content available.' }}</pre>
             }
@@ -125,6 +128,8 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   filter: string = 'ALL';
   loading = false;
   private objectUrl: string | null = null;
+  previewSrc: SafeUrl | null = null;
+  previewError = false;
 
   constructor(
     private readonly artifactsService: ArtifactsService,
@@ -135,7 +140,10 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
   get filteredArtifacts(): ArtifactResponse[] {
     if (this.filter === 'ALL') return this.artifacts;
     const target = this.filter;
-    return this.artifacts.filter(a => a.artifactType?.toUpperCase().includes(target));
+    return this.artifacts.filter(a => {
+      const type = a.artifactType?.toUpperCase() || '';
+      return type.includes(target) || (target === 'IMAGE' && type === 'THUMBNAIL');
+    });
   }
 
   ngOnInit(): void {
@@ -160,6 +168,7 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
     if (t === 'VIDEO' || t === 'MEDIA_ASSET') return 'videocam';
     if (t === 'AUDIO' || t === 'VOICE') return 'mic';
     if (t === 'IMAGE' || t === 'THUMBNAIL') return 'image';
+    if (t === 'YOUTUBE_METADATA') return 'smart_display';
     if (t === 'SCRIPT' || t === 'VIDEO_SCRIPT') return 'description';
     if (t === 'BLOG_POST' || t === 'ARTICLE') return 'article';
     return 'description';
@@ -192,20 +201,11 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
     return this.isVideo(a) || this.isAudio(a) || this.isImage(a);
   }
 
-  fileUrl(artifact: ArtifactResponse): string {
-    return `${this.apiBase}/v1/artifacts/${artifact.id}/file`;
-  }
-
-  previewUrl(artifact: ArtifactResponse): SafeUrl {
-    if (this.objectUrl) {
-      return this.sanitizer.bypassSecurityTrustUrl(this.objectUrl);
-    }
-    return this.sanitizer.bypassSecurityTrustUrl(this.fileUrl(artifact));
-  }
-
   openPreview(artifact: ArtifactResponse): void {
     this.selected = artifact;
-    this.loadObjectUrl(artifact);
+    if (this.isMedia(artifact)) {
+      this.loadObjectUrl(artifact);
+    }
   }
 
   closePreview(): void {
@@ -225,8 +225,11 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
         next: (blob) => {
           if (!this.selected || this.selected.id !== artifact.id) return;
           this.objectUrl = URL.createObjectURL(blob);
+          this.previewSrc = this.sanitizer.bypassSecurityTrustUrl(this.objectUrl);
         },
-        error: () => {}
+        error: () => {
+          this.previewError = true;
+        }
       });
   }
 
@@ -235,6 +238,8 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
       URL.revokeObjectURL(this.objectUrl);
       this.objectUrl = null;
     }
+    this.previewSrc = null;
+    this.previewError = false;
   }
 
   download(artifact: ArtifactResponse): void {
@@ -272,7 +277,4 @@ export class ArtifactExplorerComponent implements OnInit, OnDestroy {
     return 'md';
   }
 
-  private get apiBase(): string {
-    return (window as any).__KARMA_API_BASE__ || 'http://127.0.0.1:8080/api';
-  }
 }
