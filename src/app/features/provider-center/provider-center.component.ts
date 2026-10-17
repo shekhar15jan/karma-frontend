@@ -26,6 +26,8 @@ export class ProviderCenterComponent implements OnInit {
   newProviderApiKey = '';
   newProviderEndpoint = '';
   modelInputString = '';
+  /** ElevenLabs voice (a cloned or library voice ID), saved as configuration.voiceId. */
+  newProviderVoiceId = '';
 
   isAdmin = false;
 
@@ -53,13 +55,18 @@ export class ProviderCenterComponent implements OnInit {
 
   addProvider(): void {
     const models = this.modelInputString.split(',').map(m => m.trim()).filter(m => m.length > 0);
+    const providerType = this.newProvider.providerType || 'google';
+    const defaultModel = providerType === 'elevenlabs' ? 'eleven_multilingual_v2' : 'gemini-3.5-flash';
     const body: any = {
       name: this.newProvider.name || 'Custom Provider',
-      providerType: this.newProvider.providerType || 'google',
-      models: models.length ? models : ['gemini-3.5-flash'],
+      providerType,
+      models: models.length ? models : [defaultModel],
       apiKey: this.newProviderApiKey || undefined,
       apiEndpoint: this.newProviderEndpoint || undefined,
     };
+    if (providerType === 'elevenlabs' && this.newProviderVoiceId.trim()) {
+      body.configuration = { voiceId: this.newProviderVoiceId.trim() };
+    }
 
     this.providersService.create(body).subscribe({
       next: () => {
@@ -68,6 +75,7 @@ export class ProviderCenterComponent implements OnInit {
         this.newProviderApiKey = '';
         this.newProviderEndpoint = '';
         this.modelInputString = '';
+        this.newProviderVoiceId = '';
         this.loadProviders();
       },
       error: (err) => {
