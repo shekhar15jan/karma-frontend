@@ -316,6 +316,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     { path: '/knowledge', label: 'Knowledge', icon: 'menu_book' },
     { path: '/prompts', label: 'Prompts', icon: 'terminal' },
     { path: '/skills', label: 'Skills', icon: 'handyman' },
+    { path: '/catalogue', label: 'Catalogue', icon: 'grid_view' },
     { path: '/providers', label: 'AI Providers', icon: 'key' },
     { path: '/mcp-servers', label: 'MCP Servers', icon: 'settings_input_component' },
     { path: '/reviews', label: 'Reviews', icon: 'rate_review' },

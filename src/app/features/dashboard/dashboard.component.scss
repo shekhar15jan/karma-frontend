@@ -3,3 +3,29 @@
   display: block;
   min-height: 100%;
 }
+
+/* The Karma Core hub's 8 orbit nodes are positioned at hard-coded pixel offsets
+ * within a 520x520px box (see dashboard.component.html), so the box itself can't
+ * shrink like a normal flex/grid child — below its own container's actual width,
+ * the outer nodes (e.g. Thumbnail, Blog) get clipped by the ancestor's overflow:
+ * hidden instead of just re-flowing. Scale the whole box down as a unit once its
+ * container narrows, using CSS container queries (the container is the CENTER
+ * AREA flex column right of it, which itself has already been fixed to shrink
+ * correctly via `minmax(0, 1fr)` on the page's outer grid).
+ */
+.hub-scale-container {
+  container-type: inline-size;
+  container-name: hub-scale;
+}
+.hub-scale-target {
+  transform-origin: center center;
+}
+@container hub-scale (max-width: 620px) {
+  .hub-scale-target { transform: scale(0.85); }
+}
+@container hub-scale (max-width: 520px) {
+  .hub-scale-target { transform: scale(0.7); }
+}
+@container hub-scale (max-width: 420px) {
+  .hub-scale-target { transform: scale(0.55); }
+}

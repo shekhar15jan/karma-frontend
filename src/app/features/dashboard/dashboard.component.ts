@@ -48,6 +48,10 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   designBounds = { minX: 0, minY: 0, width: 800, height: 600 };
   pendingApprovals: (ArtifactResponse & { formattedDate?: string; title?: string; type?: string })[] = [];
   missionProgress = 0;
+  /** Live frame-level render progress from the renderer, pushed via the
+   *  `video.render.progress` SSE event — much finer-grained than missionProgress
+   *  (which only jumps at coarse step boundaries: script done, voice done, etc). */
+  videoRenderProgress: { status?: string; renderedFrames?: number; totalFrames?: number; progress?: number } | null = null;
   missionSteps: ExecutionStepResponse[] = [];
   directReviewStep: ExecutionStepResponse | null = null;
 
@@ -616,6 +620,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   selectReviewForDiagram(step: PendingStepReviewResponse): void {
     this.selectedReviewStep = step;
     this.reviewFeedback = '';
+    this.auth.ensureStreamToken().subscribe();
     this.cdr.detectChanges();
   }
 
@@ -683,7 +688,9 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!trimmed) return [];
     if (trimmed.startsWith('http') || trimmed.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
       const apiBase = environment.apiUrl;
-      const token = localStorage.getItem('karma_token') || '';
+      // Short-lived stream-scoped token, never the long-lived session access token —
+      // <video>/<img> src can't carry an Authorization header. See AuthService.ensureStreamToken.
+      const token = this.auth.getCachedStreamToken();
       return trimmed.split(/\r?\n/).map((u: string) => {
         let url = u.trim();
         if (/^[a-zA-Z]:[\\/]/.test(url)) {
@@ -1015,11 +1022,22 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.sseService.onMessage()
       .pipe(takeUntil(this.destroy$))
       .subscribe((msg) => {
+        if (msg.event === 'video.render.progress') {
+          this.videoRenderProgress = typeof msg.data === 'object' && msg.data ? msg.data : null;
+          if (this.videoRenderProgress?.status === 'done' || this.videoRenderProgress?.status === 'failed') {
+            // Terminal render state — let the next mission/execution refresh replace this
+            // panel instead of leaving a stale frame count on screen indefinitely.
+            setTimeout(() => { this.videoRenderProgress = null; this.cdr.detectChanges(); }, 5000);
+          }
+          this.cdr.detectChanges();
+          return;
+        }
         if (msg.event.startsWith('execution.') || msg.event.startsWith('mission.') || msg.event.startsWith('step.')) {
           if (this.activeMission?.id) {
             this.loadFlowStatuses(this.activeMission.id);
           }
           this.loadPendingReviews();
+          this.videoRenderProgress = null;
         }
       });
   }
@@ -1673,6 +1691,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       // Prefer the step that is PENDING_REVIEW, otherwise take the last one
       const pendingStep = steps.find(s => s.reviewStatus === 'PENDING_REVIEW' || s.reviewStatus === 'PENDING' || s.status === 'PENDING_APPROVAL');
       this.directReviewStep = pendingStep || steps[steps.length - 1];
+      this.auth.ensureStreamToken().subscribe();
       this.openModal('direct-review');
     } else {
       this.showToast(`No execution data available for ${key.toUpperCase()} yet`, 'info');

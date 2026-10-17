@@ -20,12 +20,23 @@ export class SseService implements OnDestroy {
   constructor(private readonly auth: AuthService) {}
 
   connect(): void {
-    const token = this.auth.getToken();
-    if (!token || this.eventSource) {
+    if (!this.auth.getToken() || this.eventSource) {
       return;
     }
     this.closedByUser = false;
-    const url = `${this.sseUrl}?token=${encodeURIComponent(token)}`;
+    // EventSource can't set an Authorization header, so it authenticates via a short-lived
+    // stream-scoped token in the URL instead of the long-lived session access token.
+    this.auth.ensureStreamToken().subscribe({
+      next: (streamToken) => this.openEventSource(streamToken),
+      error: () => this.scheduleReconnect(),
+    });
+  }
+
+  private openEventSource(streamToken: string): void {
+    if (this.eventSource) {
+      return;
+    }
+    const url = `${this.sseUrl}?token=${encodeURIComponent(streamToken)}`;
     const es = new EventSource(url);
     this.eventSource = es;
 
@@ -48,7 +59,7 @@ export class SseService implements OnDestroy {
     const eventNames = ['message', 'connected', 'execution.started', 'execution.resumed',
       'execution.waiting', 'execution.completed', 'execution.failed', 'execution.cancelled',
       'step.completed', 'mission.running', 'mission.waiting', 'mission.completed',
-      'mission.failed', 'mission.cancelled'];
+      'mission.failed', 'mission.cancelled', 'video.render.progress'];
     for (const name of eventNames) {
       es.addEventListener(name, forward);
     }

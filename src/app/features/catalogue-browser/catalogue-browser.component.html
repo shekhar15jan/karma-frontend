@@ -1,0 +1,193 @@
+<div class="h-full flex flex-col gap-4 overflow-hidden select-none">
+
+  <!-- Header + summary -->
+  <div class="glass-panel rounded-xl p-4 flex items-center justify-between gap-4 shrink-0 flex-wrap">
+    <div>
+      <h3 class="text-label-mono font-label-mono text-primary-container uppercase tracking-widest text-[10px] glow-text mb-0">Renderer Catalogue</h3>
+      <p class="text-[11px] text-on-surface-variant mt-1 mb-0">Every frame, widget, and technology icon a scene can ask for — read-only.</p>
+    </div>
+    @if (catalogue) {
+      <div class="flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider">
+        <span class="px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/20">{{ liveCount }} live frames</span>
+        <span class="px-2.5 py-1 rounded bg-white/5 text-on-surface-variant border border-outline-variant/30">{{ proposedCount }} proposed</span>
+        <span class="px-2.5 py-1 rounded bg-green-500/10 text-green-400 border border-green-500/20">{{ migratedCount }}/{{ liveCount }} migrated</span>
+        <span class="px-2.5 py-1 rounded bg-white/5 text-on-surface-variant border border-outline-variant/30">{{ liveWidgetCount }} widgets</span>
+        <span class="px-2.5 py-1 rounded bg-white/5 text-on-surface-variant border border-outline-variant/30">{{ catalogue.icons.length }} icons</span>
+      </div>
+    }
+  </div>
+
+  @if (loading) {
+    <div class="flex-grow flex items-center justify-center">
+      <span class="material-symbols-outlined text-primary text-2xl animate-spin">sync</span>
+    </div>
+  } @else if (error) {
+    <div class="glass-panel rounded-xl p-6 flex flex-col items-center gap-2 text-center">
+      <span class="material-symbols-outlined text-red-400 text-2xl">error</span>
+      <p class="text-sm text-on-surface">{{ error }}</p>
+      <p class="text-[11px] text-on-surface-variant">The renderer's /catalogue endpoint must be reachable from the backend.</p>
+    </div>
+  } @else if (catalogue) {
+
+    <!-- Tabs + filters -->
+    <div class="glass-panel rounded-xl p-3 flex items-center gap-3 shrink-0 flex-wrap">
+      <div class="flex gap-1 bg-white/5 rounded-lg p-1">
+        <button (click)="setTab('frames')" class="px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer border-0"
+                [ngClass]="tab === 'frames' ? 'bg-primary/20 text-primary' : 'bg-transparent text-on-surface-variant hover:text-primary'">
+          Frames
+        </button>
+        <button (click)="setTab('widgets')" class="px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer border-0"
+                [ngClass]="tab === 'widgets' ? 'bg-primary/20 text-primary' : 'bg-transparent text-on-surface-variant hover:text-primary'">
+          Widgets
+        </button>
+        <button (click)="setTab('icons')" class="px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer border-0"
+                [ngClass]="tab === 'icons' ? 'bg-primary/20 text-primary' : 'bg-transparent text-on-surface-variant hover:text-primary'">
+          Icons
+        </button>
+      </div>
+
+      <div class="relative flex-grow max-w-xs">
+        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">search</span>
+        <input [(ngModel)]="search" type="text" placeholder="Search…"
+               class="w-full bg-white/5 border border-outline-variant/30 rounded-lg pl-8 pr-3 py-1.5 text-xs text-on-surface focus:outline-none focus:border-primary/50" />
+      </div>
+
+      @if (tab === 'frames') {
+        <select [(ngModel)]="familyFilter" class="bg-white/5 border border-outline-variant/30 rounded-lg px-2 py-1.5 text-xs text-on-surface">
+          <option value="">All families</option>
+          @for (f of families; track f) { <option [value]="f">{{ f }}</option> }
+        </select>
+      }
+      @if (tab === 'widgets') {
+        <select [(ngModel)]="atomFilter" class="bg-white/5 border border-outline-variant/30 rounded-lg px-2 py-1.5 text-xs text-on-surface">
+          <option value="">All atoms</option>
+          @for (a of atoms; track a) { <option [value]="a">{{ a }}</option> }
+        </select>
+      }
+      @if (tab === 'icons') {
+        <select [(ngModel)]="categoryFilter" class="bg-white/5 border border-outline-variant/30 rounded-lg px-2 py-1.5 text-xs text-on-surface">
+          <option value="">All categories</option>
+          @for (c of iconCategories; track c) { <option [value]="c">{{ c }}</option> }
+        </select>
+      }
+      @if (tab !== 'icons') {
+        <label class="flex items-center gap-1.5 text-[11px] text-on-surface-variant cursor-pointer select-none">
+          <input type="checkbox" [(ngModel)]="showProposedOnly" class="cursor-pointer" />
+          proposed only
+        </label>
+      }
+    </div>
+
+    <!-- Body -->
+    <div class="flex-grow overflow-y-auto no-scrollbar">
+
+      @if (tab === 'frames') {
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          @for (f of filteredFrames; track trackFrame($index, f)) {
+            <div class="glass-panel rounded-xl p-4 flex flex-col gap-2" [class.opacity-60]="f.status === 'proposed'">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-bold text-on-surface mb-0 font-mono">{{ f.id }}</p>
+                  <p class="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0">{{ f.family }}</p>
+                </div>
+                <div class="flex flex-col items-end gap-1 shrink-0">
+                  <span class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded"
+                        [ngClass]="f.status === 'live' ? 'bg-primary/10 text-primary' : 'bg-white/5 text-on-surface-variant'">
+                    {{ f.status }}
+                  </span>
+                  @if (f.status === 'live') {
+                    <span class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded"
+                          [ngClass]="f.migrated ? 'bg-green-500/10 text-green-400' : 'bg-amber-500/10 text-amber-400'">
+                      {{ f.migrated ? 'migrated' : 'legacy' }}
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <p class="text-[11px] text-on-surface-variant leading-relaxed mb-0">{{ f.use }}</p>
+
+              @if (f.defect) {
+                <div class="flex items-start gap-1.5 text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/20 rounded px-2 py-1.5">
+                  <span class="material-symbols-outlined text-[13px] mt-0.5">warning</span>
+                  <span>{{ f.defect }}</span>
+                </div>
+              }
+
+              <div class="flex flex-wrap gap-1 mt-1">
+                @for (s of f.slots; track s.id) {
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-on-surface-variant border border-outline-variant/20"
+                        [title]="s.accepts.join(', ')">
+                    {{ s.id }} [{{ s.min }}-{{ s.max }}]{{ s.droppable ? '?' : '' }}
+                  </span>
+                }
+              </div>
+
+              <div class="flex items-center justify-between mt-1 pt-2 border-t border-outline-variant/10">
+                <div class="flex flex-wrap gap-1">
+                  @for (i of f.intent; track i) {
+                    <span class="text-[9px] text-primary/80 font-mono">{{ i }}</span>
+                  }
+                </div>
+                @if (f.fallback) {
+                  <span class="text-[9px] text-on-surface-variant font-mono">↳ {{ f.fallback }}</span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        @if (filteredFrames.length === 0) {
+          <p class="text-center text-on-surface-variant text-xs py-12">No frames match.</p>
+        }
+      }
+
+      @if (tab === 'widgets') {
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          @for (w of filteredWidgets; track trackWidget($index, w)) {
+            <div class="glass-panel rounded-xl p-4 flex flex-col gap-2" [class.opacity-60]="w.status === 'proposed'">
+              <div class="flex items-start justify-between gap-2">
+                <p class="text-sm font-bold text-on-surface mb-0 font-mono">{{ w.id }}</p>
+                <span class="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 text-on-surface-variant shrink-0">{{ w.atom }}</span>
+              </div>
+              <p class="text-[11px] text-on-surface-variant leading-relaxed mb-0">{{ w.use || w.title }}</p>
+              <div class="flex flex-wrap gap-1 mt-1">
+                @for (r of w.requires; track r) {
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/5 text-primary border border-primary/20">{{ r }}</span>
+                }
+                @for (o of w.optional; track o) {
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-on-surface-variant/70 border border-outline-variant/10">{{ o }}</span>
+                }
+              </div>
+              @if (w.aliases?.length) {
+                <p class="text-[9px] text-on-surface-variant/60 font-mono mb-0">aka: {{ w.aliases?.join(', ') }}</p>
+              }
+            </div>
+          }
+        </div>
+        @if (filteredWidgets.length === 0) {
+          <p class="text-center text-on-surface-variant text-xs py-12">No widgets match.</p>
+        }
+      }
+
+      @if (tab === 'icons') {
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          @for (ic of filteredIcons; track trackIcon($index, ic)) {
+            <div class="glass-panel rounded-xl p-3 flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center font-bold text-[10px]"
+                   [style.background]="'#' + ic.hex + '22'" [style.color]="'#' + ic.hex" [style.border]="'1px solid #' + ic.hex + '55'">
+                {{ ic.title.slice(0, 2).toUpperCase() }}
+              </div>
+              <div class="min-w-0">
+                <p class="text-[11px] font-semibold text-on-surface mb-0 truncate">{{ ic.title }}</p>
+                <p class="text-[9px] text-on-surface-variant font-mono mb-0 truncate">{{ ic.slug }}</p>
+              </div>
+            </div>
+          }
+        </div>
+        @if (filteredIcons.length === 0) {
+          <p class="text-center text-on-surface-variant text-xs py-12">No icons match.</p>
+        }
+      }
+
+    </div>
+  }
+</div>

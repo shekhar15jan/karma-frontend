@@ -123,6 +123,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalogue',
+        loadComponent: () =>
+          import('./features/catalogue-browser/catalogue-browser.component').then(
+            (m) => m.CatalogueBrowserComponent,
+          ),
+      },
+      {
         path: 'providers',
         loadComponent: () =>
           import('./features/provider-center/provider-center.component').then(

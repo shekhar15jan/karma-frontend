@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../auth.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-login',
@@ -70,14 +71,17 @@ import { AuthService } from '../auth.service';
             }
           </button>
 
-          <!-- Bypass button for local testing when credentials are not seeded -->
-          <button 
-            class="w-full mt-1.5 py-1.5 bg-white/5 hover:bg-white/10 border border-outline-variant/30 text-on-surface-variant text-[10px] rounded-lg transition-all flex items-center justify-center gap-1.5" 
-            (click)="bypass()"
-          >
-            <span class="material-symbols-outlined text-xs">vpn_key</span>
-            <span>Bypass (Local Developer Mode)</span>
-          </button>
+          <!-- Bypass button for local testing when credentials are not seeded. Disabled in
+               production builds; the backend also rejects /dev-bypass outside the dev profile. -->
+          @if (!isProduction) {
+            <button
+              class="w-full mt-1.5 py-1.5 bg-white/5 hover:bg-white/10 border border-outline-variant/30 text-on-surface-variant text-[10px] rounded-lg transition-all flex items-center justify-center gap-1.5"
+              (click)="bypass()"
+            >
+              <span class="material-symbols-outlined text-xs">vpn_key</span>
+              <span>Bypass (Local Developer Mode)</span>
+            </button>
+          }
 
           <p class="text-center mb-0 mt-2">
             <a href="javascript:void(0)" (click)="toggleMode()" class="text-[10px] text-primary hover:text-[#00e5ff] text-decoration-none transition-colors">
@@ -96,6 +100,7 @@ export class LoginComponent implements OnInit {
   name = '';
   loading = false;
   error = '';
+  readonly isProduction = environment.production;
 
   constructor(private auth: AuthService) {}
 
