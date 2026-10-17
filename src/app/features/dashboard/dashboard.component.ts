@@ -159,7 +159,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     providerId: '' as string,
     outputDirectory: '' as string,
     targetDurationSeconds: '' as string,
-    theme: 'whiteboard' as string
+    theme: 'codeatcloud' as string
   };
   selectedFlowIds: string[] = [];
   selectedFlowId: string = '';
@@ -230,7 +230,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       providerId: '',
       outputDirectory: this.workspaces[0].defaultOutputDirectory || '',
       targetDurationSeconds: '',
-      theme: 'whiteboard'
+      theme: 'codeatcloud'
     };
     if (this.projects.length > 0) {
       this.newMission.projectId = this.projects[0].id;
