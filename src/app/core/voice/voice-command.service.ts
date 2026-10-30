@@ -158,7 +158,7 @@ export class VoiceCommandService {
     }
 
     try {
-      const res = await this.api.post<VoiceCommand>('/voice/command', {
+      const res = await this.api.post<VoiceCommand>('/v1/voice/command', {
         text,
         context: { current_page: this.router.url },
       }).toPromise();
