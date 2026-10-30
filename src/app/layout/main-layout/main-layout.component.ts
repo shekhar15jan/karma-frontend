@@ -74,7 +74,7 @@ interface ChatMessage {
           </div>
         </div>
         <div class="flex flex-col items-center">
-          <span class="text-sm font-semibold text-on-surface">Good Morning, Chandrashekhar</span>
+          <span class="text-sm font-semibold text-on-surface">{{ greeting }}, {{ userName }}</span>
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_#4ade80]"></span>
             <span class="text-[10px] text-on-surface-variant">All Systems Operational</span>
@@ -333,6 +333,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   protected get navItems(): Array<{ path: string; label: string; icon: string }> {
     const role = (this.auth.user()?.role || 'OPERATOR').toUpperCase();
     return this.allNavItems.filter(item => !item.adminOnly || role === 'ADMIN');
+  }
+
+  get userName(): string {
+    return this.auth.user()?.displayName || 'Operator';
+  }
+
+  get greeting(): string {
+    const hour = new Date().getHours();
+    return hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   }
 
   constructor(private readonly router: Router, private readonly api: ApiService, private auth: AuthService, private cdr: ChangeDetectorRef, private readonly voicePrefs: VoicePreferencesService, private readonly executionsService: ExecutionsService, private readonly workspacesService: WorkspacesService, private readonly karmaActions: KarmaActionService) {
@@ -652,7 +661,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
                            cleanCmd.includes('backup');
 
     if (isWakeUpPhrase && (cleanCmd.includes('karma') || cleanCmd.includes('os'))) {
-      this.karmaReply('Hello Chandrashekhar, I am ready.');
+      this.karmaReply(`Hello ${this.userName}, I am ready.`);
       return;
     }
 
